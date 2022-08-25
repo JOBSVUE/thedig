@@ -11,6 +11,6 @@ setup(name='Transmutation',
       packages=['transmutation', 'transmutation.miners', 'transmutation.api'],
       license="AGPL",
       long_description=open("README.md").read(),
-      long_description_content_type='text/markdown'
+      long_description_content_type='text/markdown',
       install_requires=[l.split(">=")[0] for l in open("requirements.txt")]
      )

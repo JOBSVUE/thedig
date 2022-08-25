@@ -61,7 +61,7 @@ def api_keys_in_env(self) -> List[Optional[str]]:
     api_keys = settings.api_keys
     return api_keys
 AuthorizerMiddleware.api_keys_in_env = api_keys_in_env
-app.add_middleware(AuthorizerMiddleware, public_path=["/whoisdomain", "/linkedin", "/companylogo"])
+app.add_middleware(AuthorizerMiddleware, public_paths=["/whoisdomain", "/linkedin", "/companylogo"])
 
 
 app.include_router(router)

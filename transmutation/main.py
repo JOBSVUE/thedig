@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
 from pydantic import EmailStr
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 
 #import other apis
@@ -41,6 +41,7 @@ log = logging.getLogger(__name__)
 #others
 import os
 
+#routing composition
 from api import router
 app = FastAPI()
 origins = ["http://localhost:"+os.environ.get("PORT", str(settings.server_port))]
@@ -51,8 +52,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(router)
 
+#API key management
+from fastapi_key_auth import AuthorizerMiddleware
+app = FastAPI()
+#hot patch to add ability to get the api keys from configuration instead of environment variables
+def api_keys_in_env(self) -> List[Optional[str]]:
+    api_keys = settings.api_keys
+    return api_keys
+AuthorizerMiddleware.api_keys_in_env = api_keys_in_env
+app.add_middleware(AuthorizerMiddleware, public_path=["/whoisdomain", "/linkedin", "/companylogo"])
+
+
+app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn

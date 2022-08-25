@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     redis_db: str
     cache_expiration: int
     server_port: int
+    api_keys: list[str]
 
     class Config:
         env_file = ".env"

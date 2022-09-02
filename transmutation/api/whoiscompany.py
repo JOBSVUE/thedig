@@ -12,38 +12,50 @@ from pydantic import BaseModel
 from pydantic import EmailStr
 from typing import List
 from typing import Dict
-from api.config import Settings
-from api.config import configfile  
- 
-settings = Settings()
-router = APIRouter()
-
-#redis
-import redis
-cache = redis.Redis(host=settings.redis_host, password=settings.redis_password, port=settings.redis_port, db=settings.redis_db, decode_responses=True)
-
-
-#deal with fastapi issue with root/module loggers
-import logging.config
-logging.config.dictConfig(configfile)
+from api.config import settings
+from api.config import log_config  
 
 #create logger
+import logging
 log = logging.getLogger(__name__)
+
+#set-up router
+router = APIRouter()
+
+#redis for cache
+import redis
+redis_param = {setting_k.removeprefix('redis_'):setting_v for setting_k,setting_v in settings.dict().items() if setting_k.startswith('redis')}
+redis_param['decode_responses'] = True
+cache = redis.Redis(**redis_param)
 
 @router.get("/whoiscompany/{domain}")
 def whois_unique(domain: str)->str:
+    """Give company name based on the domain's owner
+
+    Args:
+        domain (str): domain
+
+    Returns:
+        str: company name
+    """
     company = cache.get(domain)
+    if company:
+        log.debug("Cache found for domain: %s" % domain)
+        return company
+
     #no cache for this domain
+    log.debug("The following domain is not cached: %s" % domain)
+    company = whoiscompany.get_company(domain)
+    
+    #invalid data for this domain
     if company is None:
-        log.debug("The following domain is not cached: %s" % domain)
-        company = whoiscompany.get_company(domain)
-        #invalid data for this domain
-        if company is None:
-            log.debug("No valid data for this domain: %s" % domain)
-            #redis refuse to store None so we'll use a void string instead
-            company = ""
-        cache.set(domain, company, ex=settings.cache_expiration)
-       
+        log.debug("No valid data for this domain: %s" % domain)
+        #redis refuse to store None so we'll use a void string instead
+        #we won't check for this domain again for some time
+        company = ""
+    
+    cache.set(domain, company, ex=settings.cache_expiration)
+    
     return company if company else None
 
 @router.post("/whoiscompany")

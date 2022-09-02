@@ -6,4 +6,3 @@ redis>=4.3.4
 requests>=2.25.1
 uvicorn>=0.18.2
 whois>=0.9.16
-fastapi-key-auth>=0.7.5

@@ -4,7 +4,7 @@ from distutils.core import setup
 
 setup(name='Transmutation',
       version='0.1dev',
-      description='Transmutation API : enrich personal data using OSINT techniques',
+      description='Transmutation API: enrich personal data using OSINT techniques',
       author='Badreddine Lejmi',
       author_email='badreddine@ankaboot.fr',
       url='https://github.com/ankaboot-source/transmutation',

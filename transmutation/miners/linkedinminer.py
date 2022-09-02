@@ -276,7 +276,5 @@ if __name__ == "__main__":
     import sys
     import os
 
-    logging.basicConfig(format="%(asctime)-15s [%(levelname)s] %(funcName)s: %(message)s", level=logging.DEBUG)
-
     miner = LinkedInSearchMiner(bing=True, google=False, google_api_key=os.getenv('GOOGLE_API_KEY'), google_cx=os.getenv('GOOGLE_CX'), bing_api_key=os.getenv('BING_API_KEY'), bing_customconfig=os.getenv('BING_CUSTOMCONFIG'))
     print(miner.search(name=' '.join(sys.argv[3:]), email=sys.argv[1], company=sys.argv[2]))

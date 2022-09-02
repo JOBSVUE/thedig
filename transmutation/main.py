@@ -13,8 +13,12 @@ __license__ = "AGPL"
 
 #fast api
 from fastapi import FastAPI
+from fastapi import Security, status
+from fastapi.exceptions import HTTPException
+from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 
+#typing & pydantic
 from pydantic import BaseModel
 from pydantic import EmailStr
 from typing import List, Dict, Optional
@@ -23,51 +27,53 @@ from typing import List, Dict, Optional
 #import other apis
 from api import whoiscompany
 from api import linkedin
-from api.config import Settings
-settings = Settings()
+from api.config import settings, log_config
 
 #logging
 import logging
 
 #deal with fastapi issue with root/module loggers
+#see https://github.com/tiangolo/uvicorn-gunicorn-fastapi-docker/issues/19
 import logging.config
-#import yaml
-#with open('logconfig.yml') as f:
-#    config = yaml.load(f, Loader=yaml.FullLoader)
-#    logging.config.dictConfig(config)
-#create logger
+logging.config.dictConfig(log_config)
+# create logger
 log = logging.getLogger(__name__)
 
 #others
 import os
+import secrets
+
+#X-API-KEY protection
+api_key_header_auth = APIKeyHeader(
+    name=settings.api_key_name,
+    description="Mandatory API Token, required for all endpoints",
+    auto_error=True,
+)
+
+async def get_api_key(api_key_header: str = Security(api_key_header_auth)):
+    if not any(secrets.compare_digest(api_key_header, api_key_v) for api_key_v in settings.api_keys):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid API Key",
+        )
+
 
 #routing composition
 from api import router
-app = FastAPI()
-origins = ["http://localhost:"+os.environ.get("PORT", str(settings.server_port))]
+app = FastAPI(dependencies=[Security(get_api_key)])
+#origins = ["http://localhost:"+os.environ.get("PORT", str(settings.server_port))]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+#    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+#    allow_methods=["*"],
+#    allow_headers=["*"],
 )
-
-#API key management
-from fastapi_key_auth import AuthorizerMiddleware
-app = FastAPI()
-#hot patch to add ability to get the api keys from configuration instead of environment variables
-def api_keys_in_env(self) -> List[Optional[str]]:
-    api_keys = settings.api_keys
-    return api_keys
-AuthorizerMiddleware.api_keys_in_env = api_keys_in_env
-app.add_middleware(AuthorizerMiddleware, public_paths=["/whoisdomain", "/linkedin", "/companylogo"])
-
 
 app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn
-
-    #start server in debug mode
+   
+    #TODO: fix issue related to child loggers levels in DEBUG mode
     uvicorn.run("main:app", port=int(os.environ.get("PORT", settings.server_port)), host="0.0.0.0", reload=True, debug=True)

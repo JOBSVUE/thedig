@@ -1,6 +1,7 @@
 """Configuration loader"""
 # go to .env to modify configuration variables or use environment variables
 from pydantic import BaseSettings
+from typing import Optional
 
 class Settings(BaseSettings):
     app_name: str = "Transmutation API"
@@ -9,7 +10,7 @@ class Settings(BaseSettings):
     bing_api_key: str
     bing_customconfig: str
     log_file: str
-    #redis_username: str
+    redis_username: Optional[str]
     redis_password: str
     redis_host: str
     redis_port: str
@@ -17,6 +18,7 @@ class Settings(BaseSettings):
     cache_expiration: int
     server_port: int
     api_keys: list[str]
+    api_key_name: str
 
     class Config:
         env_file = ".env"
@@ -24,4 +26,7 @@ class Settings(BaseSettings):
 
 import yaml
 with open('api/logconfig.yml') as f:
-    configfile = yaml.load(f, Loader=yaml.FullLoader)
+    log_config = yaml.load(f, Loader=yaml.FullLoader)
+    
+
+settings = Settings()

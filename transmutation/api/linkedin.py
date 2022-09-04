@@ -27,9 +27,10 @@ class Person(BaseModel):
 
 @router.get('/linkedin/{email}')
 def linkedinminer_unique(email: EmailStr, name: str):
-    miner = LinkedInSearchMiner(google=True, bing=True, google_api_key=settings.google_api_key, google_cx=settings.google_cx, bing_api_key=settings.bing_api_key, bing_customconfig=settings.bing_customconfig)
+    miner = LinkedInSearchMiner(google=True, bing=False, google_api_key=settings.google_api_key, google_cx=settings.google_cx, bing_api_key=settings.bing_api_key, bing_customconfig=settings.bing_customconfig)
     return miner.search(name=name, email=email)
     
 @router.post('/linkedin')
 def linkedinminer_bulk(persons: List[Person]):
+    miner = LinkedInSearchMiner(google=False, bing=True, google_api_key=settings.google_api_key, google_cx=settings.google_cx, bing_api_key=settings.bing_api_key, bing_customconfig=settings.bing_customconfig)
     return [miner.search(name=person.name, email=person.email) for person in persons]

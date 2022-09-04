@@ -10,6 +10,7 @@ Microservices for data enrichment :
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
+__version__ = "0.1"
 
 #fast api
 from fastapi import FastAPI
@@ -60,7 +61,19 @@ async def get_api_key(api_key_header: str = Security(api_key_header_auth)):
 
 #routing composition
 from api import router
-app = FastAPI(dependencies=[Security(get_api_key)])
+app = FastAPI(
+    title="Transmutation API",
+    description=__doc__,
+    version=__version__,
+    contact={
+        "name": __copyright__,
+        "email": __author__.split('<')[1][:-1]
+    },
+    license_info={
+        "name" : __license__
+    },
+    dependencies=[Security(get_api_key)]
+    )
 #origins = ["http://localhost:"+os.environ.get("PORT", str(settings.server_port))]
 app.add_middleware(
     CORSMiddleware,

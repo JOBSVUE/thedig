@@ -1,7 +1,7 @@
 
-# Transmutation API
+# 🪨➜💎 Transmutation API
 
-Enrich data about someone (e.g employee name, title, profile pictures etc.) using OSINT (Opensource Intelligence) methods i.e using only public data this person consent to share.
+Enrich data about someone (e.g employee name, title, profile pictures etc.) using OSINT (Opensource Intelligence) methods i.e only public data this person consent to share.
 
 ## Features
 

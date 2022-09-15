@@ -23,10 +23,8 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
 
+settings = Settings()
 
 import yaml
 with open('api/logconfig.yml') as f:
     log_config = yaml.load(f, Loader=yaml.FullLoader)
-    
-
-settings = Settings()

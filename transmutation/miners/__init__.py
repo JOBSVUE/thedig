@@ -1,3 +1,3 @@
-import miners.linkedinminer
+import miners.linkedin
 import miners.whoiscompany
-import miners.companylogo
+import miners.domainlogo

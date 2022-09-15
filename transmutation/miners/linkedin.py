@@ -7,7 +7,7 @@ __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"
 
 import re
-import ISO3166
+from .ISO3166 import ISO3166
 import requests
 import json
 import logging
@@ -31,7 +31,7 @@ def country_from_url(linkedin_url : str)->str:
     match = LINKEDIN_URL_RE.match(linkedin_url)
 
     if match:
-        return ISO3166.ISO3166[match[1].upper()]
+        return ISO3166[match[1].upper()]
     else:
         return None
 

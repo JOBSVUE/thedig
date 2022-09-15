@@ -4,18 +4,17 @@ __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
 #service
-from miners.linkedinminer import LinkedInSearch
+from miners.linkedin import LinkedInSearch
 
 #fast api
 from fastapi import APIRouter
 from pydantic import BaseModel
 from pydantic import EmailStr
 from typing import List
-from api.config import Settings
+from api.config import settings
 
 #init fast api
 router = APIRouter()
-settings = Settings()
 
 #logging
 #import logging

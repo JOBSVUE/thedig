@@ -6,6 +6,8 @@ Return format is JSON-LD simplified
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"
 
+import re
+import ISO3166
 import requests
 import json
 import logging
@@ -13,33 +15,66 @@ import threading
 
 log = logging.getLogger(__name__)
 
-class LinkedInSearchMiner:
+#linkedin profile url with an ISO3166 country code regular expression
+LINKEDIN_URL_RE = re.compile("https:\/\/(\w{2})\.?linkedin.com\/in\/w*")
+
+def country_from_url(linkedin_url : str)->str:
+    """Country name based on the xx.linkedin.com profile url where xx is the ISO3166 country code
+    else return None
+
+    Args:
+        linkedin_url (str): linkedin profile URL
+
+    Returns:
+        str: Country name
+    """
+    match = LINKEDIN_URL_RE.match(linkedin_url)
+
+    if match:
+        return ISO3166.ISO3166[match[1].upper()]
+    else:
+        return None
+
+
+class LinkedInSearch:
     """"
-    Mine public data from LinkedIn with an email address using Google Search API and Microsoft Bing API
+    Mine public data from LinkedIn with an email address using Google Search API and/or Microsoft Bing API
     """
 
-    GOOGLE_SEARCH_URL_BASE = "https://www.googleapis.com/customsearch/v1/siterestrict"
-    BING_SEARCH_URL_BASE = "https://api.bing.microsoft.com/v7.0/custom/search"
-    NUM_RESULT = 1
+    NUM_RESULTS = 1
     GOOGLE_FIELDS = "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image)"
+    GOOGLE_SEARCH_URL_BASE = "https://www.googleapis.com/customsearch/v1/siterestrict?key={google_api_key}&cx={google_cx}&num{num_results}&fields={google_fields}"
+    BING_SEARCH_URL_BASE = "https://api.bing.microsoft.com/v7.0/custom/search?customconfig={bing_custom_config}&count={num_results}"
 
-    def __init__(self, google=True, bing=True, google_api_key:str=None, google_cx:str=None, bing_api_key:str=None, bing_customconfig:str=None):
+    def __init__(self,  search_api_params:dict, google=True, bing=False):
+        """LinkedInSearch constructor
+
+        Args:
+            search_api_params (dict): parameters for the search API including credentials
+            google (bool, optional): search with Google. Defaults to True.
+            bing (bool, optional): search with Bing. Defaults to False.
+
+        Raises:
+            ValueError: at least bing or google search engine must be True
+        """
         
         self.google = False
         self.bing = False
 
+        #there is default values for this params, the others are mandatory
+        if 'num_result' not in search_api_params:
+            search_api_params['num_results'] = LinkedInSearch.NUM_RESULTS
+        if 'google_fields' not in search_api_params:
+            search_api_params['google_fields'] = LinkedInSearch.GOOGLE_FIELDS
+
         if google:
             self.google = True
-            self.google_api_key = google_api_key
-            self.google_cx = google_cx
-            self.google_search_url = self.GOOGLE_SEARCH_URL_BASE + "?key=" + google_api_key + "&cx=" + google_cx + "&num=" + str(self.NUM_RESULT) #+ "&fields=" + self.GOOGLE_FIELDS
+            self.google_search_url = self.GOOGLE_SEARCH_URL_BASE.format(**search_api_params)
             log.debug("Build Google search URL : "+self.google_search_url)
 
         if bing: 
             self.bing = True
-            self.bing_customconfig = bing_customconfig
-            self.bing_api_key = bing_api_key
-            self.bing_search_url = self.BING_SEARCH_URL_BASE + "?customconfig=" + bing_customconfig + "&count=" + str(self.NUM_RESULT)
+            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(**search_api_params)
             log.debug("Build Bing search URL : "+self.bing_search_url)
         
         if not bing and not google:
@@ -80,6 +115,15 @@ class LinkedInSearchMiner:
 
         log.debug("No results found for query %s " % query)
 
+    def _add_country(self):
+        """add country name to the Person JSON-LD based on the linkedin profile url
+        """
+        if 'url' in self.card:
+            country = country_from_url(self.card["url"])
+            if country:
+                self.card["address"] = {"@type" : "PostalAddress", "addressCountry": country}
+
+
     def search(self, name, email:str=None, company:str=None):
         """
         search and return the public data for an email and/or company
@@ -104,6 +148,9 @@ class LinkedInSearchMiner:
                 self.email_google(name, email)
             elif self.bing:
                 self.email_bing(name, email)
+                    
+            self._add_country()
+
             result = self.card
         if company: 
             log.debug("Searching by name %s and company %s" % (name, company))
@@ -264,5 +311,13 @@ if __name__ == "__main__":
     import sys
     import os
 
-    miner = LinkedInSearchMiner(bing=True, google=False, google_api_key=os.getenv('GOOGLE_API_KEY'), google_cx=os.getenv('GOOGLE_CX'), bing_api_key=os.getenv('BING_API_KEY'), bing_customconfig=os.getenv('BING_CUSTOMCONFIG'))
+    log.setLevel(logging.DEBUG)
+
+    search_api_params = {
+        "google_api_key" : os.getenv('GOOGLE_API_KEY'),
+        "google_cx" : os.getenv('GOOGLE_CX'),
+        "bing_api_key" : os.getenv('BING_API_KEY'),
+        "bing_customconfig" : os.getenv('BING_CUSTOMCONFIG')
+    }
+    miner = LinkedInSearch(search_api_params)
     print(miner.search(name=' '.join(sys.argv[3:]), email=sys.argv[1], company=sys.argv[2]))

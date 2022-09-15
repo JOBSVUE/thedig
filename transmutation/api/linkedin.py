@@ -4,7 +4,7 @@ __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
 #service
-from miners.linkedinminer import LinkedInSearchMiner
+from miners.linkedinminer import LinkedInSearch
 
 #fast api
 from fastapi import APIRouter
@@ -17,7 +17,6 @@ from api.config import Settings
 router = APIRouter()
 settings = Settings()
 
-
 #logging
 #import logging
 
@@ -25,12 +24,19 @@ class Person(BaseModel):
     email: EmailStr
     name: str
 
+search_api_params = {
+    'google_api_key' : settings.google_api_key,
+    'google_cx' : settings.google_cx,
+    'bing_api_key' : settings.bing_api_key,
+    'bing_customconfig' : settings.bing_customconfig
+}
+
 @router.get('/linkedin/{email}')
 def linkedinminer_unique(email: EmailStr, name: str):
-    miner = LinkedInSearchMiner(google=True, bing=False, google_api_key=settings.google_api_key, google_cx=settings.google_cx, bing_api_key=settings.bing_api_key, bing_customconfig=settings.bing_customconfig)
+    miner = LinkedInSearch(search_api_params, google=True, bing=False)
     return miner.search(name=name, email=email)
     
 @router.post('/linkedin')
 def linkedinminer_bulk(persons: List[Person]):
-    miner = LinkedInSearchMiner(google=False, bing=True, google_api_key=settings.google_api_key, google_cx=settings.google_cx, bing_api_key=settings.bing_api_key, bing_customconfig=settings.bing_customconfig)
+    miner = LinkedInSearch(search_api_params, google=False, bing=True)
     return [miner.search(name=person.name, email=person.email) for person in persons]

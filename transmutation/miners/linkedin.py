@@ -6,13 +6,13 @@ Return format is JSON-LD simplified
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"
 
-import re
-
+# make it work as a command line tool
 try:
     from .ISO3166 import ISO3166
 except ImportError:
     from ISO3166 import ISO3166
 
+import re
 import requests
 import logging
 import threading

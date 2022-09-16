@@ -7,7 +7,12 @@ __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"
 
 import re
-from .ISO3166 import ISO3166
+
+try:
+    from .ISO3166 import ISO3166
+except ImportError:
+    from ISO3166 import ISO3166
+
 import requests
 import logging
 import threading
@@ -26,7 +31,7 @@ def country_from_url(linkedin_url: str) -> str:
         linkedin_url (str): linkedin profile URL
 
     Returns:
-        str: Country name
+        str: country name
     """
     match = LINKEDIN_URL_RE.match(linkedin_url)
 
@@ -37,7 +42,7 @@ def country_from_url(linkedin_url: str) -> str:
 
 
 class LinkedInSearch:
-    """ "
+    """
     Mine public data from LinkedIn with an email address using Google Search API and/or Microsoft Bing API
     """
 
@@ -82,7 +87,7 @@ class LinkedInSearch:
         if not bing and not google:
             raise ValueError("Must choose at least one search engine: bing or google")
 
-        self.card = {}
+        self.person = {}
 
     def _search_google(self, query: str):
         """Search a query on Google and return the first result
@@ -106,7 +111,10 @@ class LinkedInSearch:
         """Search a query on Bing and return the first result
 
         Args:
-            query (str): _description_
+            query (str): query string
+        
+        Returns:
+            dict: first result
         """
         search_url_complete = self.bing_search_url + "&q=" + query
         result_raw = requests.get(
@@ -126,10 +134,10 @@ class LinkedInSearch:
 
     def _add_country(self):
         """add country name to the Person JSON-LD based on the linkedin profile url"""
-        if "url" in self.card:
-            country = country_from_url(self.card["url"])
+        if "url" in self.person:
+            country = country_from_url(self.person["url"])
             if country:
-                self.card["address"] = {
+                self.person["address"] = {
                     "@type": "PostalAddress",
                     "addressCountry": country,
                 }
@@ -161,19 +169,22 @@ class LinkedInSearch:
 
             self._add_country()
 
-            result = self.card
+            result = self.person
         if company:
             log.debug("Searching by name %s and company %s" % (name, company))
             result.update(dict(self.by_company(name, company)))
         return result
 
-    def email_google(self, name: str, email: str):
+    def email_google(self, name: str, email: str) -> dict:
         """
         Google search engine then return and update the personal data accordingly
         Google gives you the givenName/familyName but not the location
         Args:
-            name (str): _description_
-            email (str): _description_
+            name (str): full name of the person
+            email (str): email address
+        
+        Returns:
+            person (str) : person JSON-LD filled with the infos mined
         """
         result = self._search_google(email)
         if result:
@@ -187,7 +198,7 @@ class LinkedInSearch:
                     )
                     return {}
 
-                self.card.update(
+                self.person.update(
                     {
                         # for full JSON-LD conformity
                         "@context": "http://schema.org",
@@ -213,7 +224,7 @@ class LinkedInSearch:
             log.debug("No result found")
             return {}
 
-        return self.card
+        return self.person
 
     def by_company(self, name: str, company: str):
         """
@@ -235,7 +246,7 @@ class LinkedInSearch:
                 # do not need because we already have it
                 # company = full_title[2].strip() if len(full_title)>2 else None
 
-                self.card.update(
+                self.person.update(
                     {
                         "givenName": result["pagemap"]["metatags"][0][
                             "profile:first_name"
@@ -257,7 +268,7 @@ class LinkedInSearch:
             log.debug("No result found")
             return {}
 
-        return self.card
+        return self.person
 
     def email_bing(self, name: str, email: str):
         """Bing search engine then return and update the personal data accordingly
@@ -280,7 +291,7 @@ class LinkedInSearch:
                     )
                     return {}
 
-                self.card.update(
+                self.person.update(
                     {
                         # for full JSON-LD conformity
                         "@context": "http://schema.org",
@@ -299,7 +310,7 @@ class LinkedInSearch:
                 address = result["richFacts"][0]["items"][0]["text"].split(", ")
                 # however sometimes the address isn't correctly identified by Bing
                 if len(address) >= 3:
-                    self.card.update(
+                    self.person.update(
                         {
                             "address": {
                                 # "@type"    :   "PostalAddress",
@@ -316,7 +327,7 @@ class LinkedInSearch:
             log.debug("No result found")
             return {}
 
-        return self.card
+        return self.person
 
 
 def parse_linkedin_title(title):
@@ -327,6 +338,7 @@ def parse_linkedin_title(title):
     Args:
         title (str): title from LinkedIn page
     """
+    print(title)
     result = {}
     full_title = title.split("|")[0].split(" - ")
     result["name"] = full_title[0]

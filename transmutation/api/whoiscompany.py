@@ -30,7 +30,7 @@ redis_param = {
     setting_k.removeprefix("redis_"): setting_v
     for setting_k, setting_v in settings.dict().items()
     if setting_k.startswith("redis")
-}
+} 
 redis_param["decode_responses"] = True
 cache = redis.Redis(**redis_param)
 

@@ -29,4 +29,4 @@ class Settings(BaseSettings):
 settings = Settings()
 
 with open("api/logconfig.yml") as f:
-    log_config = yaml.load(f, Loader=yaml.FullLoader)
+    log_config = yaml.safe_load(f)

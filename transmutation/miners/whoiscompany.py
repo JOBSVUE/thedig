@@ -14,6 +14,8 @@ TO_IGNORE = (
     "Statutory Masking Enabled",
     "Privacy service provided by Withheld for Privacy ehf",
     "Data Protected",
+    "Whois Privacy Service",
+    "REDACTED FOR PRIVACY",
 )
 
 

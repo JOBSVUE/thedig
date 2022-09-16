@@ -99,7 +99,11 @@ class LinkedInSearch:
             dict: first result
         """
         search_url_complete = self.google_search_url + "&q=" + query
-        result_raw = requests.get(search_url_complete).json()
+        r = requests.get(search_url_complete)
+        if not r.ok:
+            r.raise_for_status()
+
+        result_raw = r.json()
 
         # if a data is missing, that means probably that there is no results
         if "items" in result_raw and len(result_raw["items"]) > 0:
@@ -117,10 +121,15 @@ class LinkedInSearch:
             dict: first result
         """
         search_url_complete = self.bing_search_url + "&q=" + query
-        result_raw = requests.get(
+        r = requests.get(
             search_url_complete,
             headers={"Ocp-Apim-Subscription-Key": self.bing_api_key},
-        ).json()
+        )
+        if not r.ok:
+            r.raise_for_status()
+            
+        result_raw = r.json()
+
         log.info("bing result %s" % result_raw)
         # if a data is missing, that means probably that there is no results
         if (
@@ -142,7 +151,7 @@ class LinkedInSearch:
                     "addressCountry": country,
                 }
 
-    def search(self, name, email: str = None, company: str = None):
+    def search(self, name, email: str = None, company: str = None) -> dict:
         """
         search and return the public data for an email and/or company
         """
@@ -152,8 +161,8 @@ class LinkedInSearch:
 
             if self.bing and self.google:
                 # creating threads
-                google = threading.Thread(target=self.email_google, args=(name, email))
-                bing = threading.Thread(target=self.email_bing, args=(name, email))
+                google = threading.Thread(target=self.extract_google, args=(name, email))
+                bing = threading.Thread(target=self.extract_bing, args=(name, email))
 
                 # starting threads
                 google.start()
@@ -163,30 +172,31 @@ class LinkedInSearch:
                 google.join()
                 bing.join()  # usually add location
             elif self.google:
-                self.email_google(name, email)
+                self.extract_google(name, email)
             elif self.bing:
-                self.email_bing(name, email)
-
-            self._add_country()
-
-            result = self.person
+                self.extract_bing(name, email)
         if company:
             log.debug("Searching by name %s and company %s" % (name, company))
-            result.update(dict(self.by_company(name, company)))
-        return result
+            self.extract_google(name, company=company)
 
-    def email_google(self, name: str, email: str) -> dict:
+        self._add_country()
+
+        return self.person
+
+    def extract_google(self, name: str, email: str = None, company: str = None) -> dict:
         """
         Google search engine then return and update the personal data accordingly
         Google gives you the givenName/familyName but not the location
         Args:
             name (str): full name of the person
             email (str): email address
+            company (str): company name (Optional)
         
         Returns:
             person (str) : person JSON-LD filled with the infos mined
         """
-        result = self._search_google(email)
+        query_string = email if email else f"{name} {company}"
+        result = self._search_google(query_string)
         if result:
             try:
                 full_title = parse_linkedin_title(result["title"])
@@ -226,51 +236,7 @@ class LinkedInSearch:
 
         return self.person
 
-    def by_company(self, name: str, company: str):
-        """
-        Search and return the public data for a name and company
-        """
-        result = self._search_google(name + " " + company)
-
-        if result:
-            try:
-                full_title = parse_linkedin_title(result["title"])
-
-                # the full name from the result must be the same that the name itself
-                if full_title["name"].lower() != name.strip().lower():
-                    log.debug(
-                        "The full name mined doesn't match the name given as a parameter"
-                    )
-                    return {}
-
-                # do not need because we already have it
-                # company = full_title[2].strip() if len(full_title)>2 else None
-
-                self.person.update(
-                    {
-                        "givenName": result["pagemap"]["metatags"][0][
-                            "profile:first_name"
-                        ],
-                        "familyName": result["pagemap"]["metatags"][0][
-                            "profile:last_name"
-                        ],
-                        "name": full_title["name"],
-                        "jobTitle": full_title.get("title"),
-                        "worksFor": {"name": full_title.get("company")},
-                        "image": result["pagemap"]["cse_thumbnail"][0]["src"],
-                        "url": result["link"],
-                    }
-                )
-            except KeyError as e:
-                log.debug("Not enough data in the results %s" % e)
-                return {}
-        else:
-            log.debug("No result found")
-            return {}
-
-        return self.person
-
-    def email_bing(self, name: str, email: str):
+    def extract_bing(self, name: str, email: str):
         """Bing search engine then return and update the personal data accordingly
         Bing gives you sometimes the location but doesn't give you the givenName/familyName
         Args:
@@ -338,7 +304,6 @@ def parse_linkedin_title(title):
     Args:
         title (str): title from LinkedIn page
     """
-    print(title)
     result = {}
     full_title = title.split("|")[0].split(" - ")
     result["name"] = full_title[0]

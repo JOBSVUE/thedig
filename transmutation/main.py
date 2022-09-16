@@ -23,12 +23,6 @@ from fastapi.exceptions import HTTPException
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 
-# typing & pydantic
-from pydantic import BaseModel
-from pydantic import EmailStr
-from typing import List, Dict, Optional
-
-
 # import other apis
 from api import whoiscompany
 from api import linkedin
@@ -44,8 +38,6 @@ import logging.config
 logging.config.dictConfig(log_config)
 # create logger
 log = logging.getLogger(__name__)
-
-# others
 
 # X-API-KEY protection
 api_key_header_auth = APIKeyHeader(

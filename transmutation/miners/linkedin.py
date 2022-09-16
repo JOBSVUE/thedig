@@ -9,7 +9,6 @@ __license__ = "AGPL"
 import re
 from .ISO3166 import ISO3166
 import requests
-import json
 import logging
 import threading
 

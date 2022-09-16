@@ -4,20 +4,24 @@ Return company name based on domain's email address whois
 """
 import logging
 import whois
+
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"
 
 # Global variable for performance purpose in case of serverless
 domains_companies = {}
-TO_IGNORE = ("Statutory Masking Enabled",
-             "Privacy service provided by Withheld for Privacy ehf", "Data Protected")
+TO_IGNORE = (
+    "Statutory Masking Enabled",
+    "Privacy service provided by Withheld for Privacy ehf",
+    "Data Protected",
+)
 
 
 log = logging.getLogger(__name__)
 
 
 def get_domain(email: str) -> str:
-    return email.split('@')[1]
+    return email.split("@")[1]
 
 
 def get_company(domain: str) -> str:
@@ -52,9 +56,9 @@ def get_company_from_email(email: str) -> str:
 
 
 def get_company_from_person(person: dict) -> dict:
-    domain = get_domain(person['email'])
+    domain = get_domain(person["email"])
     company = get_company(domain)
-    person['worksFor'] = {'legalName': company, 'name': company}
+    person["worksFor"] = {"legalName": company, "name": company}
     return person
 
 
@@ -89,5 +93,6 @@ def bulk_company_from_person(persons: list) -> list:
 
 if __name__ == "__main__":
     import sys
-    #print({domain:get_company(domain) for domain in sys.argv[1:]})
+
+    # print({domain:get_company(domain) for domain in sys.argv[1:]})
     print(bulk_companies_from_emails(sys.argv[1:]))

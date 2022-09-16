@@ -10,6 +10,7 @@ Microservices for data enrichment :
 from api import router
 import secrets
 import os
+
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
@@ -22,7 +23,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 
-#typing & pydantic
+# typing & pydantic
 from pydantic import BaseModel
 from pydantic import EmailStr
 from typing import List, Dict, Optional
@@ -39,6 +40,7 @@ import logging
 # deal with fastapi issue with root/module loggers
 # see https://github.com/tiangolo/uvicorn-gunicorn-fastapi-docker/issues/19
 import logging.config
+
 logging.config.dictConfig(log_config)
 # create logger
 log = logging.getLogger(__name__)
@@ -54,7 +56,10 @@ api_key_header_auth = APIKeyHeader(
 
 
 async def get_api_key(api_key_header: str = Security(api_key_header_auth)):
-    if not any(secrets.compare_digest(api_key_header, api_key_v) for api_key_v in settings.api_keys):
+    if not any(
+        secrets.compare_digest(api_key_header, api_key_v)
+        for api_key_v in settings.api_keys
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid API Key",
@@ -66,16 +71,11 @@ app = FastAPI(
     title="Transmutation API",
     description=__doc__,
     version=__version__,
-    contact={
-        "name": __copyright__,
-        "email": __author__.split('<')[1][:-1]
-    },
-    license_info={
-        "name": __license__
-    },
-    dependencies=[Security(get_api_key)]
+    contact={"name": __copyright__, "email": __author__.split("<")[1][:-1]},
+    license_info={"name": __license__},
+    dependencies=[Security(get_api_key)],
 )
-#origins = ["http://localhost:"+os.environ.get("PORT", str(settings.server_port))]
+# origins = ["http://localhost:"+os.environ.get("PORT", str(settings.server_port))]
 app.add_middleware(
     CORSMiddleware,
     #    allow_origins=origins,
@@ -90,5 +90,10 @@ if __name__ == "__main__":
     import uvicorn
 
     # TODO: fix issue related to child loggers levels in DEBUG mode
-    uvicorn.run("main:app", port=int(os.environ.get(
-        "PORT", settings.server_port)), host="0.0.0.0", reload=True, debug=True)
+    uvicorn.run(
+        "main:app",
+        port=int(os.environ.get("PORT", settings.server_port)),
+        host="0.0.0.0",
+        reload=True,
+        debug=True,
+    )

@@ -38,7 +38,7 @@ def country_from_url(linkedin_url: str) -> str:
 
 
 class LinkedInSearch:
-    """"
+    """ "
     Mine public data from LinkedIn with an email address using Google Search API and/or Microsoft Bing API
     """
 
@@ -47,7 +47,7 @@ class LinkedInSearch:
     GOOGLE_SEARCH_URL_BASE = "https://www.googleapis.com/customsearch/v1/siterestrict?key={google_api_key}&cx={google_cx}&num{num_results}&fields={google_fields}"
     BING_SEARCH_URL_BASE = "https://api.bing.microsoft.com/v7.0/custom/search?customconfig={bing_custom_config}&count={num_results}"
 
-    def __init__(self,  search_api_params: dict, google=True, bing=False):
+    def __init__(self, search_api_params: dict, google=True, bing=False):
         """LinkedInSearch constructor
 
         Args:
@@ -63,26 +63,25 @@ class LinkedInSearch:
         self.bing = False
 
         # there is default values for this params, the others are mandatory
-        if 'num_result' not in search_api_params:
-            search_api_params['num_results'] = LinkedInSearch.NUM_RESULTS
-        if 'google_fields' not in search_api_params:
-            search_api_params['google_fields'] = LinkedInSearch.GOOGLE_FIELDS
+        if "num_result" not in search_api_params:
+            search_api_params["num_results"] = LinkedInSearch.NUM_RESULTS
+        if "google_fields" not in search_api_params:
+            search_api_params["google_fields"] = LinkedInSearch.GOOGLE_FIELDS
 
         if google:
             self.google = True
             self.google_search_url = self.GOOGLE_SEARCH_URL_BASE.format(
-                **search_api_params)
-            log.debug("Build Google search URL : "+self.google_search_url)
+                **search_api_params
+            )
+            log.debug("Build Google search URL : " + self.google_search_url)
 
         if bing:
             self.bing = True
-            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(
-                **search_api_params)
-            log.debug("Build Bing search URL : "+self.bing_search_url)
+            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(**search_api_params)
+            log.debug("Build Bing search URL : " + self.bing_search_url)
 
         if not bing and not google:
-            raise ValueError(
-                "Must choose at least one search engine: bing or google")
+            raise ValueError("Must choose at least one search engine: bing or google")
 
         self.card = {}
 
@@ -90,7 +89,7 @@ class LinkedInSearch:
         """Search a query on Google and return the first result
 
         Args:
-            query (string): query string 
+            query (string): query string
 
         Returns:
             dict: first result
@@ -99,8 +98,8 @@ class LinkedInSearch:
         result_raw = requests.get(search_url_complete).json()
 
         # if a data is missing, that means probably that there is no results
-        if 'items' in result_raw and len(result_raw['items']) > 0:
-            return result_raw['items'][0]
+        if "items" in result_raw and len(result_raw["items"]) > 0:
+            return result_raw["items"][0]
 
         log.debug("No results found for query %s " % query)
 
@@ -111,23 +110,30 @@ class LinkedInSearch:
             query (str): _description_
         """
         search_url_complete = self.bing_search_url + "&q=" + query
-        result_raw = requests.get(search_url_complete, headers={
-                                  "Ocp-Apim-Subscription-Key": self.bing_api_key}).json()
+        result_raw = requests.get(
+            search_url_complete,
+            headers={"Ocp-Apim-Subscription-Key": self.bing_api_key},
+        ).json()
         log.info("bing result %s" % result_raw)
         # if a data is missing, that means probably that there is no results
-        if 'webPages' in result_raw and 'value' in result_raw['webPages'] and len(result_raw['webPages']['value']) > 0:
-            return result_raw['webPages']['value'][0]
+        if (
+            "webPages" in result_raw
+            and "value" in result_raw["webPages"]
+            and len(result_raw["webPages"]["value"]) > 0
+        ):
+            return result_raw["webPages"]["value"][0]
 
         log.debug("No results found for query %s " % query)
 
     def _add_country(self):
-        """add country name to the Person JSON-LD based on the linkedin profile url
-        """
-        if 'url' in self.card:
+        """add country name to the Person JSON-LD based on the linkedin profile url"""
+        if "url" in self.card:
             country = country_from_url(self.card["url"])
             if country:
                 self.card["address"] = {
-                    "@type": "PostalAddress", "addressCountry": country}
+                    "@type": "PostalAddress",
+                    "addressCountry": country,
+                }
 
     def search(self, name, email: str = None, company: str = None):
         """
@@ -139,10 +145,8 @@ class LinkedInSearch:
 
             if self.bing and self.google:
                 # creating threads
-                google = threading.Thread(
-                    target=self.email_google, args=(name, email))
-                bing = threading.Thread(
-                    target=self.email_bing, args=(name, email))
+                google = threading.Thread(target=self.email_google, args=(name, email))
+                bing = threading.Thread(target=self.email_bing, args=(name, email))
 
                 # starting threads
                 google.start()
@@ -175,28 +179,34 @@ class LinkedInSearch:
         result = self._search_google(email)
         if result:
             try:
-                full_title = parse_linkedin_title(result['title'])
+                full_title = parse_linkedin_title(result["title"])
 
                 # the full name from the result must be the same that the name itself
-                if full_title['name'].lower() != name.strip().lower():
+                if full_title["name"].lower() != name.strip().lower():
                     log.debug(
-                        f"The full name {full_title[0]} mined doesn't match the name {name} given as a parameter")
+                        f"The full name {full_title[0]} mined doesn't match the name {name} given as a parameter"
+                    )
                     return {}
 
-                self.card.update({
-                    # for full JSON-LD conformity
-                    "@context": "http://schema.org",
-                    '@type':   "@Person",
-
-                    'givenName': result['pagemap']['metatags'][0]['profile:first_name'],
-                    'familyName': result['pagemap']['metatags'][0]['profile:last_name'],
-                    'name': full_title['name'],
-                    'jobTitle': full_title.get('title'),
-                    'worksFor': {'name': full_title.get('company')},
-                    # cse_thumbnail is Google's image
-                    'image': result['pagemap']['metatags'][0]['og:image'],
-                    'url': result['link']
-                })
+                self.card.update(
+                    {
+                        # for full JSON-LD conformity
+                        "@context": "http://schema.org",
+                        "@type": "@Person",
+                        "givenName": result["pagemap"]["metatags"][0][
+                            "profile:first_name"
+                        ],
+                        "familyName": result["pagemap"]["metatags"][0][
+                            "profile:last_name"
+                        ],
+                        "name": full_title["name"],
+                        "jobTitle": full_title.get("title"),
+                        "worksFor": {"name": full_title.get("company")},
+                        # cse_thumbnail is Google's image
+                        "image": result["pagemap"]["metatags"][0]["og:image"],
+                        "url": result["link"],
+                    }
+                )
             except KeyError as e:
                 log.debug("Not enough data in the results %s" % e)
                 return {}
@@ -210,30 +220,37 @@ class LinkedInSearch:
         """
         Search and return the public data for a name and company
         """
-        result = self._search_google(name+" "+company)
+        result = self._search_google(name + " " + company)
 
         if result:
             try:
-                full_title = parse_linkedin_title(result['title'])
+                full_title = parse_linkedin_title(result["title"])
 
                 # the full name from the result must be the same that the name itself
-                if full_title['name'].lower() != name.strip().lower():
+                if full_title["name"].lower() != name.strip().lower():
                     log.debug(
-                        "The full name mined doesn't match the name given as a parameter")
+                        "The full name mined doesn't match the name given as a parameter"
+                    )
                     return {}
 
                 # do not need because we already have it
-                #company = full_title[2].strip() if len(full_title)>2 else None
+                # company = full_title[2].strip() if len(full_title)>2 else None
 
-                self.card.update({
-                    'givenName': result['pagemap']['metatags'][0]['profile:first_name'],
-                    'familyName': result['pagemap']['metatags'][0]['profile:last_name'],
-                    'name': full_title['name'],
-                    'jobTitle': full_title.get('title'),
-                    'worksFor': {'name': full_title.get('company')},
-                    'image': result['pagemap']['cse_thumbnail'][0]['src'],
-                    'url': result['link']
-                })
+                self.card.update(
+                    {
+                        "givenName": result["pagemap"]["metatags"][0][
+                            "profile:first_name"
+                        ],
+                        "familyName": result["pagemap"]["metatags"][0][
+                            "profile:last_name"
+                        ],
+                        "name": full_title["name"],
+                        "jobTitle": full_title.get("title"),
+                        "worksFor": {"name": full_title.get("company")},
+                        "image": result["pagemap"]["cse_thumbnail"][0]["src"],
+                        "url": result["link"],
+                    }
+                )
             except KeyError as e:
                 log.debug("Not enough data in the results %s" % e)
                 return {}
@@ -255,42 +272,44 @@ class LinkedInSearch:
         if result:
             try:
                 # usually a LinkedIn title has this form "Full Name - Title - Company | LinkedIn"
-                full_title = parse_linkedin_title(result['name'])
+                full_title = parse_linkedin_title(result["name"])
 
                 # the full name from the result must be the same that the name itself
-                if full_title['name'].lower() != name.strip().lower():
+                if full_title["name"].lower() != name.strip().lower():
                     log.debug(
-                        "The full name mined doesn't match the name given as a parameter")
+                        "The full name mined doesn't match the name given as a parameter"
+                    )
                     return {}
 
-                self.card.update({
-                    # for full JSON-LD conformity
-                    "@context": "http://schema.org",
-                    '@type':   "@Person",
-
-                    # it may be useful to set these values if they're absent
-                    'name': full_title['name'],
-                    'jobTitle': full_title.get('title'),
-                    'worksFor': {'name': full_title.get('company')},
-                    'url': result['url'],
-
-                    # sometimes it's an useless thumbnail : 404 Error
-                    'image': result['openGraphImage']['contentUrl'],
-                })
+                self.card.update(
+                    {
+                        # for full JSON-LD conformity
+                        "@context": "http://schema.org",
+                        "@type": "@Person",
+                        # it may be useful to set these values if they're absent
+                        "name": full_title["name"],
+                        "jobTitle": full_title.get("title"),
+                        "worksFor": {"name": full_title.get("company")},
+                        "url": result["url"],
+                        # sometimes it's an useless thumbnail : 404 Error
+                        "image": result["openGraphImage"]["contentUrl"],
+                    }
+                )
 
                 # Bing also gives you sometimes location
-                address = result['richFacts'][0]['items'][0]['text'].split(
-                    ', ')
+                address = result["richFacts"][0]["items"][0]["text"].split(", ")
                 # however sometimes the address isn't correctly identified by Bing
                 if len(address) >= 3:
-                    self.card.update({
-                        'address': {
-                            # "@type"    :   "PostalAddress",
-                            'addressLocation': address[0],
-                            'addressRegion': address[1],
-                            'addressCountry': address[2]
+                    self.card.update(
+                        {
+                            "address": {
+                                # "@type"    :   "PostalAddress",
+                                "addressLocation": address[0],
+                                "addressRegion": address[1],
+                                "addressCountry": address[2],
+                            }
                         }
-                    })
+                    )
             except KeyError as e:
                 log.debug("Not enough data in the results %s" % e)
                 return {}
@@ -310,14 +329,14 @@ def parse_linkedin_title(title):
         title (str): title from LinkedIn page
     """
     result = {}
-    full_title = title.split('|')[0].split(' - ')
-    result['name'] = full_title[0]
+    full_title = title.split("|")[0].split(" - ")
+    result["name"] = full_title[0]
 
     if len(full_title) > 1:
-        result['title'] = full_title[1]
+        result["title"] = full_title[1]
         if len(full_title) > 2:
             # sometimes the company name has a '...' suffix
-            result['company'] = full_title[2].removesuffix('...').strip()
+            result["company"] = full_title[2].removesuffix("...").strip()
     return result
 
 
@@ -328,11 +347,14 @@ if __name__ == "__main__":
     log.setLevel(logging.DEBUG)
 
     search_api_params = {
-        "google_api_key": os.getenv('GOOGLE_API_KEY'),
-        "google_cx": os.getenv('GOOGLE_CX'),
-        "bing_api_key": os.getenv('BING_API_KEY'),
-        "bing_customconfig": os.getenv('BING_CUSTOMCONFIG')
+        "google_api_key": os.getenv("GOOGLE_API_KEY"),
+        "google_cx": os.getenv("GOOGLE_CX"),
+        "bing_api_key": os.getenv("BING_API_KEY"),
+        "bing_customconfig": os.getenv("BING_CUSTOMCONFIG"),
     }
     miner = LinkedInSearch(search_api_params)
-    print(miner.search(name=' '.join(
-        sys.argv[3:]), email=sys.argv[1], company=sys.argv[2]))
+    print(
+        miner.search(
+            name=" ".join(sys.argv[3:]), email=sys.argv[1], company=sys.argv[2]
+        )
+    )

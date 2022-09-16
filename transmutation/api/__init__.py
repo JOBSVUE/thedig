@@ -7,6 +7,7 @@ from api import whoiscompany
 
 # finally API router
 from fastapi import APIRouter
+
 router = APIRouter()
 router.include_router(whoiscompany.router)
 router.include_router(linkedin.router)

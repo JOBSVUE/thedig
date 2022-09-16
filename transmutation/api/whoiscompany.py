@@ -1,5 +1,6 @@
 """Whois Company Miner API"""
 import redis
+
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
@@ -18,15 +19,19 @@ from api.config import log_config
 
 # create logger
 import logging
+
 log = logging.getLogger(__name__)
 
 # set-up router
 router = APIRouter()
 
 # redis for cache
-redis_param = {setting_k.removeprefix('redis_'): setting_v for setting_k,
-               setting_v in settings.dict().items() if setting_k.startswith('redis')}
-redis_param['decode_responses'] = True
+redis_param = {
+    setting_k.removeprefix("redis_"): setting_v
+    for setting_k, setting_v in settings.dict().items()
+    if setting_k.startswith("redis")
+}
+redis_param["decode_responses"] = True
 cache = redis.Redis(**redis_param)
 
 
@@ -64,7 +69,7 @@ def whois_unique(domain: str) -> str:
 @router.post("/whoiscompany")
 def whois_bulk(body: Dict[str, List[str]]) -> dict:
     companies = {}
-    for domain in body['domains']:
+    for domain in body["domains"]:
         company = cache.get(domain)
         if company is None:
             log.debug("The following domain is not cached: %s" % domain)
@@ -80,6 +85,5 @@ def whois_bulk(body: Dict[str, List[str]]) -> dict:
 
 @router.delete("/whoiscompany/cache")
 def _whois_flushcache():
-    """Flush cache
-    """
+    """Flush cache"""
     return cache.flushdb()

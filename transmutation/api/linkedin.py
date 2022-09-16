@@ -17,7 +17,7 @@ from api.config import settings
 router = APIRouter()
 
 # logging
-#import logging
+# import logging
 
 
 class Person(BaseModel):
@@ -26,20 +26,20 @@ class Person(BaseModel):
 
 
 search_api_params = {
-    'google_api_key': settings.google_api_key,
-    'google_cx': settings.google_cx,
-    'bing_api_key': settings.bing_api_key,
-    'bing_customconfig': settings.bing_customconfig
+    "google_api_key": settings.google_api_key,
+    "google_cx": settings.google_cx,
+    "bing_api_key": settings.bing_api_key,
+    "bing_customconfig": settings.bing_customconfig,
 }
 
 
-@router.get('/linkedin/{email}')
+@router.get("/linkedin/{email}")
 def linkedinminer_unique(email: EmailStr, name: str):
     miner = LinkedInSearch(search_api_params, google=True, bing=False)
     return miner.search(name=name, email=email)
 
 
-@router.post('/linkedin')
+@router.post("/linkedin")
 def linkedinminer_bulk(persons: List[Person]):
     miner = LinkedInSearch(search_api_params, google=False, bing=True)
     return [miner.search(name=person.name, email=person.email) for person in persons]

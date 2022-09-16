@@ -1,35 +1,37 @@
 """Whois Company Miner API"""
+import redis
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
-#service
+# service
 import miners.whoiscompany as whoiscompany
 
-#fast api
+# fast api
 from fastapi import APIRouter
 from pydantic import BaseModel
 from pydantic import EmailStr
 from typing import List
 from typing import Dict
 from api.config import settings
-from api.config import log_config  
+from api.config import log_config
 
-#create logger
+# create logger
 import logging
 log = logging.getLogger(__name__)
 
-#set-up router
+# set-up router
 router = APIRouter()
 
-#redis for cache
-import redis
-redis_param = {setting_k.removeprefix('redis_'):setting_v for setting_k,setting_v in settings.dict().items() if setting_k.startswith('redis')}
+# redis for cache
+redis_param = {setting_k.removeprefix('redis_'): setting_v for setting_k,
+               setting_v in settings.dict().items() if setting_k.startswith('redis')}
 redis_param['decode_responses'] = True
 cache = redis.Redis(**redis_param)
 
+
 @router.get("/whoiscompany/{domain}")
-def whois_unique(domain: str)->str:
+def whois_unique(domain: str) -> str:
     """Give company name based on the domain's owner
 
     Args:
@@ -43,23 +45,24 @@ def whois_unique(domain: str)->str:
         log.debug("Cache found for domain: %s" % domain)
         return company
 
-    #no cache for this domain
+    # no cache for this domain
     log.debug("The following domain is not cached: %s" % domain)
     company = whoiscompany.get_company(domain)
-    
-    #invalid data for this domain
+
+    # invalid data for this domain
     if company is None:
         log.debug("No valid data for this domain: %s" % domain)
-        #redis refuse to store None so we'll use a void string instead
-        #we won't check for this domain again for some time
+        # redis refuse to store None so we'll use a void string instead
+        # we won't check for this domain again for some time
         company = ""
-    
+
     cache.set(domain, company, ex=settings.cache_expiration)
-    
+
     return company if company else None
 
+
 @router.post("/whoiscompany")
-def whois_bulk(body: Dict[str,List[str]])->dict:
+def whois_bulk(body: Dict[str, List[str]]) -> dict:
     companies = {}
     for domain in body['domains']:
         company = cache.get(domain)

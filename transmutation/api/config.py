@@ -1,7 +1,9 @@
 """Configuration loader"""
 # go to .env to modify configuration variables or use environment variables
+import yaml
 from pydantic import BaseSettings
 from typing import Optional
+
 
 class Settings(BaseSettings):
     app_name: str = "Transmutation API"
@@ -23,8 +25,8 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
 
+
 settings = Settings()
 
-import yaml
 with open('api/logconfig.yml') as f:
     log_config = yaml.load(f, Loader=yaml.FullLoader)

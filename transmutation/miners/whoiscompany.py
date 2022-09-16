@@ -2,40 +2,43 @@
 """
 Return company name based on domain's email address whois
 """
+import logging
+import whois
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"
 
-#Global variable for performance purpose in case of serverless
+# Global variable for performance purpose in case of serverless
 domains_companies = {}
-TO_IGNORE = ("Statutory Masking Enabled", "Privacy service provided by Withheld for Privacy ehf", "Data Protected")
+TO_IGNORE = ("Statutory Masking Enabled",
+             "Privacy service provided by Withheld for Privacy ehf", "Data Protected")
 
-import whois
-import logging
 
 log = logging.getLogger(__name__)
 
-def get_domain(email:str)->str:
+
+def get_domain(email: str) -> str:
     return email.split('@')[1]
 
-def get_company(domain:str)->str:
-    result = whois.query(domain, ignore_returncode = True)
-    #if the whois request does answer a proper string
+
+def get_company(domain: str) -> str:
+    result = whois.query(domain, ignore_returncode=True)
+    # if the whois request does answer a proper string
     if not result:
         return None
 
-    #the company name is the registrant in *this* whois implementation
+    # the company name is the registrant in *this* whois implementation
     company = result.registrant
 
-    #there is some domains who hide their real registrant name
+    # there is some domains who hide their real registrant name
     if company in TO_IGNORE:
         log.debug("Following registrant in ignore list: %s" % company)
         return None
 
     domains_companies[domain] = company
     return domains_companies[domain]
-        
 
-def get_company_from_email(email:str)->str:
+
+def get_company_from_email(email: str) -> str:
     """return company name from an email address
 
     Args:
@@ -47,27 +50,30 @@ def get_company_from_email(email:str)->str:
     domain = get_domain(email)
     return get_company(domain)
 
-def get_company_from_person(person:dict)->dict:
+
+def get_company_from_person(person: dict) -> dict:
     domain = get_domain(person['email'])
     company = get_company(domain)
-    person['worksFor'] = {'legalName' : company, 'name' : company}
+    person['worksFor'] = {'legalName': company, 'name': company}
     return person
 
-def bulk_companies_from_domains(domains:list)->dict:
-    return {domain:get_company(domain) for domain in domains}
 
-def bulk_companies_from_emails(emails:list)->dict:
+def bulk_companies_from_domains(domains: list) -> dict:
+    return {domain: get_company(domain) for domain in domains}
+
+
+def bulk_companies_from_emails(emails: list) -> dict:
     domains = {}
 
-    #build directory of domains
+    # build directory of domains
     for email in emails:
         domain = get_domain(email)
         if domain not in domains:
             domains[domain] = [email]
         else:
             domains[domain].append(email)
-    
-    #map emails to companies based on their domain
+
+    # map emails to companies based on their domain
     companies = {}
     for domain in domains:
         company = get_company(domain)
@@ -76,8 +82,10 @@ def bulk_companies_from_emails(emails:list)->dict:
 
     return companies
 
-def bulk_company_from_person(persons:list)->list:
+
+def bulk_company_from_person(persons: list) -> list:
     return None
+
 
 if __name__ == "__main__":
     import sys

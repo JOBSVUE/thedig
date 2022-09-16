@@ -5,7 +5,7 @@ __version__ = "0.1dev"
 from api import linkedin
 from api import whoiscompany
 
-#finally API router
+# finally API router
 from fastapi import APIRouter
 router = APIRouter()
 router.include_router(whoiscompany.router)

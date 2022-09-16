@@ -13,7 +13,8 @@ import logging
 import requests
 log = logging.getLogger(__name__)
 
-def domain_to_urls(domain: str)->list[str]:
+
+def domain_to_urls(domain: str) -> list[str]:
     """Build hypothetical websites URL from a domain
     Gives priority to https then to www
 
@@ -25,7 +26,8 @@ def domain_to_urls(domain: str)->list[str]:
     """
     return [f"https://www.{domain}", f"https://{domain}", f"http://www.{domain}", f"http://{domain}"]
 
-def get_favicon(url: str)->bool:
+
+def get_favicon(url: str) -> bool:
     """check for favicon at a specific URL
 
     Args:
@@ -42,15 +44,16 @@ def get_favicon(url: str)->bool:
     except requests.RequestException:
         log.debug("No reachable host for this url: %s" % favicon_url)
         return None
-    
+
     if r.status_code == 200 and r.headers['Content-Type'] == 'image/x-icon':
         log.debug("favicon found at this URL %s" % favicon_url)
         return True
-    else:  #yet, this is probably the right website to scan
+    else:  # yet, this is probably the right website to scan
         log.debug("No favicon at this URL: %s" % favicon_url)
         return False
 
-def scrap_favicon(url: str)->str:
+
+def scrap_favicon(url: str) -> str:
     """Scrap for favicon on a website
     fallback to og:image if found
 
@@ -64,18 +67,20 @@ def scrap_favicon(url: str)->str:
         r = requests.get(url)
     except requests.RequestException:
         return None
-    
+
     if r.status_code == 200:
         soup = BeautifulSoup(r.text, features="lxml")
         log.debug("That page's url seems Ok: %s " % url)
-            
-        favicon_link = soup.find('link', attrs={'rel': re.compile("^(shortcut icon|icon)$", re.I)})
+
+        favicon_link = soup.find(
+            'link', attrs={'rel': re.compile("^(shortcut icon|icon)$", re.I)})
         if favicon_link:
-            log.debug("We did find the favicon link in the HTML: %s" % favicon_link)
+            log.debug("We did find the favicon link in the HTML: %s" %
+                      favicon_link)
             favicon_href = favicon_link.get("href")
             favicon_url = urllib.parse.urljoin(url, favicon_href)
         else:
-            og_image_tag = soup.find("meta", attrs={'property' : "og:image"})
+            og_image_tag = soup.find("meta", attrs={'property': "og:image"})
             if og_image_tag:
                 log.debug("og:image found for this url: %s" % url)
                 og_image = og_image_tag.get('content')
@@ -85,6 +90,7 @@ def scrap_favicon(url: str)->str:
                 return None
 
     return favicon_url
+
 
 def find_favicon(domain: str) -> str:
     """_summary_
@@ -100,16 +106,17 @@ def find_favicon(domain: str) -> str:
         favicon_url = get_favicon(url)
         if favicon_url:
             return favicon_url
-        elif favicon_url is None: #not a valid website
-            continue #next URL
+        elif favicon_url is None:  # not a valid website
+            continue  # next URL
         elif not favicon_url:
             favicon_url = scrap_favicon(url)
             if favicon_url:
                 return favicon_url
 
+
 if __name__ == "__main__":
     import sys
-    logging.basicConfig(format="%(asctime)-15s [%(levelname)s] %(funcName)s: %(message)s", level=logging.DEBUG)
+    logging.basicConfig(
+        format="%(asctime)-15s [%(levelname)s] %(funcName)s: %(message)s", level=logging.DEBUG)
 
     log.info(find_favicon(domain=sys.argv[1]))
-    

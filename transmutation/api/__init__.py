@@ -9,10 +9,6 @@ from transmutation import miners
 from .linkedin import router as linkedin_router
 from .whoiscompany import router as whoiscompany_router
 
-# create logger
-import logging
-log = logging.getLogger(__name__)
-
 # finally API router
 from fastapi import APIRouter
 

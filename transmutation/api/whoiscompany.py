@@ -13,12 +13,7 @@ from fastapi import APIRouter
 from typing import List
 from typing import Dict
 from .config import settings
-from .config import log_config
-
-# create logger
-import logging
-
-log = logging.getLogger(__name__)
+from .config import log
 
 # set-up router
 router = APIRouter()
@@ -30,8 +25,9 @@ redis_param = {
     if setting_k.startswith("redis")
 } 
 redis_param["decode_responses"] = True
-cache = redis.Redis(**redis_param)
 
+cache = redis.Redis(**redis_param)
+log.info("Set-up Redis cache for whoiscompany")
 
 @router.get("/whoiscompany/{domain}")
 def whois_unique(domain: str) -> str:

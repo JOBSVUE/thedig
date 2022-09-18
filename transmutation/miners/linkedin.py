@@ -12,10 +12,14 @@ try:
 except ImportError:
     from ISO3166 import ISO3166
 
+from multiprocessing.sharedctypes import Value
 import re
 import requests
 import logging
 import threading
+from pydantic_schemaorg.Person import Person
+from pydantic_schemaorg.Organization import Organization
+from pydantic_schemaorg.PostalAddress import PostalAddress
 
 log = logging.getLogger(__name__)
 
@@ -106,7 +110,7 @@ class LinkedInSearch:
         if not bing and not google:
             raise ValueError("Must choose at least one search engine: bing or google")
 
-        self.person = {}
+        self.person = Person()
 
     def _search_google(self, query: str):
         """Search a query on Google and return the first result
@@ -135,7 +139,7 @@ class LinkedInSearch:
 
         Args:
             query (str): query string
-        
+
         Returns:
             dict: first result
         """
@@ -162,13 +166,12 @@ class LinkedInSearch:
 
     def _add_country(self):
         """add country name to the Person JSON-LD based on the linkedin profile url"""
-        if "url" in self.person:
-            country = country_from_url(self.person["url"])
+        if self.person.url:
+            country = country_from_url(self.person.url)
             if country:
-                self.person["address"] = {
-                    "@type": "PostalAddress",
-                    "addressCountry": country,
-                }
+                self.person.address = country
+                # TOFIX: do not work for unknown reason
+                # self.person.address = PostalAddress(addressCountry=country)
 
     def search(self, name, email: str = None, company: str = None) -> dict:
         """
@@ -180,8 +183,14 @@ class LinkedInSearch:
 
             if self.bing and self.google:
                 # creating threads
-                google = threading.Thread(target=self.extract_google, args=(name, email))
-                bing = threading.Thread(target=self.extract_bing, args=(name, email))
+                google = threading.Thread(
+                    target=self.extract_google,
+                    args=(name, email)
+                    )
+                bing = threading.Thread(
+                    target=self.extract_bing,
+                    args=(name, email)
+                    )
 
                 # starting threads
                 google.start()
@@ -199,7 +208,6 @@ class LinkedInSearch:
             self.extract_google(name, company=company)
 
         self._add_country()
-
         return self.person
 
     def extract_google(self, name: str, email: str = None, company: str = None) -> dict:
@@ -210,7 +218,7 @@ class LinkedInSearch:
             name (str): full name of the person
             email (str): email address
             company (str): company name (Optional)
-        
+
         Returns:
             person (str) : person JSON-LD filled with the infos mined
         """
@@ -227,25 +235,19 @@ class LinkedInSearch:
                     )
                     return {}
 
-                self.person.update(
-                    {
-                        # for full JSON-LD conformity
-                        "@context": "http://schema.org",
-                        "@type": "@Person",
-                        "givenName": result["pagemap"]["metatags"][0][
-                            "profile:first_name"
-                        ],
-                        "familyName": result["pagemap"]["metatags"][0][
-                            "profile:last_name"
-                        ],
-                        "name": full_title["name"],
-                        "jobTitle": full_title.get("title"),
-                        "worksFor": {"name": full_title.get("company")},
-                        # cse_thumbnail is Google's image
-                        "image": result["pagemap"]["metatags"][0]["og:image"],
-                        "url": result["link"],
-                    }
-                )
+                self.person.givenName = result["pagemap"]["metatags"][0][
+                        "profile:first_name"
+                    ]
+                self.person.familyName = result["pagemap"]["metatags"][0][
+                        "profile:last_name"
+                    ]
+                self.person.name = full_title["name"]
+                self.person.jobTitle = full_title.get("title")
+                self.person.worksFor = Organization(name=full_title.get("company"))
+                # we do not use cse_thumbnail (Google's image)
+                self.person.image = result["pagemap"]["metatags"][0]["og:image"]
+                self.person.url = result["link"]
+
             except KeyError as e:
                 log.debug("Not enough data in the results %s" % e)
                 return {}
@@ -276,34 +278,22 @@ class LinkedInSearch:
                     )
                     return {}
 
-                self.person.update(
-                    {
-                        # for full JSON-LD conformity
-                        "@context": "http://schema.org",
-                        "@type": "@Person",
-                        # it may be useful to set these values if they're absent
-                        "name": full_title["name"],
-                        "jobTitle": full_title.get("title"),
-                        "worksFor": {"name": full_title.get("company")},
-                        "url": result["url"],
-                        # sometimes it's an useless thumbnail : 404 Error
-                        "image": result["openGraphImage"]["contentUrl"],
-                    }
-                )
+                # it may be useful to set these values if they're absent
+                # self.person.name = full_title["name"]
+                self.person.jobTitle = full_title.get("title")
+                self.person.worksFor = Organization(name=full_title.get("company"))
+                # sometimes it's an useless thumbnail : 404 Error
+                self.person.image = result["openGraphImage"]["contentUrl"]
+                self.person.url = result["url"]
 
                 # Bing also gives you sometimes location
                 address = result["richFacts"][0]["items"][0]["text"].split(", ")
                 # however sometimes the address isn't correctly identified by Bing
                 if len(address) >= 3:
-                    self.person.update(
-                        {
-                            "address": {
-                                # "@type"    :   "PostalAddress",
-                                "addressLocation": address[0],
-                                "addressRegion": address[1],
-                                "addressCountry": address[2],
-                            }
-                        }
+                    self.person.address = PostalAddress(
+                        addressLocation=address[0],
+                        addressRegion=address[1],
+                        addressCountry=address[2]
                     )
             except KeyError as e:
                 log.debug("Not enough data in the results %s" % e)
@@ -313,6 +303,7 @@ class LinkedInSearch:
             return {}
 
         return self.person
+
 
 if __name__ == "__main__":
     import sys

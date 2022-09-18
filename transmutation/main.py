@@ -23,8 +23,8 @@ from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 
 # import other apis
-from .api import router
-from .api.config import settings, log_config
+from transmutation.api import router
+from transmutation.api.config import settings, log_config
 
 # logging
 import logging

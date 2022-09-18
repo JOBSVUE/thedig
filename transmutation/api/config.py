@@ -30,3 +30,11 @@ settings = Settings()
 
 with open(os.path.join(os.path.dirname(__file__),settings.log_config)) as f:
     log_config = yaml.safe_load(f)
+
+# deal with fastapi issue with root/module loggers
+# see https://github.com/tiangolo/uvicorn-gunicorn-fastapi-docker/issues/19
+import logging.config
+
+logging.config.dictConfig(log_config)
+# create logger
+log = logging.getLogger(__name__)

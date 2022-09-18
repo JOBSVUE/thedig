@@ -7,7 +7,6 @@ Microservices for data enrichment :
 - /...
 - future: /socialprofiles : person (JSON-LD) -> list of social profiles
 """
-from api import router
 import secrets
 import os
 
@@ -24,9 +23,8 @@ from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 
 # import other apis
-from api import whoiscompany
-from api import linkedin
-from api.config import settings, log_config
+from .api import router
+from .api.config import settings, log_config
 
 # logging
 import logging

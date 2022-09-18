@@ -41,6 +41,25 @@ def country_from_url(linkedin_url: str) -> str:
         return None
 
 
+def parse_linkedin_title(title):
+    """parse LinkedIn Title that has this form
+        Full Name - Title - Company | LinkedIn
+        and sometimes (Google only):
+        Full Name - Title - Company... | LinkedIn
+    Args:
+        title (str): title from LinkedIn page
+    """
+    result = {}
+    full_title = title.split("|")[0].split(" - ")
+    result["name"] = full_title[0]
+
+    if len(full_title) > 1:
+        result["title"] = full_title[1]
+        if len(full_title) > 2:
+            # sometimes the company name has a '...' suffix
+            result["company"] = full_title[2].removesuffix("...").strip()
+    return result
+
 class LinkedInSearch:
     """
     Mine public data from LinkedIn with an email address using Google Search API and/or Microsoft Bing API
@@ -294,27 +313,6 @@ class LinkedInSearch:
             return {}
 
         return self.person
-
-
-def parse_linkedin_title(title):
-    """parse LinkedIn Title that has this form
-        Full Name - Title - Company | LinkedIn
-        and sometimes (Google only):
-        Full Name - Title - Company... | LinkedIn
-    Args:
-        title (str): title from LinkedIn page
-    """
-    result = {}
-    full_title = title.split("|")[0].split(" - ")
-    result["name"] = full_title[0]
-
-    if len(full_title) > 1:
-        result["title"] = full_title[1]
-        if len(full_title) > 2:
-            # sometimes the company name has a '...' suffix
-            result["company"] = full_title[2].removesuffix("...").strip()
-    return result
-
 
 if __name__ == "__main__":
     import sys

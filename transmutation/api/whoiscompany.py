@@ -6,16 +6,14 @@ __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
 # service
-import miners.whoiscompany as whoiscompany
+from ..miners import whoiscompany
 
 # fast api
 from fastapi import APIRouter
-from pydantic import BaseModel
-from pydantic import EmailStr
 from typing import List
 from typing import Dict
-from api.config import settings
-from api.config import log_config
+from .config import settings
+from .config import log_config
 
 # create logger
 import logging

@@ -3,7 +3,7 @@
 import yaml
 from pydantic import BaseSettings
 from typing import Optional
-
+import os.path
 
 class Settings(BaseSettings):
     app_name: str = "Transmutation API"
@@ -21,12 +21,12 @@ class Settings(BaseSettings):
     server_port: int
     api_keys: list[str]
     api_key_name: str
+    log_config: str
 
     class Config:
         env_file = ".env"
 
-
 settings = Settings()
 
-with open("api/logconfig.yml") as f:
+with open(os.path.join(os.path.dirname(__file__),settings.log_config)) as f:
     log_config = yaml.safe_load(f)

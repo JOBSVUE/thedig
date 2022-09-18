@@ -4,14 +4,14 @@ __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
 # service
-from miners.linkedin import LinkedInSearch
+from ..miners.linkedin import LinkedInSearch
 
 # fast api
 from fastapi import APIRouter
 from pydantic import BaseModel
 from pydantic import EmailStr
 from typing import List
-from api.config import settings
+from .config import settings
 
 # init fast api
 router = APIRouter()
@@ -34,12 +34,12 @@ search_api_params = {
 
 
 @router.get("/linkedin/{email}")
-def linkedinminer_unique(email: EmailStr, name: str):
+def linkedin_unique(email: EmailStr, name: str):
     miner = LinkedInSearch(search_api_params, google=True, bing=False)
     return miner.search(name=name, email=email)
 
 
 @router.post("/linkedin")
-def linkedinminer_bulk(persons: List[Person]):
+def linkedin_bulk(persons: List[Person]):
     miner = LinkedInSearch(search_api_params, google=False, bing=True)
     return [miner.search(name=person.name, email=person.email) for person in persons]

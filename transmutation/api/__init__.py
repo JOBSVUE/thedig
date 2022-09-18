@@ -2,12 +2,20 @@ __license__ = "AGPL"
 __author__ = "Badreddine Lejmi <badreddine@ankaboot.fr>"
 __version__ = "0.1dev"
 
-from api import linkedin
-from api import whoiscompany
+#import miners to being available in the API scope
+from transmutation import miners
+
+#import API
+from .linkedin import router as linkedin_router
+from .whoiscompany import router as whoiscompany_router
+
+# create logger
+import logging
+log = logging.getLogger(__name__)
 
 # finally API router
 from fastapi import APIRouter
 
 router = APIRouter()
-router.include_router(whoiscompany.router)
-router.include_router(linkedin.router)
+router.include_router(whoiscompany_router)
+router.include_router(linkedin_router)

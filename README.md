@@ -27,7 +27,7 @@ To run this project, you'll need a few environement variables which includes som
 ### Launch
 ```bash
   cd transmutation
-  guvicorn main:app
+  uvicorn main:app
 ``` 
 
 ## ⚠️ Support

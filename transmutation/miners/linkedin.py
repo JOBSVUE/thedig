@@ -187,14 +187,89 @@ class LinkedInSearch:
                 # TOFIX: do not work for unknown reason
                 # self.person.address = PostalAddress(addressCountry=country)
 
+    def _extract_bing_specific(self, result):
+        # sometimes it's an useless thumbnail : 404 Error
+        self.person.image = result["openGraphImage"]["contentUrl"]
+        self.person.url = result["url"]
+
+        # Bing also gives you sometimes location
+        address = result["richFacts"][0]["items"][0]["text"].split(", ")
+        # however sometimes the address isn't correctly identified by Bing
+        if len(address) >= 3:
+            self.person.address = PostalAddress(
+                addressLocation=address[0],
+                addressRegion=address[1],
+                addressCountry=address[2]
+            )
+    
+    def _extract_google_specific(self, result):
+        self.person.givenName = result["pagemap"]["metatags"][0][
+                "profile:first_name"
+            ]
+        self.person.familyName = result["pagemap"]["metatags"][0][
+                "profile:last_name"
+            ]
+
+        # we do not use cse_thumbnail (Google's image)
+        if len(result["pagemap"]["metatags"])>=1:
+            self.person.image = result["pagemap"]["metatags"][0]["og:image"]
+        self.person.url = result["link"]
+
+    def extract(self, name: str, email: str = None, company: str = None, google: bool = True) -> Person:
+        """
+        Search engine then update and return the personal data accordingly
+        Google gives you the givenName/familyName but not the location
+        Bings gives you the location sometimes but not the givenName/familyName
+        Args:
+            name (str): name
+            email (str): email
+            company (str): company's name
+            google (bool): extract with Google, if false Bing
+
+        Returns:
+            person (str) : person JSON-LD filled with the infos mined
+        """
+        query_string = email if email else f"{name} {company}"
+        result = self._search_google(query_string) if google else self._search_bing(query_string) 
+        
+        if result:
+            full_title = parse_linkedin_title(result["title" if google else "name"])
+
+            # the full name from the result must be the same that the name itself
+            # 98 seems a good ratio for difference between ascii and latin characters
+            if fuzz.token_set_ratio(full_title["name"], name.strip())<98:
+                log.error(
+                    f"The full name {full_title['name']} mined doesn't match the name {name} given as a parameter"
+                )
+                return None
+
+            if "title" in full_title:
+                self.person.jobTitle = full_title["title"]
+            if "company" in full_title:
+                self.person.worksFor = Organization(name=full_title.get("company"))
+
+            try:
+                if google:
+                    self._extract_google_specific(result)
+                else:
+                    self._extract_bing_specific(result)
+            except KeyError:
+                log.debug("No extractable data in this result : {result} ")
+        else:
+            log.debug("No result found")
+            # self.person = None
+            return None
+        return self.person
+
     def search(self, name, email: str = None, company: str = None) -> dict:
         """
         search and return the public data for an email and/or company
         """
-        self.person = Person()
+        self.person = Person(name=name)
         if email:
             log.debug("Searching by name %s and email %s" % (name, email))
 
+            self.person.email = email
             if self.bing and self.google:
                 # creating threads
                 google = threading.Thread(
@@ -214,16 +289,21 @@ class LinkedInSearch:
                 google.join()
                 bing.join()  # usually add location
             elif self.google:
-                self.extract_google(name, email)
+                self.extract(name, email)
             elif self.bing:
-                self.extract_bing(name, email)
+                self.extract(name, email, google=False)
         if company:
+            self.person.worksFor = Organization(name=company)
             log.debug("Searching by name %s and company %s" % (name, company))
-            self.extract_google(name, company=company)
+            self.extract(name, company=company)
 
         self._add_country()
         
-        return self.person
+        # answer only if we found something
+        if self.person.url:
+            return self.person
+        else:
+            return None
 
     def bulk(self, persons: list[Person]) -> list:
         """Bulk search
@@ -240,108 +320,6 @@ class LinkedInSearch:
                 self.persons.append(p_enrich)
             
         return self.persons
-
-    def extract_google(self, name: str, email: str = None, company: str = None) -> dict:
-        """
-        Google search engine then return and update the personal data accordingly
-        Google gives you the givenName/familyName but not the location
-        Args:
-            name (str): full name of the person
-            email (str): email address
-            company (str): company name (Optional)
-
-        Returns:
-            person (str) : person JSON-LD filled with the infos mined
-        """
-        query_string = email if email else f"{name} {company}"
-        result = self._search_google(query_string)
-        
-        if result:
-            try:
-                full_title = parse_linkedin_title(result["title"])
-
-                # the full name from the result must be the same that the name itself
-                # 98 seems a good ratio for difference between ascii and latin characters
-                if fuzz.token_set_ratio(full_title["name"], name.strip())<98:
-                    log.error(
-                        f"The full name {full_title['name']} mined doesn't match the name {name} given as a parameter"
-                    )
-                    return None
-
-                self.person.givenName = result["pagemap"]["metatags"][0][
-                        "profile:first_name"
-                    ]
-                self.person.familyName = result["pagemap"]["metatags"][0][
-                        "profile:last_name"
-                    ]
-
-                if "title" in full_title:
-                    self.person.jobTitle = full_title["title"]
-                if "company" in full_title:
-                    self.person.worksFor = Organization(name=full_title.get("company"))
-                # we do not use cse_thumbnail (Google's image)
-                if len(result["pagemap"]["metatags"])>=1:
-                    self.person.image = result["pagemap"]["metatags"][0]["og:image"]
-                self.person.url = result["link"]
-
-            except KeyError as e:
-                log.debug("Not enough data in the results %s" % e)
-                return None
-        else:
-            log.debug("No result found")
-            # self.person = None
-            return None
-        return self.person
-
-    def extract_bing(self, name: str, email: str):
-        """Bing search engine then return and update the personal data accordingly
-        Bing gives you sometimes the location but doesn't give you the givenName/familyName
-        Args:
-            name (str): _description_
-            email (str): _description_
-        """
-        result = self._search_bing(email)
-
-        if result:
-            try:
-                # usually a LinkedIn title has this form "Full Name - Title - Company | LinkedIn"
-                full_title = parse_linkedin_title(result["name"])
-
-                # the full name from the result must be the same that the name itself
-                if full_title["name"].lower() != name.strip().lower():
-                    log.debug(
-                        "The full name mined doesn't match the name given as a parameter"
-                    )
-                    return {}
-
-                # it may be useful to set these values if they're absent
-                # however for the moment we don't process Person without names
-                # if self.person.name = full_title["name"]
-
-                self.person.jobTitle = full_title.get("title")
-                self.person.worksFor = Organization(name=full_title.get("company"))
-                # sometimes it's an useless thumbnail : 404 Error
-                self.person.image = result["openGraphImage"]["contentUrl"]
-                self.person.url = result["url"]
-
-                # Bing also gives you sometimes location
-                address = result["richFacts"][0]["items"][0]["text"].split(", ")
-                # however sometimes the address isn't correctly identified by Bing
-                if len(address) >= 3:
-                    self.person.address = PostalAddress(
-                        addressLocation=address[0],
-                        addressRegion=address[1],
-                        addressCountry=address[2]
-                    )
-            except KeyError as e:
-                log.debug("Not enough data in the results %s" % e)
-                return {}
-        else:
-            log.debug("No result found")
-            return {}
-
-        return self.person
-
 
 if __name__ == "__main__":
     import sys

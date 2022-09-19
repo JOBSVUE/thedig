@@ -41,7 +41,20 @@ def linkedin_unique(email: EmailStr, name: str):
     "/linkedin",
     response_model=List[Person],
     response_model_exclude_none=True
-    )
-def linkedin_bulk(persons: List[Person]):
-    miner = LinkedInSearch(search_api_params, google=False, bing=True)
-    return [miner.search(name=person.name, email=person.email) for person in persons]
+    )    
+def linkedin_bulk(persons: list[Person]) -> list[Person]:
+    miner = LinkedInSearch(bulk=True, search_api_params=search_api_params)
+    r = []
+
+    # remove persons with no name
+    persons = list(filter(lambda person: person.name, persons))
+
+    randomize = True
+    batch = 10
+
+    if randomize:
+        import random
+        random.shuffle(persons)
+    
+    r = miner.bulk(persons[:min(batch,len(persons))-1])    
+    return r

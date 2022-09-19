@@ -79,7 +79,10 @@ app.include_router(router)
 if __name__ == "__main__":
     import uvicorn
 
+
     # TODO: fix issue related to child loggers levels in DEBUG mode
+    # log.setLevel(logging.DEBUG)
+
     uvicorn.run(
         "main:app",
         port=int(os.environ.get("PORT", settings.server_port)),

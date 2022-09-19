@@ -12,11 +12,16 @@ try:
 except ImportError:
     from ISO3166 import ISO3166
 
-from multiprocessing.sharedctypes import Value
 import re
 import requests
 import logging
+from thefuzz import fuzz
+
+# needed for memory sharing between threads
+from multiprocessing.sharedctypes import Value
 import threading
+
+# JSON Schema.org types
 from pydantic_schemaorg.Person import Person
 from pydantic_schemaorg.Organization import Organization
 from pydantic_schemaorg.PostalAddress import PostalAddress
@@ -28,8 +33,8 @@ LINKEDIN_URL_RE = re.compile("https:\/\/(\w{2})\.?linkedin.com\/in\/w*")
 
 
 def country_from_url(linkedin_url: str) -> str:
-    """Country name based on the xx.linkedin.com profile url where xx is the ISO3166 country code
-    else return None
+    """Country name based on the xx.linkedin.com profile url
+    where xx is the ISO3166 country code else return None
 
     Args:
         linkedin_url (str): linkedin profile URL
@@ -58,15 +63,16 @@ def parse_linkedin_title(title):
     result["name"] = full_title[0]
 
     if len(full_title) > 1:
-        result["title"] = full_title[1]
+        # when it's long, LinkedIn add a '...' suffix
+        result["title"] = full_title[1].removesuffix("...").strip()
         if len(full_title) > 2:
-            # sometimes the company name has a '...' suffix
             result["company"] = full_title[2].removesuffix("...").strip()
     return result
 
 class LinkedInSearch:
     """
-    Mine public data from LinkedIn with an email address using Google Search API and/or Microsoft Bing API
+    Mine public data from LinkedIn with an email address
+    using Google Search API and/or Microsoft Bing API
     """
 
     NUM_RESULTS = 1
@@ -74,7 +80,13 @@ class LinkedInSearch:
     GOOGLE_SEARCH_URL_BASE = "https://www.googleapis.com/customsearch/v1/siterestrict?key={google_api_key}&cx={google_cx}&num{num_results}&fields={google_fields}"
     BING_SEARCH_URL_BASE = "https://api.bing.microsoft.com/v7.0/custom/search?customconfig={bing_custom_config}&count={num_results}"
 
-    def __init__(self, search_api_params: dict, google=True, bing=False):
+    def __init__(
+        self,
+        search_api_params: dict,
+        google: bool = True,
+        bing: bool = False,
+        bulk: bool = False
+        ):
         """LinkedInSearch constructor
 
         Args:
@@ -110,7 +122,9 @@ class LinkedInSearch:
         if not bing and not google:
             raise ValueError("Must choose at least one search engine: bing or google")
 
-        self.person = Person()
+        if bulk:
+            self.persons = []
+        self.person = None
 
     def _search_google(self, query: str):
         """Search a query on Google and return the first result
@@ -177,7 +191,7 @@ class LinkedInSearch:
         """
         search and return the public data for an email and/or company
         """
-        result = {}
+        self.person = Person()
         if email:
             log.debug("Searching by name %s and email %s" % (name, email))
 
@@ -208,7 +222,24 @@ class LinkedInSearch:
             self.extract_google(name, company=company)
 
         self._add_country()
+        
         return self.person
+
+    def bulk(self, persons: list[Person]) -> list:
+        """Bulk search
+
+        Args:
+            persons (list[Persons]): list of Persons
+
+        Returns:
+            list: list of Persons
+        """
+        for person in persons:
+            p_enrich = self.search(person.name, person.email)
+            if p_enrich:
+                self.persons.append(p_enrich)
+            
+        return self.persons
 
     def extract_google(self, name: str, email: str = None, company: str = None) -> dict:
         """
@@ -224,16 +255,18 @@ class LinkedInSearch:
         """
         query_string = email if email else f"{name} {company}"
         result = self._search_google(query_string)
+        
         if result:
             try:
                 full_title = parse_linkedin_title(result["title"])
 
                 # the full name from the result must be the same that the name itself
-                if full_title["name"].lower() != name.strip().lower():
-                    log.debug(
-                        f"The full name {full_title[0]} mined doesn't match the name {name} given as a parameter"
+                # 98 seems a good ratio for difference between ascii and latin characters
+                if fuzz.token_set_ratio(full_title["name"], name.strip())<98:
+                    log.error(
+                        f"The full name {full_title['name']} mined doesn't match the name {name} given as a parameter"
                     )
-                    return {}
+                    return None
 
                 self.person.givenName = result["pagemap"]["metatags"][0][
                         "profile:first_name"
@@ -241,20 +274,23 @@ class LinkedInSearch:
                 self.person.familyName = result["pagemap"]["metatags"][0][
                         "profile:last_name"
                     ]
-                self.person.name = full_title["name"]
-                self.person.jobTitle = full_title.get("title")
-                self.person.worksFor = Organization(name=full_title.get("company"))
+
+                if "title" in full_title:
+                    self.person.jobTitle = full_title["title"]
+                if "company" in full_title:
+                    self.person.worksFor = Organization(name=full_title.get("company"))
                 # we do not use cse_thumbnail (Google's image)
-                self.person.image = result["pagemap"]["metatags"][0]["og:image"]
+                if len(result["pagemap"]["metatags"])>=1:
+                    self.person.image = result["pagemap"]["metatags"][0]["og:image"]
                 self.person.url = result["link"]
 
             except KeyError as e:
                 log.debug("Not enough data in the results %s" % e)
-                return {}
+                return None
         else:
             log.debug("No result found")
-            return {}
-
+            # self.person = None
+            return None
         return self.person
 
     def extract_bing(self, name: str, email: str):
@@ -279,7 +315,9 @@ class LinkedInSearch:
                     return {}
 
                 # it may be useful to set these values if they're absent
-                # self.person.name = full_title["name"]
+                # however for the moment we don't process Person without names
+                # if self.person.name = full_title["name"]
+
                 self.person.jobTitle = full_title.get("title")
                 self.person.worksFor = Organization(name=full_title.get("company"))
                 # sometimes it's an useless thumbnail : 404 Error

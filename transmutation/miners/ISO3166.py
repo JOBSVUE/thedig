@@ -76,6 +76,8 @@ ISO3166 = {
     "FX": "France, Metropolitan",
     "GA": "Gabon",
     "GB": "United Kingdom (Great Britain)",
+    #exception for GB
+    "UK": "United Kingdom (Great Britain)",
     "GD": "Grenada",
     "GE": "Georgia",
     "GF": "French Guiana",
@@ -87,6 +89,8 @@ ISO3166 = {
     "GP": "Guadeloupe",
     "GQ": "Equatorial Guinea",
     "GR": "Greece",
+    #exception for Greece
+    "EL": "Greece",
     "GS": "South Georgia and the South Sandwich Islands",
     "GT": "Guatemala",
     "GU": "Guam",

@@ -7,3 +7,4 @@ requests>=2.25.1
 uvicorn>=0.18.2
 whois>=0.9.16
 pydantic-schemaorg>=1.0.6
+thefuzz[speedup]>=0.19

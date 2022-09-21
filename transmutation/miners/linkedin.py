@@ -77,7 +77,7 @@ class LinkedInSearch:
 
     NUM_RESULTS = 1
     GOOGLE_FIELDS = "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image)"
-    GOOGLE_SEARCH_URL_BASE = "https://www.googleapis.com/customsearch/v1/siterestrict?key={google_api_key}&cx={google_cx}&num{num_results}&fields={google_fields}"
+    GOOGLE_SEARCH_URL_BASE = "https://www.googleapis.com/customsearch/v1/siterestrict?key={google_api_key}&cx={google_cx}&num={num_results}&fields={google_fields}"
     BING_SEARCH_URL_BASE = "https://api.bing.microsoft.com/v7.0/custom/search?customconfig={bing_custom_config}&count={num_results}"
 
     def __init__(
@@ -254,6 +254,7 @@ class LinkedInSearch:
                 else:
                     self._extract_bing_specific(result)
             except KeyError:
+
                 log.debug("No extractable data in this result : {result} ")
         else:
             log.debug("No result found")

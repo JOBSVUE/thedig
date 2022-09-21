@@ -1,7 +1,8 @@
 #!/bin/python3
 """
 Microservices for data enrichment :
-- /linkedinminer (JSON-LD schema.org format): full name and email -> fist name, last name, title, company, location, image, linkedin URL
+- /linkedin (JSON-LD schema.org format): full name and email -> 
+  fist name, last name, title, company, location, image, linkedin URL
 - /whoiscompany : list of domains -> dict of domain : company name
 - /emailvalidation : list of emails address -> dict of email address : validation status
 - /...

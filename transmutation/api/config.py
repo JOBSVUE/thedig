@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     api_keys: list[str]
     api_key_name: str
     log_config: str
+    bulk_size: int
 
     class Config:
         env_file = ".env"

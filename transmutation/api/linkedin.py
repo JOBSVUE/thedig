@@ -3,13 +3,21 @@ __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
+
+import requests
+import time
+
 # fast api
-from fastapi import APIRouter
-from pydantic import BaseModel
-from pydantic import EmailStr
-from typing import List
 from .config import settings
 from .config import log
+
+from fastapi import APIRouter
+from fastapi import Header
+from fastapi import BackgroundTasks
+
+from pydantic import EmailStr
+from pydantic import SecretStr
+from typing import List
 
 # Schema.org Person
 from pydantic_schemaorg.Person import Person
@@ -32,29 +40,94 @@ search_api_params = {
     response_model=Person,
     response_model_exclude_unset=True
     )
-def linkedin_unique(email: EmailStr, name: str):
-    miner = LinkedInSearch(search_api_params, google=True, bing=False)
-    return miner.search(name=name, email=email)
+async def linkedin_unique(email: EmailStr, name: str) -> Person:
+    """LinkedIn - enrich only one person identified by his name and email
 
+    Args:
+        email (EmailStr): email address
+        name (str): full name
+
+    Returns:
+        Person: Person Schema.org
+    """
+    miner = LinkedInSearch(search_api_params, google=True, bing=False)
+    person = miner.search(name=name, email=email)
+    return person
 
 @router.post(
     "/linkedin",
     response_model=List[Person],
     response_model_exclude_none=True
     )    
-def linkedin_bulk(persons: list[Person]) -> list[Person]:
+async def linkedin_bulk(
+    persons: list[Person],
+    ) -> List[Person]:
+    """LinkedIn - enrich several persons and returns them
+
+    Args:
+        persons (list[Person]): list of Persons
+    Returns:
+        list[Person]: list of Persons
+    """
+    # remove persons with no name
+    persons = list(filter(lambda p: p.name, persons))
+
     miner = LinkedInSearch(bulk=True, search_api_params=search_api_params)
-    r = []
+
+    return miner.bulk(persons)
+
+
+def patch_personDB(endpoint: str, headers: dict, persons: List[Person]) -> int:
+    i = 0
+    miner = LinkedInSearch(bulk=True, search_api_params=search_api_params)
+    for p in persons:
+        try:
+            p_patched = miner.search(name=p.name, email=p.email)
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                log.info("Search API Rate limits hit. We pause then try again in 1 minute.")
+                # Google limits 100 requests / minute
+                time.sleep(60)
+                p_patched = miner.search(name=p.name, email=p.email)
+            else:
+                log.error(e)
+
+        if not p_patched:
+            continue
+        
+        # for SQL link between tables,
+        # we need to set worksFor to the Organization primary key
+        if p_patched.worksFor:
+            w_json = p_patched.worksFor.json(exclude={'type_'})
+            p_patched.worksFor = p_patched.worksFor.name
+            r = requests.post(f"{endpoint}organizations", data=w_json, headers=headers)
+        
+        p_json = p_patched.json(exclude={'type_'})
+        r = requests.post(f"{endpoint}persons", data=p_json, headers=headers)   
+        
+        # useless counter but who knows?
+        i += 1 if r.ok else 0
+    return i
+
+@router.patch(
+    "/linkedin",
+    )    
+async def linkedin_callback(
+    persons: list[Person],
+    background: BackgroundTasks,
+    x_callback_endpoint: str = Header(),
+    x_callback_secret: SecretStr = Header(),
+    )-> bool:
 
     # remove persons with no name
-    persons = list(filter(lambda person: person.name, persons))
-
-    randomize = True
-    batch = 10
-
-    if randomize:
-        import random
-        random.shuffle(persons)
+    persons = list(filter(lambda p: p.name, persons))
     
-    r = miner.bulk(persons[:min(batch,len(persons))-1])    
-    return r
+    callback_secret = x_callback_secret.get_secret_value()
+    callback_headers = {
+        "apikey" : callback_secret,
+        "Authorization" : f"Bearer {callback_secret}",
+        "Prefer": "resolution=merge-duplicates",
+        "Content-type" : "application/json"
+    }
+    background.add_task(patch_personDB, x_callback_endpoint, callback_headers, persons)
+    return True

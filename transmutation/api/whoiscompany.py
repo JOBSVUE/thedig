@@ -12,6 +12,8 @@ from ..miners import whoiscompany
 from fastapi import APIRouter
 from typing import List
 from typing import Dict
+
+# config
 from .config import settings
 from .config import log
 
@@ -23,9 +25,9 @@ redis_param = {
     setting_k.removeprefix("redis_"): setting_v
     for setting_k, setting_v in settings.dict().items()
     if setting_k.startswith("redis")
-} 
+}
+redis_param["db"] = settings.cache_redis_db
 redis_param["decode_responses"] = True
-
 cache = redis.Redis(**redis_param)
 log.info("Set-up Redis cache for whoiscompany")
 

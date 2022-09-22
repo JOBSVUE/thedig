@@ -22,7 +22,7 @@ You'll need python 3.10 and a [few bunch of libraries](requirements.txt)
 ```
 
 ### Configure
-To run this project, you'll need a few environement variables which includes some API keys. Please edit [default.env](transmutation/default.env) and rename it as `.env`.
+To run this project, you'll need a few environement variables which includes some API keys. Please edit [default.env](default.env) and rename it as `.env`.
 
 ### Launch
 ```bash

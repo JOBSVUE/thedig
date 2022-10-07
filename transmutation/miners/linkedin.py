@@ -14,7 +14,6 @@ except ImportError:
 
 import re
 import requests
-import logging
 from thefuzz import fuzz
 
 # needed for memory sharing between threads
@@ -26,7 +25,8 @@ from pydantic_schemaorg.Person import Person
 from pydantic_schemaorg.Organization import Organization
 from pydantic_schemaorg.PostalAddress import PostalAddress
 
-log = logging.getLogger(__name__)
+# log
+from loguru import logger as log
 
 # linkedin profile url with an ISO3166 country code regular expression
 LINKEDIN_URL_RE = re.compile("https:\/\/(\w{2})\.?linkedin.com\/in\/w*")
@@ -238,7 +238,7 @@ class LinkedInSearch:
             # the full name from the result must be the same that the name itself
             # 98 seems a good ratio for difference between ascii and latin characters
             if fuzz.token_set_ratio(full_title["name"], name.strip())<98:
-                log.error(
+                log.debug(
                     f"The full name {full_title['name']} mined doesn't match the name {name} given as a parameter"
                 )
                 return None

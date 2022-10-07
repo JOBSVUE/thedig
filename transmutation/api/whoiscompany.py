@@ -15,7 +15,9 @@ from typing import Dict
 
 # config
 from .config import settings
-from .config import log
+
+# log
+from loguru import logger as log
 
 # set-up router
 router = APIRouter()

@@ -25,18 +25,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # import other apis
 from transmutation.api import router
-from transmutation.api.config import settings, log_config
+from transmutation.api.config import settings
+from transmutation.api.logsetup import setup_logger_from_settings
 
 # logging
 import logging
-
-# deal with fastapi issue with root/module loggers
-# see https://github.com/tiangolo/uvicorn-gunicorn-fastapi-docker/issues/19
-import logging.config
-
-logging.config.dictConfig(log_config)
-# create logger
-log = logging.getLogger(__name__)
+from fastapi.logger import logger
 
 # X-API-KEY protection
 api_key_header_auth = APIKeyHeader(
@@ -80,9 +74,7 @@ app.include_router(router)
 if __name__ == "__main__":
     import uvicorn
 
-
-    # TODO: fix issue related to child loggers levels in DEBUG mode
-    # log.setLevel(logging.DEBUG)
+    setup_logger_from_settings()
 
     uvicorn.run(
         "main:app",

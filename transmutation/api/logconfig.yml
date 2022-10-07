@@ -22,3 +22,5 @@ loggers:
     propagate: true
   uvicorn.access:
     propagate: true
+  api.config:
+    propagate: true

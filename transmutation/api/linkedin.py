@@ -4,16 +4,12 @@ __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
 
-import requests
-import time
-
 # config
 from .config import settings
 
 # fast api
 from fastapi import APIRouter
 from fastapi import Header
-from fastapi import BackgroundTasks
 
 # types
 from pydantic import EmailStr
@@ -29,8 +25,8 @@ from ..miners.linkedin import LinkedInSearch
 # celery tasks
 from .tasks import patch_personDB
 from .tasks import celery_tasks
-#from .tasks import AsyncResult
-#from celery.result import AsyncResult
+# from .tasks import AsyncResult
+# from celery.result import AsyncResult
 
 
 # init fast api
@@ -42,6 +38,7 @@ search_api_params = {
     "bing_api_key": settings.bing_api_key,
     "bing_customconfig": settings.bing_customconfig,
 }
+
 
 @router.get(
     "/linkedin/{email}",
@@ -61,6 +58,7 @@ async def linkedin_unique(email: EmailStr, name: str) -> Person:
     miner = LinkedInSearch(search_api_params, google=True, bing=False)
     person = miner.search(name=name, email=email)
     return person
+
 
 @router.post(
     "/linkedin",
@@ -84,15 +82,15 @@ async def linkedin_bulk(
 
     return miner.bulk(persons)
 
+
 @router.patch(
     "/linkedin",
     )    
 async def linkedin_callback(
     persons: list[Person],
-#    background: BackgroundTasks,
     x_callback_endpoint: str = Header(),
     x_callback_secret: SecretStr = Header(),
-    )-> str:
+    ) -> str:
 
     # remove persons with no name
     # persons = list(filter(lambda p: p.name, persons))
@@ -100,12 +98,15 @@ async def linkedin_callback(
     
     callback_secret = x_callback_secret.get_secret_value()
     callback_headers = {
-        "apikey" : callback_secret,
-        "Authorization" : f"Bearer {callback_secret}",
+        "apikey": callback_secret,
+        "Authorization": f"Bearer {callback_secret}",
         "Prefer": "resolution=merge-duplicates",
-        "Content-type" : "application/json"
+        "Content-type": "application/json"
     }
-    callback_params = {"endpoint" : x_callback_endpoint, "headers" : callback_headers}
+    callback_params = {
+        "endpoint": x_callback_endpoint,
+        "headers": callback_headers
+        }
 
     #background.add_task(patch_personDB, x_callback_endpoint, callback_headers, persons)
     miner = LinkedInSearch(bulk=True, search_api_params=search_api_params)

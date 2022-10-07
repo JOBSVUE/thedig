@@ -1,6 +1,5 @@
 """Background Tasks management using Celery"""
 
-import os
 import time
 
 # config
@@ -110,4 +109,4 @@ def patch_personDB(self, endpoint: str, headers: dict, persons: list[dict]) -> i
             state='PROGRESS',
             meta={'current': i, 'success' : success_i, 'total': len(persons)}
             )
-    return {'current' : i, 'success' : success_i, total : len(persons)}
+    return {'current' : i, 'success' : success_i, 'total' : len(persons)}

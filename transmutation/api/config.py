@@ -3,6 +3,7 @@
 from pydantic import BaseSettings
 from typing import Optional
 
+
 class Settings(BaseSettings):
     app_name: str = "Transmutation API"
     google_api_key: str
@@ -26,4 +27,15 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
 
+
 settings = Settings()
+
+# build connection string for redis
+redis_credentials = str()
+if settings.redis_username:
+    redis_credentials += settings.redis_username
+    if settings.redis_password:
+        redis_credentials += f":{settings.redis_password}"
+    redis_credentials += "@"
+# celery broker & backend based on redis
+celery_backend = celery_broker = f"redis://{redis_credentials}{settings.redis_host}:{settings.redis_port}/{settings.celery_redis_db}"

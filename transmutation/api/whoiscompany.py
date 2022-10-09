@@ -1,6 +1,4 @@
 """Whois Company Miner API"""
-import redis
-
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
@@ -23,6 +21,7 @@ from loguru import logger as log
 router = APIRouter()
 
 # redis for cache
+import redis
 redis_param = {
     setting_k.removeprefix("redis_"): setting_v
     for setting_k, setting_v in settings.dict().items()

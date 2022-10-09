@@ -236,10 +236,11 @@ class LinkedInSearch:
             full_title = parse_linkedin_title(result["title" if google else "name"])
 
             # the full name from the result must be the same that the name itself
-            # 98 seems a good ratio for difference between ascii and latin characters
-            if fuzz.token_set_ratio(full_title["name"], name.strip())<98:
-                log.debug(
-                    f"The full name {full_title['name']} mined doesn't match the name {name} given as a parameter"
+            # 96 seems a good ratio for difference between ascii and latin characters
+            # should do fine tuning here trained on a huge international dataset
+            if fuzz.token_set_ratio(full_title["name"], name.strip())<96:
+                log.info(
+                    f"The full name mined doesn't match the name given as a parameter: {full_title['name']}, {name}"
                 )
                 return None
 

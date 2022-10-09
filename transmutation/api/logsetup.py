@@ -1,4 +1,8 @@
-# taken from https://github.com/tiangolo/fastapi/issues/2019
+"""
+Logger setup using loguru
+taken from https://github.com/tiangolo/fastapi/issues/2019
+
+"""
 import logging
 import sys
 from enum import Enum
@@ -34,9 +38,10 @@ class LoggingSettings(BaseSettings):
         filepath (Path): the path where to store the logfiles. (default: None)
         rotation (str): when to rotate the logfile. (default: "1 days")
         retention (str): when to remove logfiles. (default: "1 months")
+        serialize (bool): serialize to JSON. (default: False)
     """
 
-    level: LoggingLevel = "DEBUG"
+    level: LoggingLevel = "DEBUG" if __name__ == "__main__" else "INFO"
     format: str = (
         "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
         "<level>{level: <8}</level> | "
@@ -46,6 +51,7 @@ class LoggingSettings(BaseSettings):
     filepath: Optional[Path] = None
     rotation: str = "1 days"
     retention: str = "1 months"
+    serialize: bool = False
 
     class Config:
         env_prefix = "logging_"
@@ -69,6 +75,18 @@ class InterceptHandler(logging.Handler):
             level, record.getMessage()
         )
 
+class GunicornLogger(Logger):
+    def setup(self, cfg) -> None:
+        handler = InterceptHandler()
+
+        # Add log handler to logger and set log level
+        self.error_log.addHandler(handler)
+        self.error_log.setLevel(settings.LOG_LEVEL)
+        self.access_log.addHandler(handler)
+        self.access_log.setLevel(settings.LOG_LEVEL)
+
+        # Configure logger before gunicorn starts logging
+        logger.configure(handlers=[{"sink": sys.stdout, "level": settings.LOG_LEVEL}])
 
 def setup_logger(
     level: str,
@@ -76,6 +94,7 @@ def setup_logger(
     filepath: Optional[Path] = None,
     rotation: Optional[str] = None,
     retention: Optional[str] = None,
+    serialize: Optional[bool] = False,
 ) -> Logger:
     """Define the global logger to be used by your entire service.
 
@@ -86,6 +105,7 @@ def setup_logger(
         filepath: the path where to store the logfiles.
         rotation: when to rotate the logfile.
         retention: when to remove logfiles.
+        serialize: serialize to JSON (default: False).
 
     Returns:
 
@@ -99,7 +119,17 @@ def setup_logger(
     # Remove loguru default logger
     logger.remove()
     # Cath all existing loggers
-    LOGGERS = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    # Add manually gunicorn and uvicorn
+    LOGGERS = list(map(logging.getLogger,[
+        *logging.root.manager.loggerDict.keys(),
+        "gunicorn",
+        "gunicorn.access",
+        "gunicorn.error",
+        "uvicorn",
+        "uvicorn.access",
+        "uvicorn.error",
+    ]))
+
     # Add stdout logger
     logger.add(
         sys.stdout,
@@ -108,6 +138,7 @@ def setup_logger(
         backtrace=True,
         level=level.upper(),
         format=format,
+        serialize=serialize,
     )
     # Optionally add filepath logger
     if filepath:
@@ -121,6 +152,7 @@ def setup_logger(
             backtrace=True,
             level=level.upper(),
             format=format,
+            serialize=serialize,
         )
     # Overwrite config of standard library root logger
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
@@ -153,4 +185,5 @@ def setup_logger_from_settings(settings: Optional[LoggingSettings] = None) -> Lo
         settings.filepath,
         settings.rotation,
         settings.retention,
+        settings.serialize,
     )

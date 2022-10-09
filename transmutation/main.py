@@ -70,11 +70,11 @@ app.add_middleware(
 )
 
 app.include_router(router)
+setup_logger_from_settings()
 
+# launching this app as a module is for dev purpose
 if __name__ == "__main__":
     import uvicorn
-
-    setup_logger_from_settings()
 
     uvicorn.run(
         "main:app",

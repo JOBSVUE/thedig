@@ -14,6 +14,7 @@ import requests
 
 log = logging.getLogger(__name__)
 
+FAVICON_RE = re.compile("^(shortcut icon|icon)$", re.I)
 
 def domain_to_urls(domain: str) -> list[str]:
     """Build hypothetical websites URL from a domain
@@ -79,7 +80,7 @@ def scrap_favicon(url: str) -> str:
         log.debug("That page's url seems Ok: %s " % url)
 
         favicon_link = soup.find(
-            "link", attrs={"rel": re.compile("^(shortcut icon|icon)$", re.I)}
+            "link", attrs={"rel": FAVICON_RE}
         )
         if favicon_link:
             log.debug("We did find the favicon link in the HTML: %s" % favicon_link)

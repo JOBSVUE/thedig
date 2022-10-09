@@ -4,30 +4,23 @@ import time
 
 # config
 from .config import settings
-from .config import log
+from .config import celery_backend, celery_broker
 
 from celery import Celery
-#from celery.result import AsyncResult
+# from celery.result import AsyncResult
 
 # service
 from ..miners.linkedin import LinkedInSearch
 
-# build connection string for redis
-credentials = str()
-if settings.redis_username:
-    credentials += settings.redis_username
-    if settings.redis_password:
-        credentials += f":{settings.redis_password}"
-    credentials += "@"
-backend = broker = f"redis://{credentials}{settings.redis_host}:{settings.redis_port}/{settings.celery_redis_db}"
+# log
+from loguru import logger as log
 
-celery_tasks = Celery(__name__, broker=broker, backend=backend, broker_url=broker, backend_url=backend)
+celery_tasks = Celery(__name__, broker=celery_broker, backend=celery_backend, broker_url=celery_broker, backend_url=celery_backend)
 
-celery_tasks.task_annotations = {"tasks.add" : {"rate_limit" : "1/min"}}
+celery_tasks.task_annotations = {"tasks.add": {"rate_limit": "1/min"}}
 
 # app.conf.task_annotations = {"*" : "100/min"}
 
-from .config import settings
 import requests
 
 search_api_params = {
@@ -63,10 +56,18 @@ def patch_person(name, email, search_api_params: dict, callback_params: dict):
     if p_patched.worksFor:
         w_json = p_patched.worksFor.json(exclude={'type_'})
         p_patched.worksFor = p_patched.worksFor.name
-        r = requests.post(f"{endpoint}organizations", data=w_json, headers=headers)
+        r = requests.post(
+            f"{callback_params['endpoint']}organizations",
+            data=w_json,
+            headers=callback_params['headers']
+            )
     
     p_json = p_patched.json(exclude={'type_'})
-    r = requests.post(f"{endpoint}persons", data=p_json, headers=headers)   
+    r = requests.post(
+        f"{callback_params['endpoint']}persons",
+        data=p_json,
+        headers=callback_params['headers']
+        )   
 
     return r.ok
 

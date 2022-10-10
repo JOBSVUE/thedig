@@ -46,8 +46,6 @@ def country_from_url(linkedin_url: str) -> str:
 
     if match:
         return ISO3166[match[1].upper()]
-    else:
-        return None
 
 
 def parse_linkedin_title(title):
@@ -68,6 +66,7 @@ def parse_linkedin_title(title):
         if len(full_title) > 2:
             result["company"] = full_title[2].removesuffix("...").strip()
     return result
+
 
 class LinkedInSearch:
     """
@@ -229,7 +228,7 @@ class LinkedInSearch:
         Returns:
             person (str) : person JSON-LD filled with the infos mined
         """
-        query_string = email if email else f"{name} {company}"
+        query_string = email or f"{name} {company}"
         result = self._search_google(query_string) if google else self._search_bing(query_string) 
         
         if result:
@@ -304,8 +303,7 @@ class LinkedInSearch:
         # answer only if we found something
         if self.person.url:
             return self.person
-        else:
-            return None
+
 
     def bulk(self, persons: list[Person]) -> list:
         """Bulk search

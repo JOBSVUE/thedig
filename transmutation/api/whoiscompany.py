@@ -60,8 +60,7 @@ def whois_unique(domain: str) -> str:
 
     cache.set(domain, company, ex=settings.cache_expiration)
 
-    return company if company else None
-
+    return company or None
 
 @router.post("/whoiscompany")
 def whois_bulk(body: Dict[str, List[str]]) -> dict:
@@ -76,7 +75,7 @@ def whois_bulk(body: Dict[str, List[str]]) -> dict:
                 company = ""
             cache.set(domain, company, ex=settings.cache_expiration)
         log.info(f"Domain:company - {domain}:{company}")
-        companies[domain] = company if company else None
+        companies[domain] = company or None
     return companies
 
 

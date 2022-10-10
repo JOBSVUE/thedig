@@ -55,7 +55,7 @@ async def linkedin_unique(email: EmailStr, name: str) -> Person:
     Returns:
         Person: Person Schema.org
     """
-    miner = LinkedInSearch(search_api_params, google=True, bing=False)
+    miner = LinkedInSearch(search_api_params)
     person = miner.search(name=name, email=email)
     return person
 

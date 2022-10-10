@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Optional
 
 from loguru import logger
-from loguru._logger import Logger
 from pydantic import BaseSettings
 
 
@@ -40,8 +39,7 @@ class LoggingSettings(BaseSettings):
         retention (str): when to remove logfiles. (default: "1 months")
         serialize (bool): serialize to JSON. (default: False)
     """
-
-    level: LoggingLevel = "DEBUG" if __name__ == "__main__" else "INFO"
+    level: LoggingLevel = "DEBUG"
     format: str = (
         "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
         "<level>{level: <8}</level> | "
@@ -58,6 +56,11 @@ class LoggingSettings(BaseSettings):
 
 
 class InterceptHandler(logging.Handler):
+    """
+    Default handler from examples in loguru documentaion.
+    See https://loguru.readthedocs.io/en/stable/overview.html#entirely-compatible-with-standard-logging
+    """
+    
     def emit(self, record):
         # Get corresponding Loguru level if it exists
         try:
@@ -75,18 +78,23 @@ class InterceptHandler(logging.Handler):
             level, record.getMessage()
         )
 
-class GunicornLogger(Logger):
-    def setup(self, cfg) -> None:
-        handler = InterceptHandler()
+try:
+    from gunicorn.glogging import Logger
+    
+    class GunicornLogger(Logger):
+        def setup(self, cfg) -> None:
+            handler = InterceptHandler()
+            
+            # Add log handler to logger and set log level
+            self.error_log.addHandler(handler)
+            self.error_log.setLevel(log_settings.log_level)
+            self.access_log.addHandler(handler)
+            self.access_log.setLevel(log_settings.log_level)
 
-        # Add log handler to logger and set log level
-        self.error_log.addHandler(handler)
-        self.error_log.setLevel(settings.LOG_LEVEL)
-        self.access_log.addHandler(handler)
-        self.access_log.setLevel(settings.LOG_LEVEL)
-
-        # Configure logger before gunicorn starts logging
-        logger.configure(handlers=[{"sink": sys.stdout, "level": settings.LOG_LEVEL}])
+            # Configure logger before gunicorn starts logging
+            logger.configure(handlers=[{"sink": sys.stdout, "level": log_settings.log_level}])
+except:
+    logger.info("No gunicorn here")
 
 def setup_logger(
     level: str,
@@ -95,7 +103,7 @@ def setup_logger(
     rotation: Optional[str] = None,
     retention: Optional[str] = None,
     serialize: Optional[bool] = False,
-) -> Logger:
+):
     """Define the global logger to be used by your entire service.
 
     Arguments:
@@ -164,7 +172,7 @@ def setup_logger(
     return logger
 
 
-def setup_logger_from_settings(settings: Optional[LoggingSettings] = None) -> Logger:
+def setup_logger_from_settings(log_settings: Optional[LoggingSettings] = None):
     """Define the global logger to be used by your entire service.
 
     Arguments:
@@ -176,14 +184,14 @@ def setup_logger_from_settings(settings: Optional[LoggingSettings] = None) -> Lo
         the logger instance.
     """
     # Parse from env when no settings are given
-    if not settings:
-        settings = LoggingSettings()
+    if not log_settings:
+        log_settings = LoggingSettings()
     # Return logger even though it's not necessary
     return setup_logger(
-        settings.level,
-        settings.format,
-        settings.filepath,
-        settings.rotation,
-        settings.retention,
-        settings.serialize,
+        log_settings.level,
+        log_settings.format,
+        log_settings.filepath,
+        log_settings.rotation,
+        log_settings.retention,
+        log_settings.serialize,
     )

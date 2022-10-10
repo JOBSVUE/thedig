@@ -2,6 +2,7 @@
 # go to .env to modify configuration variables or use environment variables
 from pydantic import BaseSettings
 from typing import Optional
+from logging import DEBUG
 
 
 class Settings(BaseSettings):
@@ -10,6 +11,7 @@ class Settings(BaseSettings):
     google_cx: str
     bing_api_key: str | None
     bing_customconfig: str | None
+    log_level: Optional[int] = DEBUG
     log_file: str | None
     redis_username: Optional[str]
     redis_password: str
@@ -31,7 +33,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # build connection string for redis
-redis_credentials = str()
+redis_credentials = ""
 if settings.redis_username:
     redis_credentials += settings.redis_username
     if settings.redis_password:

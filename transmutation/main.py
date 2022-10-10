@@ -36,7 +36,6 @@ from fastapi.logger import logger
 api_key_header_auth = APIKeyHeader(
     name=settings.api_key_name,
     description="Mandatory API Token, required for all endpoints",
-    auto_error=True,
 )
 
 

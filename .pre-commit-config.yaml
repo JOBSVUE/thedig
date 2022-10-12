@@ -75,3 +75,8 @@ repos:
           (?ix)^(
             LICENSES/.*
           )$
+
+  - repo: https://github.com/dosisod/refurb
+    rev: ""
+    hooks:
+      - id: refurb

@@ -64,7 +64,7 @@ async def linkedin_unique(email: EmailStr, name: str) -> Person:
     "/linkedin",
     response_model=List[Person],
     response_model_exclude_none=True
-    )    
+    )
 async def linkedin_bulk(
     persons: list[Person],
     ) -> List[Person]:
@@ -85,7 +85,7 @@ async def linkedin_bulk(
 
 @router.patch(
     "/linkedin",
-    )    
+    )
 async def linkedin_callback(
     persons: list[Person],
     x_callback_endpoint: str = Header(),

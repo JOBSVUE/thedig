@@ -22,6 +22,7 @@ router = APIRouter()
 
 # redis for cache
 import redis
+
 redis_param = {
     setting_k.removeprefix("redis_"): setting_v
     for setting_k, setting_v in settings.dict().items()
@@ -31,6 +32,7 @@ redis_param["db"] = settings.cache_redis_db
 redis_param["decode_responses"] = True
 cache = redis.Redis(**redis_param)
 log.info("Set-up Redis cache for whoiscompany")
+
 
 @router.get("/whoiscompany/{domain}")
 def whois_unique(domain: str) -> str:
@@ -61,6 +63,7 @@ def whois_unique(domain: str) -> str:
     cache.set(domain, company, ex=settings.cache_expiration)
 
     return company or None
+
 
 @router.post("/whoiscompany")
 def whois_bulk(body: Dict[str, List[str]]) -> dict:

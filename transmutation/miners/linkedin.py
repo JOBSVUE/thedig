@@ -84,8 +84,8 @@ class LinkedInSearch:
         search_api_params: dict,
         google: bool = True,
         bing: bool = False,
-        bulk: bool = False
-        ):
+        bulk: bool = False,
+    ):
         """LinkedInSearch constructor
 
         Args:
@@ -163,7 +163,7 @@ class LinkedInSearch:
         )
         if not r.ok:
             r.raise_for_status()
-            
+
         result_raw = r.json()
 
         log.info("bing result %s" % result_raw)
@@ -198,23 +198,21 @@ class LinkedInSearch:
             self.person.address = PostalAddress(
                 addressLocation=address[0],
                 addressRegion=address[1],
-                addressCountry=address[2]
+                addressCountry=address[2],
             )
-    
+
     def _extract_google_specific(self, result):
-        self.person.givenName = result["pagemap"]["metatags"][0][
-                "profile:first_name"
-            ]
-        self.person.familyName = result["pagemap"]["metatags"][0][
-                "profile:last_name"
-            ]
+        self.person.givenName = result["pagemap"]["metatags"][0]["profile:first_name"]
+        self.person.familyName = result["pagemap"]["metatags"][0]["profile:last_name"]
 
         # we do not use cse_thumbnail (Google's image)
-        if len(result["pagemap"]["metatags"])>=1:
+        if len(result["pagemap"]["metatags"]) >= 1:
             self.person.image = result["pagemap"]["metatags"][0]["og:image"]
         self.person.url = result["link"]
 
-    def extract(self, name: str, email: str = None, company: str = None, google: bool = True) -> Person:
+    def extract(
+        self, name: str, email: str = None, company: str = None, google: bool = True
+    ) -> Person:
         """
         Search engine then update and return the personal data accordingly
         Google gives you the givenName/familyName but not the location
@@ -229,15 +227,19 @@ class LinkedInSearch:
             person (str) : person JSON-LD filled with the infos mined
         """
         query_string = email or f"{name} {company}"
-        result = self._search_google(query_string) if google else self._search_bing(query_string) 
-        
+        result = (
+            self._search_google(query_string)
+            if google
+            else self._search_bing(query_string)
+        )
+
         if result:
             full_title = parse_linkedin_title(result["title" if google else "name"])
 
             # the full name from the result must be the same that the name itself
             # 96 seems a good ratio for difference between ascii and latin characters
             # should do fine tuning here trained on a huge international dataset
-            if fuzz.token_set_ratio(full_title["name"], name.strip())<96:
+            if fuzz.token_set_ratio(full_title["name"], name.strip()) < 96:
                 log.info(
                     f"The full name mined doesn't match the name given as a parameter: {full_title['name']}, {name}"
                 )
@@ -274,13 +276,9 @@ class LinkedInSearch:
             if self.bing and self.google:
                 # creating threads
                 google = threading.Thread(
-                    target=self.extract_google,
-                    args=(name, email)
-                    )
-                bing = threading.Thread(
-                    target=self.extract_bing,
-                    args=(name, email)
-                    )
+                    target=self.extract_google, args=(name, email)
+                )
+                bing = threading.Thread(target=self.extract_bing, args=(name, email))
 
                 # starting threads
                 google.start()
@@ -299,11 +297,10 @@ class LinkedInSearch:
             self.extract(name, company=company)
 
         self._add_country()
-        
+
         # answer only if we found something
         if self.person.url:
             return self.person
-
 
     def bulk(self, persons: list[Person]) -> list:
         """Bulk search
@@ -318,8 +315,9 @@ class LinkedInSearch:
             p_enrich = self.search(person.name, person.email)
             if p_enrich:
                 self.persons.append(p_enrich)
-            
+
         return self.persons
+
 
 if __name__ == "__main__":
     import sys

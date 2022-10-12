@@ -17,4 +17,5 @@ router.include_router(whoiscompany_router)
 router.include_router(linkedin_router)
 
 from .tasks import celery_tasks
-__all__ = ('celery_tasks',)
+
+__all__ = ("celery_tasks",)

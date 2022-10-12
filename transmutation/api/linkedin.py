@@ -25,6 +25,7 @@ from ..miners.linkedin import LinkedInSearch
 # celery tasks
 from .tasks import patch_personDB
 from .tasks import celery_tasks
+
 # from .tasks import AsyncResult
 # from celery.result import AsyncResult
 
@@ -41,10 +42,8 @@ search_api_params = {
 
 
 @router.get(
-    "/linkedin/{email}",
-    response_model=Person,
-    response_model_exclude_unset=True
-    )
+    "/linkedin/{email}", response_model=Person, response_model_exclude_unset=True
+)
 async def linkedin_unique(email: EmailStr, name: str) -> Person:
     """LinkedIn - enrich only one person identified by his name and email
 
@@ -60,14 +59,10 @@ async def linkedin_unique(email: EmailStr, name: str) -> Person:
     return person
 
 
-@router.post(
-    "/linkedin",
-    response_model=List[Person],
-    response_model_exclude_none=True
-    )
+@router.post("/linkedin", response_model=List[Person], response_model_exclude_none=True)
 async def linkedin_bulk(
     persons: list[Person],
-    ) -> List[Person]:
+) -> List[Person]:
     """LinkedIn - enrich several persons and returns them
 
     Args:
@@ -85,46 +80,42 @@ async def linkedin_bulk(
 
 @router.patch(
     "/linkedin",
-    )
+)
 async def linkedin_callback(
     persons: list[Person],
     x_callback_endpoint: str = Header(),
     x_callback_secret: SecretStr = Header(),
-    ) -> str:
+) -> str:
 
     # remove persons with no name
     # persons = list(filter(lambda p: p.name, persons))
     persons = [p.dict(exclude_unset=True) for p in persons if p.name]
-    
+
     callback_secret = x_callback_secret.get_secret_value()
     callback_headers = {
         "apikey": callback_secret,
         "Authorization": f"Bearer {callback_secret}",
         "Prefer": "resolution=merge-duplicates",
-        "Content-type": "application/json"
+        "Content-type": "application/json",
     }
-    callback_params = {
-        "endpoint": x_callback_endpoint,
-        "headers": callback_headers
-        }
+    callback_params = {"endpoint": x_callback_endpoint, "headers": callback_headers}
 
-    #background.add_task(patch_personDB, x_callback_endpoint, callback_headers, persons)
+    # background.add_task(patch_personDB, x_callback_endpoint, callback_headers, persons)
     miner = LinkedInSearch(bulk=True, search_api_params=search_api_params)
-    
+
     # t = patch_person.delay(persons[0].name, persons[0].email, search_api_params, callback_params)
     t = patch_personDB.delay(x_callback_endpoint, callback_headers, persons)
     return t.id
 
-@router.get(
-    "/tasks/{task_id}"
-)
+
+@router.get("/tasks/{task_id}")
 def linkedin_task(task_id: str):
     task_result = celery_tasks.AsyncResult(task_id)
-    
+
     result = {
         "task_id": task_id,
         "task_status": task_result.status,
         "task_result": task_result.result,
-        #"current" : task_result.status.current,   
+        # "current" : task_result.status.current,
     }
     return result

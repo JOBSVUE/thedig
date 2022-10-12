@@ -40,4 +40,6 @@ if settings.redis_username:
         redis_credentials += f":{settings.redis_password}"
     redis_credentials += "@"
 # celery broker & backend based on redis
-celery_backend = celery_broker = f"redis://{redis_credentials}{settings.redis_host}:{settings.redis_port}/{settings.celery_redis_db}"
+celery_backend = (
+    celery_broker
+) = f"redis://{redis_credentials}{settings.redis_host}:{settings.redis_port}/{settings.celery_redis_db}"

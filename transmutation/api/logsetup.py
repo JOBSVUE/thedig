@@ -39,6 +39,7 @@ class LoggingSettings(BaseSettings):
         retention (str): when to remove logfiles. (default: "1 months")
         serialize (bool): serialize to JSON. (default: False)
     """
+
     level: LoggingLevel = "DEBUG"
     format: str = (
         "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
@@ -60,7 +61,7 @@ class InterceptHandler(logging.Handler):
     Default handler from examples in loguru documentaion.
     See https://loguru.readthedocs.io/en/stable/overview.html#entirely-compatible-with-standard-logging
     """
-    
+
     def emit(self, record):
         # Get corresponding Loguru level if it exists
         try:
@@ -78,13 +79,14 @@ class InterceptHandler(logging.Handler):
             level, record.getMessage()
         )
 
+
 try:
     from gunicorn.glogging import Logger
-    
+
     class GunicornLogger(Logger):
         def setup(self, cfg) -> None:
             handler = InterceptHandler()
-            
+
             # Add log handler to logger and set log level
             self.error_log.addHandler(handler)
             self.error_log.setLevel(log_settings.log_level)
@@ -92,9 +94,13 @@ try:
             self.access_log.setLevel(log_settings.log_level)
 
             # Configure logger before gunicorn starts logging
-            logger.configure(handlers=[{"sink": sys.stdout, "level": log_settings.log_level}])
+            logger.configure(
+                handlers=[{"sink": sys.stdout, "level": log_settings.log_level}]
+            )
+
 except:
     logger.info("No gunicorn here")
+
 
 def setup_logger(
     level: str,
@@ -128,15 +134,20 @@ def setup_logger(
     logger.remove()
     # Cath all existing loggers
     # Add manually gunicorn and uvicorn
-    LOGGERS = list(map(logging.getLogger,[
-        *logging.root.manager.loggerDict.keys(),
-        "gunicorn",
-        "gunicorn.access",
-        "gunicorn.error",
-        "uvicorn",
-        "uvicorn.access",
-        "uvicorn.error",
-    ]))
+    LOGGERS = list(
+        map(
+            logging.getLogger,
+            [
+                *logging.root.manager.loggerDict.keys(),
+                "gunicorn",
+                "gunicorn.access",
+                "gunicorn.error",
+                "uvicorn",
+                "uvicorn.access",
+                "uvicorn.error",
+            ],
+        )
+    )
 
     # Add stdout logger
     logger.add(

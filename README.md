@@ -14,20 +14,24 @@ Data fetched:
 
 ## 🏗️ How to use
 
-You'll need python 3.10 and a [few bunch of libraries](requirements.txt)
-
-### Install
-```bash
-  pip install transmutation
-```
+You'll need python 3.10 and a [few bunch of libraries](requirements.txt).
 
 ### Configure
 To run this project, you'll need a few environement variables which includes some API keys. Please edit [default.env](default.env) and rename it as `.env`.
 
+You'll need a few API keys, at least Google CustomSearch and Google Vision.
+- [Create a custom search engine](https://programmablesearchengine.google.com/controlpanel/create)  by specifying "\*.linkedin.com" as restricted sites to search on. Once created note the *ID* created and set it in the `.env` file as `GOOGLE_CX` variable. Then you'll need an [API key](https://developers.google.com/custom-search/v1/overview#api_key). 
+- Run `setup_google.sh` to set-up automatically Google Vision API. By default, the project will be transmutation and so the API key. If you wish to change defaults, feel free to modify the script by yourself.
+
+### Install
+
+```bash
+  pip install transmutation
+```
+
 ### Launch
 ```bash
-  cd transmutation
-  uvicorn main:app
+  uvicorn transmutation:app
 ``` 
 
 ## ⚠️ Support

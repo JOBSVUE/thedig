@@ -13,20 +13,18 @@ except ImportError:
     from ISO3166 import ISO3166
 
 import re
-import requests
-from thefuzz import fuzz
-
+import threading
 # needed for memory sharing between threads
 from multiprocessing.sharedctypes import Value
-import threading
 
-# JSON Schema.org types
-from pydantic_schemaorg.Person import Person
-from pydantic_schemaorg.Organization import Organization
-from pydantic_schemaorg.PostalAddress import PostalAddress
-
+import requests
 # log
 from loguru import logger as log
+from pydantic_schemaorg.Organization import Organization
+# JSON Schema.org types
+from pydantic_schemaorg.Person import Person
+from pydantic_schemaorg.PostalAddress import PostalAddress
+from thefuzz import fuzz
 
 # linkedin profile url with an ISO3166 country code regular expression
 LINKEDIN_URL_RE = re.compile("https:\/\/(\w{2})\.?linkedin.com\/in\/w*")
@@ -320,10 +318,10 @@ class LinkedInSearch:
 
 
 if __name__ == "__main__":
-    import sys
     import os
+    import sys
 
-    log.setLevel(logging.DEBUG)
+    log.level("DEBUG")
 
     search_api_params = {
         "google_api_key": os.getenv("GOOGLE_API_KEY"),

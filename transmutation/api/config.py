@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     app_name: str = "Transmutation API"
     google_api_key: str
     google_cx: str
+    google_vision_credentials: str
     bing_api_key: str | None
     bing_customconfig: str | None
     log_level: Optional[int] = DEBUG
@@ -23,7 +24,6 @@ class Settings(BaseSettings):
     server_port: int
     api_keys: list[str]
     api_key_name: str
-    log_config: str
     bulk_size: int
 
     class Config:

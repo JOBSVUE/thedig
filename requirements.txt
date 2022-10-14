@@ -10,3 +10,4 @@ pydantic-schemaorg>=1.0.6
 thefuzz[speedup]>=0.19
 celery[redis]>=5.2.7
 loguru>=0.6.0
+pre-commit

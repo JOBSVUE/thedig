@@ -53,7 +53,7 @@ def get_favicon(url: str) -> bool:
         log.debug("No reachable host for this url: %s" % favicon_url)
         return None
 
-    if r.status_code == 200 and r.headers["Content-Type"] == "image/x-icon":
+    if r.ok and r.headers["Content-Type"] == "image/x-icon":
         log.debug("favicon found at this URL %s" % favicon_url)
         return True
     else:  # yet, this is probably the right website to scan

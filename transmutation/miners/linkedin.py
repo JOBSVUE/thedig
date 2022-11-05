@@ -24,10 +24,11 @@ from pydantic_schemaorg.Organization import Organization
 # JSON Schema.org types
 from pydantic_schemaorg.Person import Person
 from pydantic_schemaorg.PostalAddress import PostalAddress
+# Fuzzy string match for person name identification
 from thefuzz import fuzz
 
 # linkedin profile url with an ISO3166 country code regular expression
-LINKEDIN_URL_RE = re.compile("https:\/\/(\w{2})\.?linkedin.com\/in\/w*")
+LINKEDIN_URL_RE = re.compile(r"https:\/\/(?P<countrycode>\w{2})\.?linkedin.com\/in\/(?P<nickname>w)*")
 
 
 def country_from_url(linkedin_url: str) -> str:
@@ -43,7 +44,7 @@ def country_from_url(linkedin_url: str) -> str:
     match = LINKEDIN_URL_RE.match(linkedin_url)
 
     if match:
-        return ISO3166[match[1].upper()]
+        return ISO3166[match["countrycode"].upper()]
 
 
 def parse_linkedin_title(title):

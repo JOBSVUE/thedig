@@ -1,8 +1,10 @@
 """Configuration loader"""
 # go to .env to modify configuration variables or use environment variables
-from pydantic import BaseSettings
-from typing import Optional
 from logging import DEBUG
+from typing import Optional
+
+from pydantic import BaseSettings
+from requests import get
 
 
 class Settings(BaseSettings):
@@ -15,7 +17,7 @@ class Settings(BaseSettings):
     log_level: Optional[int] = DEBUG
     log_file: str | None
     redis_username: Optional[str]
-    redis_password: str
+    redis_password: Optional[str]
     redis_host: str
     redis_port: str
     cache_redis_db: int
@@ -25,12 +27,20 @@ class Settings(BaseSettings):
     api_keys: list[str]
     api_key_name: str
     bulk_size: int
+    google_vision_credentials: str
+    public_email_providers_url: str
+    public_email_providers: Optional[set[str]]
 
     class Config:
         env_file = ".env"
 
 
 settings = Settings()
+
+if not settings.public_email_providers:
+    settings.public_email_providers = set(
+            get(settings.public_email_providers_url).json()
+            )
 
 # build connection string for redis
 redis_credentials = ""

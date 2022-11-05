@@ -80,7 +80,7 @@ def patch_person(name, email, search_api_params: dict, callback_params: dict):
 
 
 @celery_tasks.task(bind=True)
-def patch_personDB(self, endpoint: str, headers: dict, persons: list[dict]) -> int:
+def patch_persons(self, endpoint: str, headers: dict, persons: list[dict]) -> int:
     i = 0
     success_i = 0
     miner = LinkedInSearch(bulk=True, search_api_params=search_api_params)

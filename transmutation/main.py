@@ -28,7 +28,7 @@ from transmutation.api import router
 from transmutation.api.config import settings
 from transmutation.api.logsetup import setup_logger_from_settings
 
-# logging
+# logging modules
 import logging
 from fastapi.logger import logger
 
@@ -37,7 +37,6 @@ api_key_header_auth = APIKeyHeader(
     name=settings.api_key_name,
     description="Mandatory API Token, required for all endpoints",
 )
-
 
 async def get_api_key(api_key_header: str = Security(api_key_header_auth)):
     if not any(

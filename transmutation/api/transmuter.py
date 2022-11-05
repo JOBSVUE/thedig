@@ -61,17 +61,6 @@ def transmute_one(email: EmailStr, name: str) -> Person:
     if not person:
         person = Person(email=email, name=name)
 
-    if not person.worksFor:
-        # add company details
-        domain = email.split("@")[1]
-        company = cache.get(domain)
-        if not company:
-            company = get_company(domain)
-            # redis refuse to store None so we'll use a void string instead
-            # we won't check for this domain again for some time 
-            cache.set(domain, company or '', ex=settings.cache_expiration)
-        person.worksFor = company
-
     # then if there is no image, let's gravatar it
     if not person.image:
         image = gravatar(person.email)
@@ -88,6 +77,19 @@ def transmute_one(email: EmailStr, name: str) -> Person:
     if person.image:
         snm.image()
 
+    # otherwise, the domain will give us the org
+    # except for public email providers
+    if not person.worksFor:
+        domain = email.split("@")[1]
+        if not domain in settings.public_email_providers:
+            company = cache.get(domain)
+            if not company:
+                company = get_company(domain)
+                # redis refuse to store None so we'll use a void string instead
+                # we won't check for this domain again for some time 
+                cache.set(domain, company or '', ex=settings.cache_expiration)
+            person.worksFor = company
+            
     return person
 
 

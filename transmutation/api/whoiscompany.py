@@ -44,6 +44,9 @@ def whois_unique(domain: str) -> str:
     Returns:
         str: company name
     """
+    if domain in settings.public_email_providers:
+        return None
+    
     company = cache.get(domain)
     if company:
         log.debug("Cache found for domain: %s" % domain)
@@ -69,7 +72,10 @@ def whois_unique(domain: str) -> str:
 def whois_bulk(body: Dict[str, List[str]]) -> dict:
     companies = {}
     for domain in body["domains"]:
-        company = cache.get(domain)
+        if domain in settings.public_email_providers:
+            company = None
+        else:
+            company = cache.get(domain)
         if company is None:
             log.debug("The following domain is not cached: %s" % domain)
             company = whoiscompany.get_company(domain)

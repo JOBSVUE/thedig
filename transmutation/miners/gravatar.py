@@ -1,16 +1,16 @@
+#!/bin/env python
 """Gravatar profile picture"""
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
-import requests
-
 from hashlib import md5
+
+import requests
 
 # 400x400 is the de facto standard size for profile picture (linkedin, twitter)
 # make it easier for comparison purpose
 GRAVATAR_SIZE = 400
-
 GRAVATAR_URL = "https://www.gravatar.com/avatar/{hashed_email}?d=404&s={size}"
 
 
@@ -51,8 +51,7 @@ def gravatar(email: str, check: bool = True) -> str:
 # command line usage only for dev purpose
 if __name__ == "__main__":
     import sys
-    sample_url = "https://www.gravatar.com/avatar/205e460b479e2e5b48aec07710c08d50"
-    url = gravatar(sys.argv[1]) if sys.argv else sample_url
+    url = gravatar(sys.argv[1])
 
     print(url)
     if not url:
@@ -61,9 +60,10 @@ if __name__ == "__main__":
     # taken from https://github.com/nikhilkumarsingh/terminal-image-viewer
     # Copyright Nikhil Kumarsingh
     try:
+        from io import BytesIO
+
         import numpy as np
         from PIL import Image
-        from io import BytesIO
     except ImportError:
         sys.exit()
 

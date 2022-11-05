@@ -23,7 +23,7 @@ from pydantic_schemaorg.Person import Person
 from ..miners.linkedin import LinkedInSearch
 
 # celery tasks
-from .tasks import patch_personDB
+from .tasks import patch_persons
 from .tasks import celery_tasks
 
 # from .tasks import AsyncResult

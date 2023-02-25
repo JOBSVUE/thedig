@@ -8,16 +8,14 @@ import whois
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"
 
-# Global variable for performance purpose in case of serverless
-domains_companies = {}
 TO_IGNORE = (
     "Statutory Masking Enabled",
     "Privacy service provided by Withheld for Privacy ehf",
     "Data Protected",
     "Whois Privacy Service",
+    "Redacted for Privacy Purposes",
     "REDACTED FOR PRIVACY",
 )
-
 
 log = logging.getLogger(__name__)
 
@@ -28,6 +26,7 @@ def get_domain(email: str) -> str:
 
 def get_company(domain: str) -> str:
     result = whois.query(domain, ignore_returncode=True)
+
     # if the whois request does answer a proper string
     if not result:
         return None
@@ -37,12 +36,10 @@ def get_company(domain: str) -> str:
 
     # there is some domains who hide their real registrant name
     if company in TO_IGNORE:
-        log.debug("Following registrant in ignore list: %s" % company)
+        log.debug(f"Registrant in ignore list: {company}")
         return None
 
-    domains_companies[domain] = company
-    return domains_companies[domain]
-
+    return company
 
 def get_company_from_email(email: str) -> str:
     """return company name from an email address

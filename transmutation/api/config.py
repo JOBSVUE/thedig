@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     google_api_key: str
     google_cx: str
     google_vision_credentials: str
+    query_type: str = "q"
     bing_api_key: str | None
     bing_customconfig: str | None
     log_level: Optional[int] = DEBUG

@@ -36,6 +36,7 @@ router = APIRouter()
 search_api_params = {
     "google_api_key": settings.google_api_key,
     "google_cx": settings.google_cx,
+    "query_type": settings.query_type,
     "bing_api_key": settings.bing_api_key,
     "bing_customconfig": settings.bing_customconfig,
 }

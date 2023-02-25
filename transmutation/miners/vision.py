@@ -31,7 +31,7 @@ from pydantic_schemaorg.Person import Person
 # - person: crunchbase
 # - @: tiktok (without trailing /)
 # - add: snapchat
-generic_socialprofile_regexp = r"^https:\/\/(?P<subdomain>www|\w{2})?\.?(?P<socialnetwork>\w+)\.(?P<TLD>\w{2,10})(\/(in|people|add))?\/@?(?P<identifier>\w+)"
+generic_socialprofile_regexp = r"^https:\/\/((?P<subdomain>www|mobile|\w{2})\.)?(?P<socialnetwork>\w+)\.(?P<tld>\w{2,10})(\/(in|people|add))?\/@?(?P<identifier>\w+)$"
 generic_socialprofile_regexp = re.compile(generic_socialprofile_regexp)
 
 MAX_RETRY = 3
@@ -64,6 +64,7 @@ def find_pages_with_matching_images(
     client = vision.ImageAnnotatorClient.from_service_account_file(
             settings.google_vision_credentials
             )
+
     response = client.annotate_image({
         'image': {'source': {'image_uri': image_url}},
         'features': [{
@@ -80,8 +81,10 @@ def find_pages_with_matching_images(
             'https://cloud.google.com/apis/design/errors'.format(
                 response.error.message))
 
-    log.debug(response.pages_with_matching_images)
-    return response.pages_with_matching_images
+    matching = [r for r in response.pages_with_matching_images if "full_matching_images" in r]
+    log.debug(f"Matching images found for {image_url}: {matching}")
+
+    return matching
 
 
 def random_ua_headers():
@@ -114,7 +117,6 @@ def is_valid_socialprofile(url, name, retry=0, max_retry=MAX_RETRY):
     except requests.exceptions.ProxyError as e:
         log.warning(f"Proxy error, let's retry. Params: {params}. Error {e}")
         return is_valid_socialprofile(url, name, retry=retry+1)
-        #log.error(f"Too much proxy retry. Proxy: {param['proxies']['http']}")
     except requests.exceptions.ConnectTimeout:
         log.warning(f"Timeout error, let's retry. Params: {params}")
         if params.get("proxies"):
@@ -128,7 +130,6 @@ def is_valid_socialprofile(url, name, retry=0, max_retry=MAX_RETRY):
         log.debug(f"Social Network profile not found. URL: {url}, Error: {r.status_code}")
         return False
     
-    #soup = BeautifulSoup(r.text, "html.parser", parse_only=parse_only_title)
     soup = BeautifulSoup(r.text, "html.parser")
 
     # the title from the profile must contains the person's name itself
@@ -202,7 +203,7 @@ class SocialNetworkMiner:
         # twitter is full javascript, needs a headless browser
         'twitter': "https://twitter.com/{identifier}",
         #"twitter#alt": "https://instalker.org/{identifier}",
-        "twitter#alt": "https://nitter.it/{identifier}",
+        "twitter#alt": "https://nitter.net/{identifier}",
         'youtube': "https://youtube.com/{identifier}",
     }
 
@@ -215,23 +216,16 @@ class SocialNetworkMiner:
     }
 
     def __init__(self, person: Person, socialnetworks: Optional[list] = None):
-        
         # person init
         self.person = person
         if not self.person.identifier:
             self.person.identifier = set()
         elif type(self.person.identifier) == str:
-            self.person.identifer = {self.person.identifier}
+            self.person.identifier = {self.person.identifier}
         elif type(self.person.identifier) == list:
             self.person.identifier = set(self.person.identifier)
-        
-        self.profiles = {}
-
-        # generate identifiers from provided social profiles in sameAs
         if not self.person.sameAs:
             self.person.sameAs = set()
-        else:
-            self._generate_identifiers()
 
         # one could choose to opt out some social networks
         if socialnetworks:
@@ -241,8 +235,12 @@ class SocialNetworkMiner:
             self.socialnetworks = socialnetworks
         else:
             self.socialnetworks = self.socialnetworks_urls.keys()
+
+        # now we populate profiles
+        self.profiles = {}
+        self._populate_profiles()        
         
-    def image(self, match_name: bool = True) -> dict:
+    def image(self, match_check: bool = True) -> dict:
         """Look for social profiles using profile picture
 
         Returns:
@@ -252,27 +250,40 @@ class SocialNetworkMiner:
         for page in pages:
             url_matched = re.match(generic_socialprofile_regexp, page.url)
             #valid_sp = is_valid_socialprofile(url_matched.group(0), self.person.name)  
-            if url_matched and url_matched["socialnetwork"] in self.socialnetworks_urls:
-                log.debug(f"Social Network Profile found: {url_matched.group(0)}")
-                m = url_matched.groupdict()
-                # we only add new social networks URLs
-                if m["socialnetwork"] not in self.profiles:
-                    self.profiles[m.pop("socialnetwork")] = m | {'url': url_matched.group(0)}
-                    self.person.identifier.add(m['identifier'])
-                    self.person.sameAs.add(url_matched.group(0))
+            if not url_matched or not url_matched["socialnetwork"] in self.socialnetworks_urls:
+                log.debug(f"Invalid/existing social network profile: {page.url}")
+                continue
+            if match_check and not match_name(self.person.name, page.page_title):
+                log.debug(f"Social Profile: {page.page_title} doesn't match name {self.person.name}")
+                continue
+    
+            log.debug(f"Social Network Profile found: {url_matched.group(0)}")
+            m = url_matched.groupdict()
+
+            # we only add new social networks URLs
+            if m["socialnetwork"] not in self.profiles:
+                log.info(f"Social Network profile added: {m}")
+                self.add_profile(url_matched.group(0), **m)
 
         log.debug(f"Profiles found by image: {self.profiles}")
         return self.profiles
+    
+    def add_profile(self, url, socialnetwork, identifier, tld, subdomain=None):
+        self.profiles[socialnetwork] = {
+                'url': url,
+                'identifier': identifier,
+                'tld': tld,
+                'subdomain': subdomain,
+        }
+        self.person.identifier.add(identifier)
+        self.person.sameAs.add(url)
 
-    def identifier(self, generate_id: bool = True) -> dict:
-        """Look for social profiles using identifier
+    def identifier(self) -> dict:
+        """Look for social profiles using identifiers
 
         Returns:
             dict: dict of profiles urls by social network
         """
-        if generate_id:
-            self._generate_identifiers()
-        
         for idr in self.person.identifier:
             for sn, url in self.socialnetworks_urls.items():
                 # pass existing social networks profiles
@@ -291,28 +302,12 @@ class SocialNetworkMiner:
                         sn = sn.removesuffix("#alt")
                         url = self.socialnetworks_urls[sn].format(identifier=idr)
                     m = re.match(generic_socialprofile_regexp, url).groupdict()
-                    self.profiles[sn] = m | {'url': url}
-                    self.person.identifier.add(m['identifier'])
-                    self.person.sameAs.add(url)
-                    #extract_socialprofile(soup, url, self.person.name)
+                    self.add_profile(url, **m)
+                    # extract_socialprofile(soup, url, self.person.name)
 
         return self.profiles
 
-    def _generate_identifiers(self, email: bool = True):
-        # add typical identifier from email
-        if email and self.person.email:
-            id_email = self._generate_identifier_from_email()
-            if id_email:
-                self.person.identifier.add(id_email)
-
-        # generate *potential* identifier from name
-        # useless alone: too many false positives
-        # if self.person.name:
-        #    self.person.identifier.add(
-        #        self._generate_identifier_from_name()
-        #    )
-
-        # extract identifier from social profiles
+    def _populate_profiles(self, email: bool = True):
         urls = []
         if self.person.url:
             urls.append(self.person.url)
@@ -321,11 +316,10 @@ class SocialNetworkMiner:
 
         for url in urls:
             url_matched = re.match(generic_socialprofile_regexp, url)
-            if url_matched and url_matched['identifier']:
+            if url_matched:
                 m = url_matched.groupdict()
-                if m['socialnetwork'] not in self.profiles:
-                    self.profiles[m.pop('socialnetwork')] = m | {'url': url}
-                self.person.identifier.add(url_matched['identifier'])
+                if m['socialnetwork'] not in self.profiles and m['socialnetwork'] in self.socialnetworks:
+                    self.add_profile(url, **m)
 
     def _generate_identifier_from_name(self):
         return self.person.name.encode("ASCII", "ignore").strip().lower().decode().replace(' ', '')
@@ -338,6 +332,7 @@ class SocialNetworkMiner:
         # otherwise, it gives too much false positive
         if fuzz.partial_token_sort_ratio(id_email, self.person.name) > 81:
             return None
+        self.identifiers.add(id_email)
         return id_email
 
   

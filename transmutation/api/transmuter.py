@@ -35,6 +35,7 @@ router = APIRouter()
 search_api_params = {
     "google_api_key": settings.google_api_key,
     "google_cx": settings.google_cx,
+    "query_type": settings.query_type,
 }
 
 # redis for cache
@@ -81,15 +82,16 @@ def transmute_one(email: EmailStr, name: str) -> Person:
     # except for public email providers
     if not person.worksFor:
         domain = email.split("@")[1]
-        if not domain in settings.public_email_providers:
+        if domain not in settings.public_email_providers:
             company = cache.get(domain)
             if not company:
                 company = get_company(domain)
                 # redis refuse to store None so we'll use a void string instead
                 # we won't check for this domain again for some time 
                 cache.set(domain, company or '', ex=settings.cache_expiration)
-            person.worksFor = company
-            
+            if company:
+                person.worksFor = company
+
     return person
 
 

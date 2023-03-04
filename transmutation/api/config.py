@@ -5,6 +5,9 @@ from typing import Optional
 
 from pydantic import BaseSettings
 from requests import get
+from requests.exceptions import ConnectionError
+
+from loguru import logger as log
 
 
 class Settings(BaseSettings):
@@ -39,9 +42,13 @@ class Settings(BaseSettings):
 settings = Settings()
 
 if not settings.public_email_providers:
-    settings.public_email_providers = set(
-            get(settings.public_email_providers_url).json()
+    try:
+        public_email_providers = get(settings.public_email_providers_url).json()
+        settings.public_email_providers = set(
+            public_email_providers
             )
+    except ConnectionError as e:
+        log.info(f"Impossible to GET public_email_providers_url: {e}")
 
 # build connection string for redis
 redis_credentials = ""

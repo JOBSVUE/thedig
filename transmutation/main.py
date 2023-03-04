@@ -17,10 +17,8 @@ __license__ = "AGPL"
 __version__ = "0.1"
 
 # fast api
-from fastapi import FastAPI
-from fastapi import Security, status
+from fastapi import FastAPI, Security
 from fastapi.exceptions import HTTPException
-from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 
 # import other apis
@@ -33,21 +31,7 @@ import logging
 from fastapi.logger import logger
 
 # X-API-KEY protection
-api_key_header_auth = APIKeyHeader(
-    name=settings.api_key_name,
-    description="Mandatory API Token, required for all endpoints",
-)
-
-async def get_api_key(api_key_header: str = Security(api_key_header_auth)):
-    if not any(
-        secrets.compare_digest(api_key_header, api_key_v)
-        for api_key_v in settings.api_keys
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid API Key",
-        )
-
+from transmutation.security import get_api_key
 
 # routing composition
 app = FastAPI(

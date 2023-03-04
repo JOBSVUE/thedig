@@ -11,13 +11,15 @@ __license__ = "AGPL"
 from .config import settings
 
 # fast api
-from fastapi import APIRouter
+from fastapi import APIRouter, Query, WebSocket, Depends, WebSocketDisconnect
+from ..security import websocket_api_key
 
 # Schema.org Person
 from pydantic_schemaorg.Person import Person
 
 # types
 from pydantic import EmailStr
+from typing import Set
 
 # logger
 from loguru import logger as log
@@ -27,6 +29,7 @@ from ..miners.linkedin import LinkedInSearch
 from ..miners.whoiscompany import get_company
 from ..miners.gravatar import gravatar
 from ..miners.vision import SocialNetworkMiner
+from ..miners.alchemist import Alchemist
 
 
 # init fast api
@@ -94,6 +97,63 @@ def transmute_one(email: EmailStr, name: str) -> Person:
 
     return person
 
+al = Alchemist()
+@al.register(element="email")
+async def miner_gravatar(p: Person):
+    status = False
+    avatar = gravatar(p.email)
+    if avatar:
+        status = True
+    return status, {'image': avatar}
+
+
+class WebSocketManager:
+    def __init__(self):
+        self.connections: Set[WebSocket] = set()
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.connections.add(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.connections.remove(websocket)
+
+    async def message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+    async def broadcast(self, message: str):
+        for connection in self.connections:
+            await connection.send_text(message)
+
+wss_manager = WebSocketManager()
+
+
+@router.websocket("/transmute/websocket")
+async def websocket_endpoint(websocket: WebSocket, token: str = Depends(websocket_api_key)):
+    await wss_manager.connect(websocket)
+    log.debug(f"Websocket connected: {websocket}")
+    try:
+        while True:
+            # Wait for any message from the client
+            person_data = await websocket.receive_json()
+            persons = []
+            if type(person_data) is list:
+                persons = [Person(**p_data) for p_data in person_data]
+            elif type(person_data) is dict:
+                persons = [Person(**person_data)]
+            else:
+                log.debug(f"invalid type: {person_data} {type(person_data)}")
+            log.debug(persons)
+            # Send message to the client
+            async for person_a in al.transmute_bulk(persons):
+                status, person = await person_a
+                if not status:
+                    continue
+                person_d = person.dict(exclude_unset=True, exclude_none=True)
+                await websocket.send_json(person_d)
+    except WebSocketDisconnect:
+        log.debug(f"Websocket {websocket} disconnected")
+        wss_manager.disconnect(websocket)
 
 # @router.post("/transmute", response_model=list[Person], response_model_exclude_none=True)
 # def transmute_many(self):

@@ -36,7 +36,7 @@ class Alchemist:
         Returns:
             bool, Person: succeed or not, enriched person
         """
-        elements = list(self.elements & person.__fields_set__)
+        elements = list(person.__fields_set__ & self.elements)
 
         p_new = person.dict(exclude_unset=True, exclude_none=True)
         log.debug(f"mining {elements} for {person}")
@@ -61,10 +61,11 @@ class Alchemist:
                         modified = True
 
                     # add new elements with miners registered
-                    new_keys = set(p_mined.keys()) & self.elements
+                    new_keys = set(dict(p_mined).keys()) & self.elements
                     if new_keys:
                         elements.extend(list(new_keys))
 
+        log.debug(p_new)
         return modified, Person(**p_new)
 
     async def transmute_bulk(self, persons: list[Person]):
@@ -76,18 +77,8 @@ class Alchemist:
         Yields:
             Iterator[AsyncIterator]: iterator over transmuted person
         """
-        async for person in persons:
+        for person in persons:
             yield self.transmute_person(person)
-
-    async def transmute(
-            self,
-            person: Person = None,
-            persons: list[Person] = None
-            ):
-        if person:
-            return await self.transmute_person(person)
-        elif persons:
-            return self.transmute_bulk(persons)
 
     def register(self, element: str):
         def decorator(miner_func):

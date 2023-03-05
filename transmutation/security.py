@@ -2,7 +2,6 @@
 Security
 """
 import secrets
-import os
 
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"

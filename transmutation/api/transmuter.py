@@ -11,7 +11,8 @@ __license__ = "AGPL"
 from .config import settings
 
 # fast api
-from fastapi import APIRouter, Query, WebSocket, Depends, WebSocketDisconnect
+from fastapi import APIRouter, Depends, status
+from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
 from ..security import websocket_api_key
 
 # Schema.org Person
@@ -127,39 +128,30 @@ class WebSocketManager:
 
 wss_manager = WebSocketManager()
 
-
-@router.websocket("/transmute/websocket")
-async def websocket_endpoint(websocket: WebSocket, token: str = Depends(websocket_api_key)):
+@router.websocket("/transmute/{user_id}/websocket")
+async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = Depends(websocket_api_key)):
     await wss_manager.connect(websocket)
+    transmuted_count = 0
     log.debug(f"Websocket connected: {websocket}")
     try:
-        while True:
+        while transmuted_count < settings.persons_bulk_max:
             # Wait for any message from the client
             person_data = await websocket.receive_json()
-            persons = []
-            if type(person_data) is list:
-                persons = [Person(**p_data) for p_data in person_data]
-            elif type(person_data) is dict:
-                persons = [Person(**person_data)]
+            if type(person_data) is dict and 'email' in person_data and 'name' in person_data:
+                person = Person(**person_data)
             else:
-                log.debug(f"invalid type: {person_data} {type(person_data)}")
-            log.debug(persons)
+                log.debug(f"invalid data: {person_data} - {type(person_data)}")
+                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)     
             # Send message to the client
-            async for person_a in al.transmute_bulk(persons):
-                status, person = await person_a
-                if not status:
-                    continue
-                person_d = person.dict(exclude_unset=True, exclude_none=True)
-                await websocket.send_json(person_d)
+            mining_status, person = await al.transmute_person(person)
+            if not mining_status:
+                continue
+            else:
+                transmuted_count += 1
+            await websocket.send_text(person.json())
+        # reached bulk limit
+        log.debug(f"limit reached: {transmuted_count}/{settings.persons_bulk_max}")
+        raise WebSocketException(code=status.WS_1009_MESSAGE_TOO_BIG)
     except WebSocketDisconnect:
-        log.debug(f"Websocket {websocket} disconnected")
+        log.debug(f"Websocket disconnected: {websocket}")
         wss_manager.disconnect(websocket)
-
-# @router.post("/transmute", response_model=list[Person], response_model_exclude_none=True)
-# def transmute_many(self):
-
-# @router.patch("/transmute")
-# def transmute_bulk(self):
-
-# @router.get("/transmute/status")
-# def status(self):

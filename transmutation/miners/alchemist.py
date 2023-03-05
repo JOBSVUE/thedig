@@ -39,7 +39,7 @@ class Alchemist:
         elements = list(person.__fields_set__ & self.elements)
 
         p_new = person.dict(exclude_unset=True, exclude_none=True)
-        log.debug(f"mining {elements} for {person}")
+        log.debug(f"mining {elements} for {person.json()}")
 
         modified = False
         # sync because we want to control the order of mining elements
@@ -60,12 +60,12 @@ class Alchemist:
                     if not modified:
                         modified = True
 
-                    # add new elements with miners registered
-                    new_keys = set(dict(p_mined).keys()) & self.elements
+                    # add new values only
+                    # pick only elements with miners registered
+                    new_keys = set([k for k in p_mined if p_mined[k] != p_new.get(k)]) & self.elements
                     if new_keys:
                         elements.extend(list(new_keys))
 
-        log.debug(p_new)
         return modified, Person(**p_new)
 
     async def transmute_bulk(self, persons: list[Person]):

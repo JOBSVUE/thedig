@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     google_vision_credentials: str
     public_email_providers_url: str
     public_email_providers: Optional[set[str]]
+    persons_bulk_max: int = 10000
 
     class Config:
         env_file = ".env"
@@ -49,6 +50,13 @@ if not settings.public_email_providers:
             )
     except ConnectionError as e:
         log.info(f"Impossible to GET public_email_providers_url: {e}")
+
+# redis parameters
+redis_parameters = {
+    setting_k.removeprefix("redis_"): setting_v
+    for setting_k, setting_v in settings.dict().items()
+    if setting_k.startswith("redis")
+}
 
 # build connection string for redis
 redis_credentials = ""

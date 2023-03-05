@@ -13,6 +13,7 @@ from typing import Dict
 
 # config
 from .config import settings
+from .config import redis_parameters as redis_param
 
 # log
 from loguru import logger as log
@@ -23,7 +24,6 @@ router = APIRouter()
 # redis for cache
 import redis
 
-redis_param = settings.redis_parameters
 redis_param["db"] = settings.cache_redis_db
 redis_param["decode_responses"] = True
 cache = redis.Redis(**redis_param)

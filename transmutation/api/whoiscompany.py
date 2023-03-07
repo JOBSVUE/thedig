@@ -13,7 +13,7 @@ from typing import Dict
 
 # config
 from .config import settings
-from .config import redis_parameters as redis_param
+from .config import setup_cache
 
 # log
 from loguru import logger as log
@@ -21,14 +21,7 @@ from loguru import logger as log
 # set-up router
 router = APIRouter()
 
-# redis for cache
-import redis
-
-redis_param["db"] = settings.cache_redis_db
-redis_param["decode_responses"] = True
-cache = redis.Redis(**redis_param)
-log.info("Set-up Redis cache for whoiscompany")
-
+cache = setup_cache(settings, settings.cache_redis_db)
 
 @router.get("/whoiscompany/{domain}")
 def whois_unique(domain: str) -> str:

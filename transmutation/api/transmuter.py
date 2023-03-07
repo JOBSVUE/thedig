@@ -8,7 +8,9 @@ __license__ = "AGPL"
 
 
 # config
+import asyncio
 from .config import settings
+from .config import setup_cache
 
 # fast api
 from fastapi import APIRouter, Depends, status
@@ -25,13 +27,15 @@ from typing import Set
 # logger
 from loguru import logger as log
 
+# json
+import json
+
 # service
 from ..miners.linkedin import LinkedInSearch
 from ..miners.whoiscompany import get_company
 from ..miners.gravatar import gravatar
 from ..miners.vision import SocialNetworkMiner
 from ..miners.alchemist import Alchemist
-
 
 # init fast api
 router = APIRouter()
@@ -42,19 +46,8 @@ search_api_params = {
     "query_type": settings.query_type,
 }
 
-# redis for cache
-import redis
-
-# init cache for whois
-redis_param = {
-    setting_k.removeprefix("redis_"): setting_v
-    for setting_k, setting_v in settings.dict().items()
-    if setting_k.startswith("redis")
-}
-redis_param["db"] = settings.cache_redis_db
-redis_param["decode_responses"] = True
-cache = redis.Redis(**redis_param)
-log.info("Set-up Redis cache for whoiscompany")
+# init cache for transmuter
+cache = setup_cache(settings, 7)
 
 @router.get("/transmute/{email}", response_model=Person, response_model_exclude_none=True)
 def transmute_one(email: EmailStr, name: str) -> Person:
@@ -101,11 +94,11 @@ def transmute_one(email: EmailStr, name: str) -> Person:
 al = Alchemist()
 @al.register(element="email")
 async def miner_gravatar(p: Person):
-    status = False
+    p_new = {}
     avatar = gravatar(p.email)
     if avatar:
-        status = True
-    return status, {'image': avatar}
+        p_new['image'] = avatar
+    return p_new
 
 
 class WebSocketManager:
@@ -133,22 +126,36 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = De
     await wss_manager.connect(websocket)
     transmuted_count = 0
     log.debug(f"Websocket connected: {websocket}")
+
+    aqueue = asyncio.Queue(maxsize=20)
+
     try:
         while transmuted_count < settings.persons_bulk_max:
             # Wait for any message from the client
             person_data = await websocket.receive_json()
+            mining_status = None
+
+            # data validation
             if type(person_data) is dict and 'email' in person_data and 'name' in person_data:
                 person = Person(**person_data)
             else:
                 log.debug(f"invalid data: {person_data} - {type(person_data)}")
-                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)     
-            # Send message to the client
-            mining_status, person = await al.transmute_person(person)
-            if not mining_status:
-                continue
+                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
+               
+            person_c = cache.get(f"{user_id}-{person.email}")
+            person_c = None
+            if person_c:
+                al_status = True
+                person = Person(**json.loads(person_c))
+                log.debug(f"{person.email} found: {person_c}")
             else:
-                transmuted_count += 1
-            await websocket.send_text(person.json())
+                await aqueue.put(person)
+                al_status, transmuted = await al.person(await aqueue.get())
+                if al_status:
+                    cache.set(f"{user_id}-{person.email}", transmuted.json(), ex=settings.cache_expiration)
+                    transmuted_count += 1
+            # Send message to the client
+            await websocket.send_text(f"[{al_status}, {transmuted.json()}]")
         # reached bulk limit
         log.debug(f"limit reached: {transmuted_count}/{settings.persons_bulk_max}")
         raise WebSocketException(code=status.WS_1009_MESSAGE_TOO_BIG)

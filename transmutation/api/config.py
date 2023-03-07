@@ -9,6 +9,8 @@ from requests.exceptions import ConnectionError
 
 from loguru import logger as log
 
+from redis import Redis
+
 
 class Settings(BaseSettings):
     app_name: str = "Transmutation API"
@@ -51,12 +53,28 @@ if not settings.public_email_providers:
     except ConnectionError as e:
         log.info(f"Impossible to GET public_email_providers_url: {e}")
 
-# redis parameters
-redis_parameters = {
-    setting_k.removeprefix("redis_"): setting_v
-    for setting_k, setting_v in settings.dict().items()
-    if setting_k.startswith("redis")
-}
+
+def setup_cache(settings: Settings, db: int) -> Redis:
+    """setup cache based on Redis
+
+    Args:
+        settings (Settings):settings including redis_*
+        db (str): database name
+
+    Returns:
+        Redis: redis database instance
+    """
+    # redis parameters
+    redis_parameters = {
+        setting_k.removeprefix("redis_"): setting_v
+        for setting_k, setting_v in settings.dict().items()
+        if setting_k.startswith("redis")
+    }
+    redis_parameters["db"] = db
+    redis_parameters["decode_responses"] = True
+    cache = Redis(**redis_parameters)
+    log.info(f"Set-up Redis cache for {db}")
+    return cache
 
 # build connection string for redis
 redis_credentials = ""

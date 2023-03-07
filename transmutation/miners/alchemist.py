@@ -7,6 +7,7 @@ __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
 from collections import OrderedDict
+from functools import wraps
 from pydantic_schemaorg.Person import Person
 from loguru import logger as log
 
@@ -27,7 +28,7 @@ class Alchemist:
             k: [] for k in self._ordered_elements
         })
 
-    async def transmute_person(self, person: Person) -> tuple[bool, Person]:
+    async def person(self, person: Person) -> tuple[bool, Person]:
         """Transmute one person
 
         Args:
@@ -52,8 +53,8 @@ class Alchemist:
 
             for miner in self.miners[el]:
                 log.debug(f"mining {el} with miner {miner}")
-                p_status, p_mined = await miner(Person(**p_new))
-                if p_status:
+                p_mined = await miner(Person(**p_new))
+                if p_mined:
                     log.debug(f"miner {miner} on {el} gave {p_mined}")
                     p_new.update(p_mined)
 
@@ -65,10 +66,9 @@ class Alchemist:
                     new_keys = set([k for k in p_mined if p_mined[k] != p_new.get(k)]) & self.elements
                     if new_keys:
                         elements.extend(list(new_keys))
-
         return modified, Person(**p_new)
 
-    async def transmute_bulk(self, persons: list[Person]):
+    async def bulk(self, persons: list[Person]):
         """Bulk transmute
 
         Args:
@@ -78,9 +78,17 @@ class Alchemist:
             Iterator[AsyncIterator]: iterator over transmuted person
         """
         for person in persons:
-            yield self.transmute_person(person)
+            yield self.person(person)
 
     def register(self, element: str):
+        """register a function as a miner for an element field
+
+        Args:
+            element (str): schema.org element to mine
+
+        Returns:
+            function: miner
+        """
         def decorator(miner_func):
             if element in self._ordered_elements:
                 log.debug(f"add {miner_func} to miners for {element}")

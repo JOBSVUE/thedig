@@ -53,19 +53,28 @@ class Alchemist:
 
             for miner in self.miners[el]:
                 log.debug(f"mining {el} with miner {miner}")
-                p_mined = await miner(Person(**p_new))
+                p_mined = await miner['func'](Person(**p_new))
                 if p_mined:
-                    log.debug(f"miner {miner} on {el} gave {p_mined}")
-                    p_new.update(p_mined)
+                    log.debug(f"miner {miner['func']} on {el} gave {p_mined}")
 
                     if not modified:
                         modified = True
 
-                    # add new values only
-                    # pick only elements with miners registered
+                    # identify eligible new / existing keys
                     new_keys = set([k for k in p_mined if p_mined[k] != p_new.get(k)]) & self.elements
+                    existing_keys = p_mined.keys() & p_new.keys() & self.elements
+                    found = p_mined.keys() & miner['elements']
+
+                    # add new keys to current mining
                     if new_keys:
                         elements.extend(list(new_keys))
+
+                    # update or add 
+                    for k in new_keys:
+                        p_new[k] = p_mined[k]
+                    for k in existing_keys:
+                        p_new[k].update(p_mined[k])
+
         return modified, Person(**p_new)
 
     async def bulk(self, persons: list[Person]):
@@ -80,19 +89,23 @@ class Alchemist:
         for person in persons:
             yield self.person(person)
 
-    def register(self, element: str):
+    def register(self, element_to_mine: str, elements_mined: set = None):
         """register a function as a miner for an element field
 
         Args:
-            element (str): schema.org element to mine
+            element_to_mine (str): schema.org element to mine
+            elements_mined (set): elements added by the miner
 
         Returns:
             function: miner
         """
         def decorator(miner_func):
-            if element in self._ordered_elements:
-                log.debug(f"add {miner_func} to miners for {element}")
-                self.miners[element].append(miner_func)
-                self.elements.add(element)
+            if element_to_mine in self._ordered_elements:
+                log.debug(f"add {miner_func} to miners for {element_to_mine}")
+                self.miners[element_to_mine].append({
+                    'func': miner_func,
+                    'elements': elements_mined
+                     })
+                self.elements.add(element_to_mine)
             return miner_func
         return decorator

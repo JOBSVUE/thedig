@@ -35,7 +35,7 @@ You'll need a few API keys, at least Google Custom Search API and Google Vision.
 
 ### Launch
 ```bash
-  uvicorn transmutation:app
+  python -m transmutation.app
 ``` 
 
 ## ⚠️ Support

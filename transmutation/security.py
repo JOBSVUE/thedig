@@ -24,6 +24,7 @@ api_key_header_auth = APIKeyHeader(
 )
 
 async def get_api_key(api_key_header: str = Security(api_key_header_auth)):
+    log.debug(f"Checking API Key authentication: {api_key_header}")
     if not any(
         secrets.compare_digest(api_key_header, api_key_v)
         for api_key_v in settings.api_keys
@@ -52,6 +53,7 @@ ws_api_key_query_auth = WebSocketAuth(
 )
 
 async def websocket_api_key(api_key_query: str = Security(ws_api_key_query_auth)):
+    log.debug(f"Websocket - Checking API Key authentication: {api_key_query}")
     if not any(
         secrets.compare_digest(api_key_query, api_key_v)
         for api_key_v in settings.api_keys

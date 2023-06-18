@@ -23,8 +23,8 @@ from pydantic_schemaorg.Person import Person
 from ..miners.linkedin import LinkedInSearch
 
 # celery tasks
-from .tasks import patch_persons
-from .tasks import celery_tasks
+# from .tasks import patch_persons
+# from .tasks import celery_tasks
 
 # from .tasks import AsyncResult
 # from celery.result import AsyncResult
@@ -105,8 +105,8 @@ async def linkedin_callback(
     miner = LinkedInSearch(bulk=True, search_api_params=search_api_params)
 
     # t = patch_person.delay(persons[0].name, persons[0].email, search_api_params, callback_params)
-    t = patch_persons.delay(x_callback_endpoint, callback_headers, persons)
-    return t.id
+    # t = patch_persons.delay(x_callback_endpoint, callback_headers, persons)
+    # return t.id
 
 @router.get("/tasks/{task_id}")
 def linkedin_task(task_id: str):

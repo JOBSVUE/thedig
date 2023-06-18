@@ -111,6 +111,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = De
     transmuted_count = 0
     log.debug(f"Websocket connected: {websocket}")
 
+    # this async queue is for buffering results
     aqueue = asyncio.Queue(maxsize=20)
 
     try:
@@ -125,7 +126,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = De
             else:
                 log.debug(f"invalid data: {person_data}")
                 raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
-               
+
             person_c = cache.get(f"{user_id}-{person.email}")
             person_c = None
             if person_c:
@@ -143,6 +144,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = De
         # reached bulk limit
         log.debug(f"limit reached: {transmuted_count}/{settings.persons_bulk_max}")
         raise WebSocketException(code=status.WS_1009_MESSAGE_TOO_BIG)
+    
     except WebSocketDisconnect:
         log.debug(f"Websocket disconnected: {websocket}")
         ws_manager.disconnect(websocket)

@@ -89,23 +89,23 @@ class Alchemist:
         for person in persons:
             yield self.person(person)
 
-    def register(self, element_to_mine: str, elements_mined: set = None):
+    def register(self, element: str, output: set = None):
         """register a function as a miner for an element field
 
         Args:
-            element_to_mine (str): schema.org element to mine
-            elements_mined (set): elements added by the miner
+            element (str): schema.org element to mine
+            output (set): elements added by the miner
 
         Returns:
             function: miner
         """
         def decorator(miner_func):
-            if element_to_mine in self._ordered_elements:
-                log.debug(f"add {miner_func} to miners for {element_to_mine}")
-                self.miners[element_to_mine].append({
+            if element in self._ordered_elements:
+                log.debug(f"add {miner_func} to miners for {element}")
+                self.miners[element].append({
                     'func': miner_func,
-                    'elements': elements_mined
+                    'elements': output
                      })
-                self.elements.add(element_to_mine)
+                self.elements.add(element)
             return miner_func
         return decorator

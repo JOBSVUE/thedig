@@ -6,8 +6,12 @@ redis>=4.3.4
 requests>=2.25.1
 uvicorn>=0.18.2
 whois>=0.9.16
+pydantic[dotenv]
+pydantic[email]
 pydantic-schemaorg>=1.0.6
 thefuzz[speedup]>=0.19
-celery[redis]>=5.2.7
+#celery[redis]>=5.2.7
 loguru>=0.6.0
 pre-commit
+fake_useragent
+google-cloud-vision

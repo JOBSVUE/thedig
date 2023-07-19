@@ -22,7 +22,7 @@ from .websocketmanager import manager as ws_manager
 
 # types
 from pydantic import EmailStr
-from typing import Set
+from typing import Set, Annotated
 
 # logger
 from loguru import logger as log
@@ -116,10 +116,15 @@ async def mine_country(p: dict):
     # exclude = ('io', 're', 'tv', 'sk', 'ly', 'in', 'me', 'sh', 'ws', 'ai', 'cc', 'bz', 'co', 'fm', 'im', 'to', 'am', 'it', 'at', 'mu', 'nu', 'is', 'tk')
     country = "France" if tld == "fr" else ""
     return {"location": country}
-    
+
 
 @router.websocket("/transmute/{user_id}/websocket")
-async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = Depends(websocket_api_key)):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    user_id: int,
+    q: int | None = None,
+    cookie_or_token: str = Annotated[str, Depends(websocket_api_key)]
+    ):
     await ws_manager.connect(websocket)
     transmuted_count = 0
     log.debug(f"Websocket connected: {websocket}")

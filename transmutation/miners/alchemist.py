@@ -38,13 +38,12 @@ class Alchemist:
         """
         elements = list(person.keys() & self.elements)
 
-        p_new = person.copy()
         log.debug(f"mining {elements} for {person}")
 
         modified = False
         # sync because we want to control the order of mining elements
         for el in elements:
-            log.debug(f"mining {el}: {p_new.get(el)}")
+            log.debug(f"mining {el}: {person.get(el)}")
 
             if el not in self.miners:
                 log.debug(f"no miner for {el}")
@@ -52,29 +51,23 @@ class Alchemist:
 
             for miner in self.miners[el]:
                 log.debug(f"mining {el} with miner {miner}")
-                p_mined = await miner['func'](p_new)
+                p_mined = await miner['func'](person)
                 if p_mined:
                     log.debug(f"miner {miner['func']} on {el} gave {p_mined}")
 
                     if not modified:
                         modified = True
 
-                    # identify eligible new / existing keys
-                    new_keys = set([k for k in p_mined if p_mined[k] != p_new.get(k)]) & self.elements
-                    existing_keys = p_mined.keys() & p_new.keys() & self.elements
-                    found = p_mined.keys() & miner['elements']
-
-                    # add new keys to current mining
-                    if new_keys:
-                        elements.extend(list(new_keys))
-
-                    # update or add 
-                    for k in new_keys:
-                        p_new[k] = p_mined[k]
-                    for k in existing_keys:
-                        p_new[k].update(p_mined[k])
-
-        return modified, p_new
+                    for k, v in p_mined.items():
+                        # eligibility to update
+                        if k in miner['output']:
+                            person[k] = v
+                            # eligibility to mine
+                            if k in self.elements:
+                                elements.append(k)  
+                                                  
+                    
+        return modified, person
 
     async def bulk(self, persons: list[dict]):
         """Bulk transmute
@@ -88,7 +81,7 @@ class Alchemist:
         for person in persons:
             yield self.person(person)
 
-    def register(self, element: str, output: set = None):
+    def register(self, element: str, output: tuple|str):
         """register a function as a miner for an element field
 
         Args:
@@ -103,7 +96,7 @@ class Alchemist:
                 log.debug(f"add {miner_func} to miners for {element}")
                 self.miners[element].append({
                     'func': miner_func,
-                    'elements': output
+                    'output': output if type(output) is tuple else (output,)
                      })
                 self.elements.add(element)
             return miner_func

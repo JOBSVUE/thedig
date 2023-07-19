@@ -109,7 +109,7 @@ async def mine_identifier(p: dict):
     return {'identifier': p.email.split('@')[0]}
 """
 
-@al.register(element="email")
+@al.register(element="email", output="location")
 async def mine_country(p: dict):
     tld = p['email'].split('.')[-1]
     # tld used generically are irrelevant to guess country
@@ -159,7 +159,7 @@ async def websocket_endpoint(
                 transmuted_count += 1
             
             # Send message when transmutation finished
-            websocket.send_text(f"[{al_status}, {transmuted.json()}]")
+            await websocket.send_text(f"[{al_status}, {transmuted}]")
         
         # reached bulk limit
         log.debug(f"limit reached: {transmuted_count}/{settings.persons_bulk_max}")

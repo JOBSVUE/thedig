@@ -20,7 +20,7 @@ from typing import Annotated
 # logging modules
 from loguru import logger as log
 
-class UniversalAPIKeyHeader(APIKeyQuery):
+class UniversalAPIKey(APIKeyQuery):
     async def __call__(self, request: Request=None, websocket: WebSocket=None):
         request = request or websocket
         if not request:
@@ -33,7 +33,7 @@ class UniversalAPIKeyHeader(APIKeyQuery):
         return await super().__call__(request)
 
 # X-API-KEY protection
-api_key_header_auth = UniversalAPIKeyHeader(
+api_key_header_auth = UniversalAPIKey(
     name=settings.api_key_name,
     description="Mandatory API Token, required for all endpoints",
 )

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from loguru import logger
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class LoggingLevel(str, Enum):
@@ -51,9 +51,7 @@ class LoggingSettings(BaseSettings):
     rotation: str = "1 days"
     retention: str = "1 months"
     serialize: bool = False
-
-    class Config:
-        env_prefix = "logging_"
+    model_config = SettingsConfigDict(env_prefix="logging_")
 
 
 class InterceptHandler(logging.Handler):

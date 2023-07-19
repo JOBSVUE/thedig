@@ -2,14 +2,13 @@
 # go to .env to modify configuration variables or use environment variables
 from logging import DEBUG
 from typing import Optional
-
-from pydantic import BaseSettings
 from requests import get
 from requests.exceptions import ConnectionError
 
 from loguru import logger as log
 
 from redis import Redis
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -18,12 +17,12 @@ class Settings(BaseSettings):
     google_cx: str
     google_vision_credentials: str
     query_type: str = "q"
-    bing_api_key: str | None
-    bing_customconfig: str | None
+    bing_api_key: Optional[str] = None
+    bing_customconfig: Optional[str] = None
     log_level: Optional[int] = DEBUG
-    log_file: str | None
-    redis_username: Optional[str]
-    redis_password: Optional[str]
+    log_file: Optional[str] = None
+    redis_username: Optional[str] = None
+    redis_password: Optional[str] = None
     redis_host: str
     redis_port: str
     cache_redis_db: int
@@ -34,12 +33,10 @@ class Settings(BaseSettings):
     api_key_name: str
     bulk_size: int
     google_vision_credentials: str
-    public_email_providers_url: str
-    public_email_providers: Optional[set[str]]
+    public_email_providers_url: str = "https://raw.githubusercontent.com/ankaboot-source/email-open-data/main/public-email-providers.json"
+    public_email_providers: Optional[set[str]] = None
     persons_bulk_max: int = 10000
-
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env")
 
 
 settings = Settings()

@@ -22,10 +22,7 @@ from pydantic import AnyHttpUrl
 import requests
 # log
 from loguru import logger as log
-from pydantic_schemaorg.Organization import Organization
-# JSON Schema.org types
-from pydantic_schemaorg.Person import Person
-from pydantic_schemaorg.PostalAddress import PostalAddress
+
 # Fuzzy string match for person name identification
 from thefuzz import fuzz
 
@@ -200,37 +197,37 @@ class LinkedInSearch:
         log.debug("No results found for query %s " % query)
 
     def _add_country(self):
-        """add country name to the Person JSON-LD based on the linkedin profile url"""
-        if self.person.url:
-            country = country_from_url(self.person.url)
+        """add country name to the dict JSON-LD based on the linkedin profile url"""
+        if 'url' in self.person:
+            country = country_from_url(self.person['url'])
             if country:
-                self.person.workLocation = country
+                self.person['workLocation'] = country
                 # TOFIX: do not work for unknown reason
-                # self.person.workLocation = PostalAddress(addressCountry=country)
+                # self.person['workLocation'] = PostalAddress(addressCountry=country)
 
     def _extract_bing_specific(self, result):
         # sometimes it's an useless thumbnail : 404 Error
-        self.person.image = result["openGraphImage"]["contentUrl"]
-        self.person.url = result["url"]
+        self.person['image'] = result["openGraphImage"]["contentUrl"]
+        self.person['url'] = result["url"]
 
         # Bing also gives you sometimes location
         address = result["richFacts"][0]["items"][0]["text"].split(", ")
         # however sometimes the address isn't correctly identified by Bing
         if len(address) >= 3:
-            self.person.workLocation = PostalAddress(
+            self.person['workLocation'] = PostalAddress(
                 addressLocation=address[0],
                 addressRegion=address[1],
                 addressCountry=address[2],
             )
 
     def _extract_google_specific(self, result):
-        self.person.givenName = result["pagemap"]["metatags"][0]["profile:first_name"]
-        self.person.familyName = result["pagemap"]["metatags"][0]["profile:last_name"]
+        self.person['givenName'] = result["pagemap"]["metatags"][0]["profile:first_name"]
+        self.person['familyName'] = result["pagemap"]["metatags"][0]["profile:last_name"]
 
         # we do not use cse_thumbnail (Google's image)
         if len(result["pagemap"]["metatags"]) >= 1:
-            self.person.image = result["pagemap"]["metatags"][0]["og:image"]
-        self.person.url = result["link"]
+            self.person['image'] = result["pagemap"]["metatags"][0]["og:image"]
+        self.person['url'] = result["link"]
 
     def _result_to_dict(self, result) -> dict:
 
@@ -258,7 +255,7 @@ class LinkedInSearch:
     
     def extract(
         self, name: str, email: str = None, company: str = None, google: bool = True
-    ) -> Person:
+    ) -> dict:
         """
         Search engine then update and return the personal data accordingly
         Google gives you the givenName/familyName but not the location
@@ -315,10 +312,8 @@ class LinkedInSearch:
         if name not in persons_d:
             return None
         
-        persons_d[name].update(self.person.dict())
-        self.person = Person(**persons_d[name])
-        if self.person.worksFor:
-            self.person.worksFor = Organization(name=self.person.worksFor)
+        persons_d[name].update(self.person)
+        self.person = persons_d[name]
 
         return self.person
 
@@ -326,11 +321,11 @@ class LinkedInSearch:
         """
         search and return the public data for an email and/or company
         """
-        self.person = Person(name=name)
+        self.person = dict(name=name)
         if email:
             log.debug("Searching by name %s and email %s" % (name, email))
 
-            self.person.email = email
+            self.person['email'] = email
             if self.bing and self.google:
                 # creating threads
                 google = threading.Thread(
@@ -350,27 +345,27 @@ class LinkedInSearch:
             elif self.bing:
                 self.extract(name, email, google=False)
         if company:
-            self.person.worksFor = Organization(name=company)
+            self.person['worksFor'] = company
             log.debug("Searching by name %s and company %s" % (name, company))
             self.extract(name, company=company)
 
         self._add_country()
 
         # answer only if we found something
-        if self.person.url:
+        if 'url' in self.person:
             return self.person
 
-    def bulk(self, persons: list[Person]) -> list:
+    def bulk(self, persons: list[dict]) -> list:
         """Bulk search
 
         Args:
-            persons (list[Persons]): list of Persons
+            persons (list[dicts]): list of dicts
 
         Returns:
-            list: list of Persons
+            list: list of dicts
         """
         for person in persons:
-            p_enrich = self.search(person.name, person.email)
+            p_enrich = self.search(person['name'], person['email'])
             if p_enrich:
                 self.persons.append(p_enrich)
 

@@ -16,9 +16,6 @@ from pydantic import EmailStr
 from pydantic import SecretStr
 from typing import List
 
-# Schema.org Person
-from pydantic_schemaorg.Person import Person
-
 # service
 from ..miners.linkedin import LinkedInSearch
 
@@ -42,10 +39,8 @@ search_api_params = {
 }
 
 
-@router.get(
-    "/linkedin/{email}", response_model=Person, response_model_exclude_unset=True
-)
-async def linkedin_unique(email: EmailStr, name: str) -> Person:
+@router.get("/linkedin/{email}")
+async def linkedin_unique(email: EmailStr, name: str) -> dict:
     """LinkedIn - enrich only one person identified by his name and email
 
     Args:
@@ -53,23 +48,23 @@ async def linkedin_unique(email: EmailStr, name: str) -> Person:
         name (str): full name
 
     Returns:
-        Person: Person Schema.org
+        dict: dict Schema.org
     """
     miner = LinkedInSearch(search_api_params)
     person = miner.search(name=name, email=email)
     return person
 
 
-@router.post("/linkedin", response_model=List[Person], response_model_exclude_none=True)
+@router.post("/linkedin")
 async def linkedin_bulk(
-    persons: list[Person],
-) -> List[Person]:
+    persons: list[dict],
+) -> List[dict]:
     """LinkedIn - enrich several persons and returns them
 
     Args:
-        persons (list[Person]): list of Persons
+        persons (list[dict]): list of dicts
     Returns:
-        list[Person]: list of Persons
+        list[dict]: list of dicts
     """
     # remove persons with no name
     persons = list(filter(lambda p: p.name, persons))
@@ -83,7 +78,7 @@ async def linkedin_bulk(
     "/linkedin",
 )
 async def linkedin_callback(
-    persons: list[Person],
+    persons: list[dict],
     x_callback_endpoint: str = Header(),
     x_callback_secret: SecretStr = Header(),
 ) -> str:
@@ -104,7 +99,7 @@ async def linkedin_callback(
     # background.add_task(patch_personDB, x_callback_endpoint, callback_headers, persons)
     miner = LinkedInSearch(bulk=True, search_api_params=search_api_params)
 
-    # t = patch_person.delay(persons[0].name, persons[0].email, search_api_params, callback_params)
+    # t = patch_person['delay'](persons[0].name, persons[0].email, search_api_params, callback_params)
     # t = patch_persons.delay(x_callback_endpoint, callback_headers, persons)
     # return t.id
 

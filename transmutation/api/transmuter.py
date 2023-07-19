@@ -20,9 +20,6 @@ from ..security import websocket_api_key
 # websocket manager
 from .websocketmanager import manager as ws_manager
 
-# Schema.org Person
-from pydantic_schemaorg.Person import Person
-
 # types
 from pydantic import EmailStr
 from typing import Set
@@ -52,21 +49,21 @@ search_api_params = {
 # init cache for transmuter
 cache = setup_cache(settings, 7)
 
-@router.get("/transmute/{email}", response_model=Person, response_model_exclude_none=True)
-def transmute_one(email: EmailStr, name: str) -> Person:
+@router.get("/transmute/{email}", response_model_exclude_none=True)
+def transmute_one(email: EmailStr, name: str) -> dict:
 
     # first, let's find him on LinkedIn
     miner = LinkedInSearch(search_api_params)
     person = miner.search(name=name, email=email)
 
     if not person:
-        person = Person(email=email, name=name)
+        person = dict(email=email, name=name)
 
     # then if there is no image, let's gravatar it
-    if not person.image:
-        image = gravatar(person.email)
+    if not 'image' in person:
+        image = gravatar(person['email'])
         if image:
-            person.image = image
+            person['image'] = image
 
     snm = SocialNetworkMiner(person)
 
@@ -75,28 +72,31 @@ def transmute_one(email: EmailStr, name: str) -> Person:
 
     # if there is an image, let's vision mine it
     # it will ads other social network URLs
-    if person.image:
+    if 'image' in person:
         snm.image()
 
     # otherwise, the domain will give us the org
     # except for public email providers
-    if not person.worksFor:
+    if 'worksFor' not in person:
         domain = email.split("@")[1]
         if domain not in settings.public_email_providers:
             company = cache.get(domain)
             if not company:
                 company = get_company(domain)
-                # redis refuse to store None so we'll use a void string instead
+                # redis refuses to store None so we'll use a void string instead
                 # we won't check for this domain again for some time 
                 cache.set(domain, company or '', ex=settings.cache_expiration)
             if company:
-                person.worksFor = company
+                person['worksFor'] = company
 
     return person
 
+
 al = Alchemist()
+
+""""
 @al.register(element="email")
-async def miner_gravatar(p: Person):
+async def miner_gravatar(p: dict):
     p_new = {}
     avatar = gravatar(p.email)
     if avatar:
@@ -104,6 +104,19 @@ async def miner_gravatar(p: Person):
     return p_new
 
 
+@al.register(element="email")
+async def mine_identifier(p: dict):
+    return {'identifier': p.email.split('@')[0]}
+"""
+
+@al.register(element="email")
+async def mine_country(p: dict):
+    tld = p['email'].split('.')[-1]
+    # tld used generically are irrelevant to guess country
+    # exclude = ('io', 're', 'tv', 'sk', 'ly', 'in', 'me', 'sh', 'ws', 'ai', 'cc', 'bz', 'co', 'fm', 'im', 'to', 'am', 'it', 'at', 'mu', 'nu', 'is', 'tk')
+    country = "France" if tld == "fr" else ""
+    return {"location": country}
+    
 
 @router.websocket("/transmute/{user_id}/websocket")
 async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = Depends(websocket_api_key)):
@@ -112,35 +125,37 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = De
     log.debug(f"Websocket connected: {websocket}")
 
     # this async queue is for buffering results
-    aqueue = asyncio.Queue(maxsize=20)
+    # aqueue = asyncio.Queue(maxsize=20)
 
     try:
         while transmuted_count < settings.persons_bulk_max:
             # Wait for any message from the client
-            person_data = await websocket.receive_json()
+            person = await websocket.receive_json()
             al_status = None
 
             # data validation
-            if type(person_data) is dict and 'email' in person_data and 'name' in person_data:
-                person = Person(**person_data)
-            else:
-                log.debug(f"invalid data: {person_data}")
+            if not type(person) is dict or not 'email' in person or 'name' not in person:
+                log.debug(f"invalid data: {person}")
                 raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
 
-            person_c = cache.get(f"{user_id}-{person.email}")
-            person_c = None
-            if person_c:
-                al_status = True
-                person = Person(**json.loads(person_c))
-                log.debug(f"{person.email} found: {person_c}")
-            else:
-                await aqueue.put(person)
-                al_status, transmuted = await al.person(await aqueue.get())
-                if al_status:
-                    cache.set(f"{user_id}-{person.email}", transmuted.json(), ex=settings.cache_expiration)
-                    transmuted_count += 1
-            # Send message to the client
-            await websocket.send_text(f"[{al_status}, {transmuted.json()}]")
+            # person_c = cache.get(f"{user_id}-{person['email']}")
+            # person_c = None
+            # if person_c:
+            #    al_status = True
+            #    person = dict(**json.loads(person_c))
+            #    log.debug(f"{person['email']} found: {person_c}")
+            # aqueue.put(person)
+            # al_status, transmuted = await al.person(await aqueue.get())
+            
+            al_status, transmuted = await al.person(person)
+            
+            if al_status:
+                #cache.set(f"{user_id}-{person['email']}", transmuted.json(), ex=settings.cache_expiration)
+                transmuted_count += 1
+            
+            # Send message when transmutation finished
+            websocket.send_text(f"[{al_status}, {transmuted.json()}]")
+        
         # reached bulk limit
         log.debug(f"limit reached: {transmuted_count}/{settings.persons_bulk_max}")
         raise WebSocketException(code=status.WS_1009_MESSAGE_TOO_BIG)

@@ -8,7 +8,6 @@ __license__ = "AGPL"
 
 from collections import OrderedDict
 from functools import wraps
-from pydantic_schemaorg.Person import Person
 from loguru import logger as log
 
 
@@ -28,19 +27,19 @@ class Alchemist:
             k: [] for k in self._ordered_elements
         })
 
-    async def person(self, person: Person) -> tuple[bool, Person]:
+    async def person(self, person: dict) -> tuple[bool, dict]:
         """Transmute one person
 
         Args:
-            person (Person): person to transmute
+            person (dict): person to transmute
 
         Returns:
-            bool, Person: succeed or not, enriched person
+            bool, dict: succeed or not, enriched person
         """
-        elements = list(person.__fields_set__ & self.elements)
+        elements = list(person.keys() & self.elements)
 
-        p_new = person.dict(exclude_unset=True, exclude_none=True)
-        log.debug(f"mining {elements} for {person.json()}")
+        p_new = person.copy()
+        log.debug(f"mining {elements} for {person}")
 
         modified = False
         # sync because we want to control the order of mining elements
@@ -53,7 +52,7 @@ class Alchemist:
 
             for miner in self.miners[el]:
                 log.debug(f"mining {el} with miner {miner}")
-                p_mined = await miner['func'](Person(**p_new))
+                p_mined = await miner['func'](p_new)
                 if p_mined:
                     log.debug(f"miner {miner['func']} on {el} gave {p_mined}")
 
@@ -75,13 +74,13 @@ class Alchemist:
                     for k in existing_keys:
                         p_new[k].update(p_mined[k])
 
-        return modified, Person(**p_new)
+        return modified, p_new
 
-    async def bulk(self, persons: list[Person]):
+    async def bulk(self, persons: list[dict]):
         """Bulk transmute
 
         Args:
-            persons (list[Person]): list of persons to transmute
+            persons (list[dict]): list of persons to transmute
 
         Yields:
             Iterator[AsyncIterator]: iterator over transmuted person

@@ -20,8 +20,7 @@ from fake_useragent import UserAgent
 from google.cloud import vision
 from loguru import logger as log
 from thefuzz import fuzz
-# JSON Schema.org types
-from pydantic_schemaorg.Person import Person
+
 
 # generic social profile matcher
 # Hypothesis: TLD is max 10 characters
@@ -215,17 +214,17 @@ class SocialNetworkMiner:
 
     }
 
-    def __init__(self, person: Person, socialnetworks: Optional[list] = None):
+    def __init__(self, person: dict, socialnetworks: Optional[list] = None):
         # person init
         self.person = person
-        if not self.person.identifier:
-            self.person.identifier = set()
-        elif type(self.person.identifier) == str:
-            self.person.identifier = {self.person.identifier}
-        elif type(self.person.identifier) == list:
-            self.person.identifier = set(self.person.identifier)
-        if not self.person.sameAs:
-            self.person.sameAs = set()
+        if not 'identifier' in self.person:
+            self.person['identifier'] = set()
+        elif type(self.person['identifier']) == str:
+            self.person['identifier'] = {self.person['identifier']}
+        elif type(self.person['identifier']) == list:
+            self.person['identifier'] = set(self.person['identifier'])
+        if not 'sameAs' in self.person:
+            self.person['sameAs'] = set()
 
         # one could choose to opt out some social networks
         if socialnetworks:
@@ -246,15 +245,15 @@ class SocialNetworkMiner:
         Returns:
             dict: dict of profiles urls by social network
         """
-        pages = find_pages_with_matching_images(self.person.image)
+        pages = find_pages_with_matching_images(self.person['image'])
         for page in pages:
             url_matched = re.match(generic_socialprofile_regexp, page.url)
-            #valid_sp = is_valid_socialprofile(url_matched.group(0), self.person.name)  
+            #valid_sp = is_valid_socialprofile(url_matched.group(0), self.person['name'])  
             if not url_matched or not url_matched["socialnetwork"] in self.socialnetworks_urls:
                 log.debug(f"Invalid/existing social network profile: {page.url}")
                 continue
-            if match_check and not match_name(self.person.name, page.page_title):
-                log.debug(f"Social Profile: {page.page_title} doesn't match name {self.person.name}")
+            if match_check and not match_name(self.person['name'], page.page_title):
+                log.debug(f"Social Profile: {page.page_title} doesn't match name {self.person['name']}")
                 continue
     
             log.debug(f"Social Network Profile found: {url_matched.group(0)}")
@@ -275,8 +274,8 @@ class SocialNetworkMiner:
                 'tld': tld,
                 'subdomain': subdomain,
         }
-        self.person.identifier.add(identifier)
-        self.person.sameAs.add(url)
+        self.person['identifier'].add(identifier)
+        self.person['sameAs'].add(url)
 
     def identifier(self) -> dict:
         """Look for social profiles using identifiers
@@ -284,7 +283,7 @@ class SocialNetworkMiner:
         Returns:
             dict: dict of profiles urls by social network
         """
-        for idr in self.person.identifier:
+        for idr in self.person['identifier']:
             for sn, url in self.socialnetworks_urls.items():
                 # pass existing social networks profiles
                 if sn in self.profiles:
@@ -295,7 +294,7 @@ class SocialNetworkMiner:
                 if f"{sn}#alt" in self.socialnetworks_urls:
                     continue
                 # check if there is this person profile for this social network
-                soup = is_valid_socialprofile(url, self.person.name)
+                soup = is_valid_socialprofile(url, self.person['name'])
                 if soup:
                     # replace alternative mirror URL with the original one
                     if sn.endswith("#alt"):
@@ -303,16 +302,16 @@ class SocialNetworkMiner:
                         url = self.socialnetworks_urls[sn].format(identifier=idr)
                     m = re.match(generic_socialprofile_regexp, url).groupdict()
                     self.add_profile(url, **m)
-                    # extract_socialprofile(soup, url, self.person.name)
+                    # extract_socialprofile(soup, url, self.person['name'])
 
         return self.profiles
 
     def _populate_profiles(self, email: bool = True):
         urls = []
-        if self.person.url:
-            urls.append(self.person.url)
-        if self.person.sameAs:
-            urls.extend(self.person.sameAs)
+        if 'url' in self.person:
+            urls.append(self.person['url'])
+        if 'sameAs' in self.person:
+            urls.extend(self.person['sameAs'])
 
         for url in urls:
             url_matched = re.match(generic_socialprofile_regexp, url)
@@ -322,15 +321,15 @@ class SocialNetworkMiner:
                     self.add_profile(url, **m)
 
     def _generate_identifier_from_name(self):
-        return self.person.name.encode("ASCII", "ignore").strip().lower().decode().replace(' ', '')
+        return self.person['name'].encode("ASCII", "ignore").strip().lower().decode().replace(' ', '')
 
     def _generate_identifier_from_email(self):
         id_email = ''.join(
-                filter(str.isalnum, self.person.email.split('@')[0].split('+')[0])
+                filter(str.isalnum, self.person['email'].split('@')[0].split('+')[0])
                 )
         # useful only if really different from name
         # otherwise, it gives too much false positive
-        if fuzz.partial_token_sort_ratio(id_email, self.person.name) > 81:
+        if fuzz.partial_token_sort_ratio(id_email, self.person['name']) > 81:
             return None
         self.identifiers.add(id_email)
         return id_email
@@ -349,7 +348,7 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--socialnetwork")
     args = parser.parse_args()
     
-    p = Person(name=args.name, identifier=args.identifier, image=args.image, email=args.email, sameAs=[])
+    p = dict(name=args.name, identifier=args.identifier, image=args.image, email=args.email, sameAs=[])
 
     s = SocialNetworkMiner(p, socialnetworks=args.socialnetwork)
     print(s.identifier())

@@ -1,16 +1,13 @@
 #!/bin/python3
 """
 Microservices for data enrichment :
-- /linkedin (JSON-LD schema.org format): full name and email -> 
+- /linkedin (JSON-LD schema.org format): full name and email ->
   fist name, last name, title, company, location, image, linkedin URL
 - /whoiscompany : list of domains -> dict of domain : company name
-- /emailvalidation : list of emails address -> dict of email address : validation status
+- /emailvalidation : list of emails address -> dict of validation status
 - /...
 - future: /socialprofiles : person (JSON-LD) -> list of social profiles
 """
-import secrets
-import os
-
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
@@ -18,17 +15,12 @@ __version__ = "0.1"
 
 # fast api
 from fastapi import FastAPI, Security
-from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 # import other apis
 from transmutation.api import router
 from transmutation.api.config import settings
 from transmutation.api.logsetup import setup_logger_from_settings
-
-# logging modules
-import logging
-from fastapi.logger import logger
 
 # X-API-KEY protection
 from transmutation.security import get_api_key
@@ -42,7 +34,7 @@ app = FastAPI(
     license_info={"name": __license__},
     dependencies=[Security(get_api_key)],
 )
-# origins = ["http://localhost:"+os.environ.get("PORT", str(settings.server_port))]
+# origins = [f"http://localhost:{settings.server_port}""]
 app.add_middleware(
     CORSMiddleware,
     #    allow_origins=origins,
@@ -60,7 +52,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "main:app",
-        port=int(os.environ.get("PORT", settings.server_port)),
+        port=settings.server_port,
         host="0.0.0.0",
         reload=True,
     )

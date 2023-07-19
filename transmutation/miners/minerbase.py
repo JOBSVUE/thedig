@@ -7,7 +7,7 @@ __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
 from collections import OrderedDict
-from pydantic_schemaorg.Person import Person
+from pydantic_schemaorg.dict import dict
 
 class BaseAlchemist:
 
@@ -21,7 +21,7 @@ class BaseAlchemist:
 
     @classmethod
     def from_keys(cls, **fields):
-        return cls(Person(**fields))
+        return cls(dict(**fields))
 
     def __init__(self, person):
         self.person = person
@@ -42,7 +42,7 @@ class BaseAlchemist:
 
 if __name__ == "__main__":
     from loguru import logger as log
-    p = Person(name="Khalil LEJMI")
+    p = dict(name="Khalil LEJMI")
     b = BaseMiner.from_keys(name="Khalil LEJMI")
     b.mine()
     log.debug(b.__dict__)

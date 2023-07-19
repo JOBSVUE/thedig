@@ -49,25 +49,3 @@ async def get_api_key(api_key_header: str = Security(api_key_header_auth)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid API Key",
         )
-
-async def websocket_api_key(
-    websocket: WebSocket,
-    session: Annotated[str | None, Cookie()] = None,
-    token: Annotated[str | None, Query()] = None,
-    ):
-    if token:
-        api_key = token.get(settings.api_key_name)
-    elif session:
-        api_key = session.get(settings.api_key_name)
-        
-    log.debug(f"Websocket - Checking API Key authentication: {api_key}")
-    if session is None and token is None:
-        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
-    if not any(
-        secrets.compare_digest(api_key, api_key_v)
-        for api_key_v in settings.api_keys
-    ):
-        log.debug(f"Invalid API Key {api_key}")
-        raise WebSocketException(
-            code=status.WS_1008_POLICY_VIOLATION
-        )

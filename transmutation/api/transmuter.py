@@ -15,7 +15,6 @@ from .config import setup_cache
 # fast api
 from fastapi import APIRouter, Depends, status
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
-from ..security import websocket_api_key
 
 # websocket manager
 from .websocketmanager import manager as ws_manager
@@ -122,8 +121,7 @@ async def mine_country(p: dict):
 async def websocket_endpoint(
     websocket: WebSocket,
     user_id: int,
-    q: int | None = None,
-    cookie_or_token: str = Annotated[str, Depends(websocket_api_key)]
+    q: int | None = None
     ):
     await ws_manager.connect(websocket)
     transmuted_count = 0

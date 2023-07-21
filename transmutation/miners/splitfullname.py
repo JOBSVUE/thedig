@@ -9,8 +9,12 @@ __license__ = "AGPL"
 
 import re
 import logging
+from contextlib import suppress
+# import spacy
+# import xx_ent_wiki_sm
 
 log = logging.getLogger(__name__)
+# nlp = xx_ent_wiki_sm.load()
 
 FAMILYNAME_SEPARATOR = {
     "إبن",
@@ -118,6 +122,7 @@ BUSINESS_SEPARATOR = {
     'van',
     'von',
     'de',
+    'd',
 }
 
 
@@ -134,12 +139,28 @@ def order(firstname: str, familyname: str) -> dict:
     }
 
 
-def is_company(familyname: str, domain: str) -> bool:
-    _familyname = familyname.encode(
+def is_company(name: str, domain: str) -> bool:
+    for sep in BUSINESS_SEPARATOR:
+        if name.startswith(sep):
+            name = name.removeprefix(sep)
+            break
+        
+    _name = name.encode(
         "ASCII", "ignore"
         ).strip().lower().decode().replace(' ', '')
-    return _familyname == domain.split('.')[-2]
 
+    return _name in (
+            domain.split('.')[-2],
+            domain, 
+            '.'.join(domain.split('.')[-2:])
+            )
+
+
+# def is_organization(familyname: str) -> bool:
+#    return any(
+#        map(lambda e: e.label_ == "ORG", 
+#        nlp(familyname).ents
+#        ))
 
 def _split_fullname(fullname: str) -> dict:
     # needs to look like a word somehow
@@ -168,14 +189,6 @@ def _split_fullname(fullname: str) -> dict:
     fullname = RE_WHITESPACE.sub(' ', fullname).strip()
     words = fullname.split(' ')
 
-    # e.g FirstName FamilyName
-    if len(words) == 2:
-        log.debug("Only two words")
-        return order(
-            words[0],
-            words[1]
-        )
-
     # eg. Dr. First Name FamilyName
     jobtitle = None
     if len(words[0]) > 1 and len(words[0]) < 5:
@@ -183,15 +196,25 @@ def _split_fullname(fullname: str) -> dict:
         _jobtitle = words[0] if words[0][-1] != "." else words[0][:-1]
         if _jobtitle in JOBTITLES:
             log.debug(f"Jobtitle detected {_jobtitle}")
-            jobtitle = words[0][:-1]
+            jobtitle = _jobtitle
             words.pop(0)
 
+    # e.g FirstName FamilyName
+    if len(words) == 2:
+        log.debug("Only two words")
+        return {**order(
+            words[0],
+            words[1]
+        ), **{'jobtitle' : jobtitle}
+        }
+        
     # eg. First name FAMILY NAME (or the opposite)
-    last_word_upper = words[-1].isupper()
-    first_word_upper = words[0].isupper()
     firstname = words[0]
     familyname = None
-    jobtitle = None
+    
+    last_word_upper = words[-1].isupper()
+    first_word_upper = words[0].isupper()
+
     if first_word_upper ^ last_word_upper:
         log.debug("One of words is uppercase")
         # trick to reverse test
@@ -216,25 +239,31 @@ def _split_fullname(fullname: str) -> dict:
         return {
                 'firstname': firstname,
                 'familyname': familyname,
+  #               'familyname': familyname if is_organization(familyname) else None,
                 'jobtitle': jobtitle,
             }
 
 
 def split_fullname(fullname: str, domain: str = None) -> dict:
+    if is_company(fullname, domain):
+        return None
+    
     splitted = _split_fullname(fullname)
     if not splitted:
         return None
-
-    if not splitted['familyname']:
-        splitted.pop('familyname')
-    elif domain and is_company(splitted['familyname'], domain):
-        log.debug(f"Company detected {splitted['familyname']}:{domain}")
-        splitted.pop('familyname')
-    if not splitted.get('jobtitle'):
-        with suppress(KeyError):
-            splitted.pop('jobtitle')
     
-    return splitted
+    for k, v in splitted.copy().items():
+        if not v:
+            splitted.pop(k)
+        # needs to look like a word somehow
+        elif not re.match(RE_ALPHA, v):
+            log.debug(f"Not a word {k}: {v}")
+            splitted.pop(k)
+        elif domain and is_company(v, domain):
+            splitted.pop(k)
+            log.debug(f"Company detected {v}:{domain}")
+    
+    return splitted if splitted.get('firstname') else None
 
 
 if __name__ == "__main__":
@@ -274,7 +303,7 @@ if __name__ == "__main__":
                         row['Email'].split('@')[-1]
                         )
                     if s:
-                        print(f"{row['Name']}: {s}")
+                        print(f"{row['Name']}: {s} from {row['Email']}")
                     else:
                         print(f"{row['Name']}: None")
     elif args.name and args.email:

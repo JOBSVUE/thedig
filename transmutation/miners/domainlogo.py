@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 
 FAVICON_RE = re.compile("^(shortcut icon|icon)$", re.I)
 
-COUNTRY_TLD_EXCLUSION = (
+COUNTRY_TLD_EXCLUSION = {
     'io',
     're',
     'tv',
@@ -48,7 +48,7 @@ COUNTRY_TLD_EXCLUSION = (
     'nu',
     'is',
     'tk',
-    )
+}
 
 def get_tld(domain: str) -> str:
     return domain.split('.')[-1]

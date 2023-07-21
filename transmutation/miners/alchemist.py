@@ -52,21 +52,24 @@ class Alchemist:
             for miner in self.miners[el]:
                 log.debug(f"mining {el} with miner {miner}")
                 p_mined = await miner['func'](person)
-                if p_mined:
-                    log.debug(f"miner {miner['func']} on {el} gave {p_mined}")
+                if not p_mined:
+                    continue
+                
+                log.debug(f"miner {miner['func']} on {el} gave {p_mined}")
 
-                    if not modified:
-                        modified = True
+                if not modified:
+                    modified = True
 
-                    for k, v in p_mined.items():
-                        # eligibility to update
-                        if k in miner['output']:
-                            person[k] = v
-                            # eligibility to mine
-                            if k in self.elements:
-                                elements.append(k)  
+                for k, v in p_mined.items():
+                    # eligibility to update
+                    if k in miner['output'] and v and v != person.get(k):
+                        person[k] = v
+                        log.debug(f"updated {k} : {v}")
+                        # eligibility to mine
+                        if k in self.elements:
+                            elements.append(k)  
+                            log.debug(f"new element to mine: {k}")
                                                   
-                    
         return modified, person
 
     async def bulk(self, persons: list[dict]):

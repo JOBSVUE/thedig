@@ -20,16 +20,17 @@ from typing import Annotated
 # logging modules
 from loguru import logger as log
 
-class UniversalAPIKey(APIKeyQuery):
+class UniversalAPIKey(APIKeyHeader):
     async def __call__(self, request: Request=None, websocket: WebSocket=None):
-        request = request or websocket
-        if not request:
+        if not request and not websocket:
             if self.auto_error:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Not authenticated"
                 )
             return None
+        if websocket:
+            return await APIKeyQuery.__call__(self, websocket)
         return await super().__call__(request)
 
 # X-API-KEY protection

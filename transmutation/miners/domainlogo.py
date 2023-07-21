@@ -1,6 +1,8 @@
 #!/bin/python3
 """
-Find the logo related to a domain
+Enrichment related to a domain
+- favicon
+- country (exclusion list for country tld misused like .io)
 """
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"
@@ -12,10 +14,51 @@ import urllib.parse
 import logging
 import requests
 
+# make it work as a command line tool
+try:
+    from .ISO3166 import ISO3166
+except ImportError:
+    from ISO3166 import ISO3166
+
 log = logging.getLogger(__name__)
 
 FAVICON_RE = re.compile("^(shortcut icon|icon)$", re.I)
 
+COUNTRY_TLD_EXCLUSION = (
+    'io',
+    're',
+    'tv',
+    'sk',
+    'ly',
+    'in',
+    'me',
+    'sh',
+    'ws',
+    'ai',
+    'cc',
+    'bz',
+    'co',
+    'fm',
+    'im',
+    'to',
+    'am',
+    'it',
+    'at',
+    'mu',
+    'nu',
+    'is',
+    'tk',
+    )
+
+def get_tld(domain: str) -> str:
+    return domain.split('.')[-1]
+
+def guess_country(domain: str) -> str:
+    tld = get_tld(domain)
+    # tld used generically are irrelevant to guess country
+    if tld in COUNTRY_TLD_EXCLUSION:
+        return None
+    return ISO3166.get(tld.upper())
 
 def domain_to_urls(domain: str) -> list[str]:
     """Build hypothetical websites URL from a domain

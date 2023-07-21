@@ -19,14 +19,17 @@ TO_IGNORE = (
 
 log = logging.getLogger(__name__)
 
-
 def get_domain(email: str) -> str:
     return email.split("@")[1]
 
 
 def get_company(domain: str) -> str:
-    result = whois.query(domain, ignore_returncode=True)
-
+    try:
+        result = whois.query(domain, ignore_returncode=True)
+    except whois.exceptions.WhoisPrivateRegistry as e:
+        log.debug(f"Whois failed: {e}")
+        return None
+    
     # if the whois request does answer a proper string
     if not result:
         return None

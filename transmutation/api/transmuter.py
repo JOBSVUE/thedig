@@ -13,7 +13,7 @@ from .config import settings
 from .config import setup_cache
 
 # fast api
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
 
 # websocket manager
@@ -32,6 +32,7 @@ import json
 # service
 from ..miners.linkedin import LinkedInSearch
 from ..miners.whoiscompany import get_company
+from ..miners.domainlogo import guess_country
 from ..miners.gravatar import gravatar
 from ..miners.vision import SocialNetworkMiner
 from ..miners.alchemist import Alchemist
@@ -48,36 +49,45 @@ search_api_params = {
 # init cache for transmuter
 cache = setup_cache(settings, 7)
 
-@router.get("/transmute/{email}", response_model_exclude_none=True)
-def transmute_one(email: EmailStr, name: str) -> dict:
+al = Alchemist()
 
-    # first, let's find him on LinkedIn
+
+@al.register(element="name", output=("image", "sameAs", "location", "worksFor", "jobtitle", "identifier"))
+async def miner_linkedin(p: dict):
     miner = LinkedInSearch(search_api_params)
-    person = miner.search(name=name, email=email)
+    person = miner.search(name=p['name'], email=p['email'])
+    return person
 
-    if not person:
-        person = dict(email=email, name=name)
 
-    # then if there is no image, let's gravatar it
-    if not 'image' in person:
-        image = gravatar(person['email'])
-        if image:
-            person['image'] = image
+@al.register(element="email", output="image")
+async def miner_gravatar(p: dict):
+    p_new = {}
+    avatar = gravatar(p['email'])
+    if avatar:
+        p_new['image'] = avatar
+    return p_new
 
-    snm = SocialNetworkMiner(person)
+
+@al.register(element="email", output=('sameAs','identifier'))
+async def mine_social(p: dict):
+    snm = SocialNetworkMiner(p.copy())
 
     # fuzzy identifier miner
     snm.identifier()
 
     # if there is an image, let's vision mine it
     # it will ads other social network URLs
-    if 'image' in person:
+    if 'image' in p:
         snm.image()
+    
+    return snm.person
 
+@al.register(element="email", output='worksFor')
+async def mine_worksfor(p: dict):
     # otherwise, the domain will give us the org
     # except for public email providers
-    if 'worksFor' not in person:
-        domain = email.split("@")[1]
+    if 'worksFor' not in p:
+        domain = p['email'].split("@")[1]
         if domain not in settings.public_email_providers:
             company = cache.get(domain)
             if not company:
@@ -86,36 +96,21 @@ def transmute_one(email: EmailStr, name: str) -> dict:
                 # we won't check for this domain again for some time 
                 cache.set(domain, company or '', ex=settings.cache_expiration)
             if company:
-                person['worksFor'] = company
+                p['worksFor'] = company
+                return p
 
-    return person
-
-
-al = Alchemist()
-
-""""
-@al.register(element="email")
-async def miner_gravatar(p: dict):
-    p_new = {}
-    avatar = gravatar(p.email)
-    if avatar:
-        p_new['image'] = avatar
-    return p_new
-
-
-@al.register(element="email")
-async def mine_identifier(p: dict):
-    return {'identifier': p.email.split('@')[0]}
-"""
 
 @al.register(element="email", output="location")
 async def mine_country(p: dict):
-    tld = p['email'].split('.')[-1]
-    # tld used generically are irrelevant to guess country
-    # exclude = ('io', 're', 'tv', 'sk', 'ly', 'in', 'me', 'sh', 'ws', 'ai', 'cc', 'bz', 'co', 'fm', 'im', 'to', 'am', 'it', 'at', 'mu', 'nu', 'is', 'tk')
-    country = "France" if tld == "fr" else ""
-    return {"location": country}
+    country = guess_country(p['email'].split('@')[-1])
+    return {"location": country} if country else None
 
+@router.get("/transmute/{email}")
+async def transmute_one(email: EmailStr, name: str) -> dict:
+    al_status, transmuted = await al.person({"email": email, "name": name})
+    if not al_status:
+        raise HTTPException(status_code=404, detail="No result for this person")
+    return transmuted
 
 @router.websocket("/transmute/{user_id}/websocket")
 async def websocket_endpoint(
@@ -125,7 +120,7 @@ async def websocket_endpoint(
     ):
     await ws_manager.connect(websocket)
     transmuted_count = 0
-    log.debug(f"Websocket connected: {websocket}")
+    log.debug(f"Websocket connected: {websocket} - {user_id}")
 
     # this async queue is for buffering results
     # aqueue = asyncio.Queue(maxsize=20)
@@ -133,11 +128,16 @@ async def websocket_endpoint(
     try:
         while transmuted_count < settings.persons_bulk_max:
             # Wait for any message from the client
-            person = await websocket.receive_json()
+            try:
+                person = await websocket.receive_json()
+            except json.JSONDecodeError as e:
+                log.debug(f"JSON malformed: {e}")
+                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
+            
             al_status = None
 
             # data validation
-            if not type(person) is dict or not 'email' in person or 'name' not in person:
+            if not type(person) is dict or not 'email' in person or not 'name' in person:
                 log.debug(f"invalid data: {person}")
                 raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
 

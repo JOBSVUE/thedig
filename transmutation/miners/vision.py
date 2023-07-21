@@ -91,7 +91,7 @@ def random_ua_headers():
     generate a random user-agent
     basic techniques against bot blockers
     """
-    ua = UserAgent(num_newest_uas=1)
+    ua = UserAgent()
     return {"user-agent": ua.random}
 
 
@@ -197,7 +197,8 @@ class SocialNetworkMiner:
         #'linkedin': "https://linkedin.com/in/{identifier}",
         'pinterest': "https://pinterest.com/{identifier}",
         'snapchat':  "https://snapchat.com/add/{identifier}",   
-        'telegram': "https://telegram.me/{identifier}",
+        #false positive
+        #'telegram': "https://telegram.me/{identifier}",
         'tiktok':  "https://tiktok.com/@{identifier}",
         # twitter is full javascript, needs a headless browser
         'twitter': "https://twitter.com/{identifier}",
@@ -216,15 +217,16 @@ class SocialNetworkMiner:
 
     def __init__(self, person: dict, socialnetworks: Optional[list] = None):
         # person init
-        self.person = person
-        if not 'identifier' in self.person:
-            self.person['identifier'] = set()
-        elif type(self.person['identifier']) == str:
-            self.person['identifier'] = {self.person['identifier']}
-        elif type(self.person['identifier']) == list:
-            self.person['identifier'] = set(self.person['identifier'])
-        if not 'sameAs' in self.person:
-            self.person['sameAs'] = set()
+        self._original_person = person
+        self._person = person
+        if not 'identifier' in self._person:
+            self._person['identifier'] = set()
+        elif type(self._person['identifier']) == str:
+            self._person['identifier'] = {self._person['identifier']}
+        elif type(self._person['identifier']) == list:
+            self._person['identifier'] = set(self._person['identifier'])
+        if not 'sameAs' in self._person:
+            self._person['sameAs'] = set()
 
         # one could choose to opt out some social networks
         if socialnetworks:
@@ -237,7 +239,14 @@ class SocialNetworkMiner:
 
         # now we populate profiles
         self.profiles = {}
-        self._populate_profiles()        
+        self._populate_profiles()
+        
+    @property
+    def person(self):
+        return {
+            k:v for k,v in self._person.items()
+            if k not in self._original_person
+            }        
         
     def image(self, match_check: bool = True) -> dict:
         """Look for social profiles using profile picture
@@ -245,15 +254,15 @@ class SocialNetworkMiner:
         Returns:
             dict: dict of profiles urls by social network
         """
-        pages = find_pages_with_matching_images(self.person['image'])
+        pages = find_pages_with_matching_images(self._person['image'])
         for page in pages:
             url_matched = re.match(generic_socialprofile_regexp, page.url)
-            #valid_sp = is_valid_socialprofile(url_matched.group(0), self.person['name'])  
+            #valid_sp = is_valid_socialprofile(url_matched.group(0), self._person['name'])  
             if not url_matched or not url_matched["socialnetwork"] in self.socialnetworks_urls:
                 log.debug(f"Invalid/existing social network profile: {page.url}")
                 continue
-            if match_check and not match_name(self.person['name'], page.page_title):
-                log.debug(f"Social Profile: {page.page_title} doesn't match name {self.person['name']}")
+            if match_check and not match_name(self._person['name'], page.page_title):
+                log.debug(f"Social Profile: {page.page_title} doesn't match name {self._person['name']}")
                 continue
     
             log.debug(f"Social Network Profile found: {url_matched.group(0)}")
@@ -274,8 +283,8 @@ class SocialNetworkMiner:
                 'tld': tld,
                 'subdomain': subdomain,
         }
-        self.person['identifier'].add(identifier)
-        self.person['sameAs'].add(url)
+        self._person['identifier'].add(identifier)
+        self._person['sameAs'].add(url)
 
     def identifier(self) -> dict:
         """Look for social profiles using identifiers
@@ -283,7 +292,10 @@ class SocialNetworkMiner:
         Returns:
             dict: dict of profiles urls by social network
         """
-        for idr in self.person['identifier']:
+        # if we don't have any identifier we'll use temporary ones
+        identifiers = self._person['identifier'] or self._generate_identifiers()
+            
+        for idr in identifiers:
             for sn, url in self.socialnetworks_urls.items():
                 # pass existing social networks profiles
                 if sn in self.profiles:
@@ -294,7 +306,7 @@ class SocialNetworkMiner:
                 if f"{sn}#alt" in self.socialnetworks_urls:
                     continue
                 # check if there is this person profile for this social network
-                soup = is_valid_socialprofile(url, self.person['name'])
+                soup = is_valid_socialprofile(url, self._person['name'])
                 if soup:
                     # replace alternative mirror URL with the original one
                     if sn.endswith("#alt"):
@@ -302,16 +314,16 @@ class SocialNetworkMiner:
                         url = self.socialnetworks_urls[sn].format(identifier=idr)
                     m = re.match(generic_socialprofile_regexp, url).groupdict()
                     self.add_profile(url, **m)
-                    # extract_socialprofile(soup, url, self.person['name'])
+                    # extract_socialprofile(soup, url, self._person['name'])
 
         return self.profiles
 
     def _populate_profiles(self, email: bool = True):
         urls = []
-        if 'url' in self.person:
-            urls.append(self.person['url'])
-        if 'sameAs' in self.person:
-            urls.extend(self.person['sameAs'])
+        if 'url' in self._person:
+            urls.append(self._person['url'])
+        if 'sameAs' in self._person:
+            urls.extend(self._person['sameAs'])
 
         for url in urls:
             url_matched = re.match(generic_socialprofile_regexp, url)
@@ -320,18 +332,25 @@ class SocialNetworkMiner:
                 if m['socialnetwork'] not in self.profiles and m['socialnetwork'] in self.socialnetworks:
                     self.add_profile(url, **m)
 
+    def _generate_identifiers(self):
+        id_email = self._generate_identifier_from_email()
+        id_name = self._generate_identifier_from_name()
+        return {
+            id_email,
+            id_name
+        } if id_email else {id_name}
+        
     def _generate_identifier_from_name(self):
-        return self.person['name'].encode("ASCII", "ignore").strip().lower().decode().replace(' ', '')
+        return self._person['name'].encode("ASCII", "ignore").strip().lower().decode().replace(' ', '')
 
     def _generate_identifier_from_email(self):
         id_email = ''.join(
-                filter(str.isalnum, self.person['email'].split('@')[0].split('+')[0])
+                filter(str.isalnum, self._person['email'].split('@')[0].split('+')[0])
                 )
         # useful only if really different from name
         # otherwise, it gives too much false positive
-        if fuzz.partial_token_sort_ratio(id_email, self.person['name']) > 81:
+        if fuzz.partial_token_sort_ratio(id_email, self._person['name']) > 81:
             return None
-        self.identifiers.add(id_email)
         return id_email
 
   

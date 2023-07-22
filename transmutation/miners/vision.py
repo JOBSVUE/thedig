@@ -6,6 +6,8 @@ Google Vision API Limits:
 - 1800 requests/minute
 - 8000 simultaneous requests
 """
+__author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
+__license__ = "AGPL"
 
 import re
 import urllib
@@ -21,6 +23,8 @@ from google.cloud import vision
 from loguru import logger as log
 from thefuzz import fuzz
 
+from .utils import TOKEN_RATIO, match_name
+
 
 # generic social profile matcher
 # Hypothesis: TLD is max 10 characters
@@ -35,13 +39,6 @@ generic_socialprofile_regexp = re.compile(generic_socialprofile_regexp)
 
 MAX_RETRY = 3
 MAX_VISION_RESULTS = 20
-TOKEN_RATIO = 96
-
-
-def match_name(name: str, text: str) -> bool:
-    if not name:
-        return True
-    return fuzz.partial_token_sort_ratio(name, text) >= TOKEN_RATIO
 
 
 def find_pages_with_matching_images(

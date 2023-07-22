@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/bin/env python3
 """
 Enrichment related to a domain
 - favicon
@@ -10,6 +10,10 @@ __license__ = "AGPL"
 import re
 import logging
 from contextlib import suppress
+try:
+    from .utils import match_name, normalize
+except ImportError:
+    from utils import match_name, normalize
 # import spacy
 # import xx_ent_wiki_sm
 
@@ -105,13 +109,34 @@ FAMILYNAME_SEPARATOR = {
     "zu",
 }
 
+CIVILITY = {
+    "M",
+    "Mme",
+    "Mlle",
+    "Mr",
+    "Mrs",
+    "Ms",
+}
+
+ROLE_NAMES = {
+    "contact",
+    "forum",
+    "secretariat",
+    "secretario",
+    "service",
+    "service client",
+    "support",
+    "wordpress",    
+}
 
 JOBTITLES = {
-    "Dr",
-    "Pr",
-    "Ing",
-    "Eng",
-    "Phd",
+    "Dr": "Doctor",
+    "Ing": "Engineer",
+    "Eng": "Engineer",
+    "Engr": "Engineer",
+    "Phd": "Doctor",
+    "Pr": "Professor",
+    "Prof": "Professor",
 }
 
 RE_WHITESPACE = re.compile(r"\s+")
@@ -144,10 +169,8 @@ def is_company(name: str, domain: str) -> bool:
         if name.startswith(sep):
             name = name.removeprefix(sep)
             break
-        
-    _name = name.encode(
-        "ASCII", "ignore"
-        ).strip().lower().decode().replace(' ', '')
+  
+    _name = normalize(name)
 
     return _name in (
             domain.split('.')[-2],
@@ -262,6 +285,9 @@ def split_fullname(fullname: str, domain: str = None) -> dict:
         elif domain and is_company(v, domain):
             splitted.pop(k)
             log.debug(f"Company detected {v}:{domain}")
+        elif v.lower() in CIVILITY | ROLE_NAMES:
+            splitted.pop(k)
+            log.debug(f"Civility or Role detected {v}")
     
     return splitted if splitted.get('firstname') else None
 

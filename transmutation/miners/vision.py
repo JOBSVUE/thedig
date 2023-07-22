@@ -34,8 +34,9 @@ from .utils import TOKEN_RATIO, match_name
 # - person: crunchbase
 # - @: tiktok (without trailing /)
 # - add: snapchat
-generic_socialprofile_regexp = r"^https:\/\/((?P<subdomain>www|mobile|\w{2})\.)?(?P<socialnetwork>\w+)\.(?P<tld>\w{2,10})(\/(in|people|add))?\/@?(?P<identifier>\w+)$"
-generic_socialprofile_regexp = re.compile(generic_socialprofile_regexp)
+generic_socialprofile_regexp = re.compile(
+    r"^https:\/\/((?P<subdomain>www|mobile|\w{2})\.)?(?P<socialnetwork>\w+)\.(?P<tld>\w{2,10})(\/(in|people|add))?\/@?(?P<identifier>\w+)$"
+)
 
 MAX_RETRY = 3
 MAX_VISION_RESULTS = 20
@@ -215,7 +216,7 @@ class SocialNetworkMiner:
     def __init__(self, person: dict, socialnetworks: Optional[list] = None):
         # person init
         self._original_person = person
-        self._person = person
+        self._person = person.copy()
         if not 'identifier' in self._person:
             self._person['identifier'] = set()
         elif type(self._person['identifier']) == str:
@@ -237,7 +238,7 @@ class SocialNetworkMiner:
         # now we populate profiles
         self.profiles = {}
         self._populate_profiles()
-        
+
     @property
     def person(self):
         return {
@@ -258,8 +259,9 @@ class SocialNetworkMiner:
             if not url_matched or not url_matched["socialnetwork"] in self.socialnetworks_urls:
                 log.debug(f"Invalid/existing social network profile: {page.url}")
                 continue
-            if match_check and not match_name(self._person['name'], page.page_title):
-                log.debug(f"Social Profile: {page.page_title} doesn't match name {self._person['name']}")
+            page_title = BeautifulSoup(page.page_title, "html.parser").contents[0].text
+            if match_check and not match_name(self._person['name'], page_title):
+                log.debug(f"Social Profile: {page_title} doesn't match name {self._person['name']}")
                 continue
     
             log.debug(f"Social Network Profile found: {url_matched.group(0)}")

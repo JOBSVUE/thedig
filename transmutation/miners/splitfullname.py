@@ -139,9 +139,6 @@ JOBTITLES = {
     "Prof": "Professor",
 }
 
-RE_WHITESPACE = re.compile(r"\s+")
-RE_ALPHA = re.compile(r"\b[^\W\d_]+\b")
-
 BUSINESS_SEPARATOR = {
     'from',
     'van',
@@ -150,6 +147,9 @@ BUSINESS_SEPARATOR = {
     'd',
 }
 
+
+RE_WHITESPACE = re.compile(r"\s+")
+RE_ALPHA = re.compile(r"\b[^\W\d_]+\b")
 
 def order(firstname: str, familyname: str) -> dict:
     # FAMILY NAME First Name (reversed)
@@ -169,7 +169,7 @@ def is_company(name: str, domain: str) -> bool:
         if name.startswith(sep):
             name = name.removeprefix(sep)
             break
-  
+
     _name = normalize(name)
 
     return _name in (
@@ -270,11 +270,11 @@ def _split_fullname(fullname: str) -> dict:
 def split_fullname(fullname: str, domain: str = None) -> dict:
     if is_company(fullname, domain):
         return None
-    
+ 
     splitted = _split_fullname(fullname)
     if not splitted:
         return None
-    
+
     for k, v in splitted.copy().items():
         if not v:
             splitted.pop(k)
@@ -288,7 +288,7 @@ def split_fullname(fullname: str, domain: str = None) -> dict:
         elif v.lower() in CIVILITY | ROLE_NAMES:
             splitted.pop(k)
             log.debug(f"Civility or Role detected {v}")
-    
+
     return splitted if splitted.get('firstname') else None
 
 

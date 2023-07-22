@@ -6,7 +6,7 @@ __license__ = "AGPL"
 
 from thefuzz import fuzz
 
-TOKEN_RATIO = 96
+TOKEN_RATIO = 82
 
 def match_name(name: str, text: str) -> bool:
     if not name:

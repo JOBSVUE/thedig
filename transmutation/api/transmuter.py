@@ -70,16 +70,18 @@ async def miner_gravatar(p: dict):
 
 @al.register(element="email", output=('sameAs','identifier'))
 async def mine_social(p: dict):
-    snm = SocialNetworkMiner(p.copy())
+    snm = SocialNetworkMiner(p)
 
     # fuzzy identifier miner
+    # it's not an independent miner since identifier can't be mined
+    # until confirmed social profiles are found
     snm.identifier()
 
     # if there is an image, let's vision mine it
     # it will ads other social network URLs
     if 'image' in p:
         snm.image()
-    
+        
     return snm.person
 
 @al.register(element="email", output='worksFor')

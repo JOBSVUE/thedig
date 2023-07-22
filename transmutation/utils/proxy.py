@@ -55,7 +55,7 @@ def random_ua_headers():
     generate a random user-agent
     most basic technique against bot blockers
     """
-    ua = UserAgent(num_newest_uas=2)
+    ua = UserAgent()
     return {"user-agent": ua.random}
 
 
@@ -215,7 +215,7 @@ class ProxyMiner:
         Returns:
             bool: success
         """
-        ips = dict([p.removeprefix(f"{self.protocol}://").split(':') for p in self.proxies])
+        ips = dict([p.removeprefix(f"{self.protocol}://").split(':')[:2] for p in self.proxies])
         ips_l = list(ips.keys())
         chunks = [ips_l[x:x+max] for x in range(0, len(ips_l), max)]
         chunk_i = 1

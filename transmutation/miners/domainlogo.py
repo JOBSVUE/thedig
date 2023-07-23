@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 import urllib.parse
 
 import logging
-import requests
+from curl_cffi import requests
 
 # make it work as a command line tool
 try:

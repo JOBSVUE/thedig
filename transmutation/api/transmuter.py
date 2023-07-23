@@ -75,13 +75,13 @@ async def mine_social(p: dict):
     # fuzzy identifier miner
     # it's not an independent miner since identifier can't be mined
     # until confirmed social profiles are found
-    snm.identifier()
+    id_profiles = await snm.identifier()
 
     # if there is an image, let's vision mine it
     # it will ads other social network URLs
     if 'image' in p:
-        snm.image()
-        
+        img_profiles = await snm.image()
+    #asyncio.gather(id_profiles, img_profiles)
     return snm.person
 
 @al.register(element="email", output='worksFor')

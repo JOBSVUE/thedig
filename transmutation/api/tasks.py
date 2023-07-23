@@ -28,7 +28,7 @@ celery_tasks.task_annotations = {"tasks.add": {"rate_limit": "1/min"}}
 
 # app.conf.task_annotations = {"*" : "100/min"}
 
-import requests
+from curl_cffi import requests
 
 search_api_params = {
     "google_api_key": settings.google_api_key,

@@ -9,6 +9,7 @@ Google Vision API Limits:
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"
 
+import asyncio
 import re
 import urllib
 from random import choice
@@ -16,12 +17,22 @@ from typing import Optional
 
 from ..api.config import settings
 
-import requests
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 from google.cloud import vision
 from loguru import logger as log
 from thefuzz import fuzz
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+try:
+    from curl_cffi import requests
+    CURL_REQUESTS = True
+    IMPERSONATE_BROWSER = "chrome110"
+except ImportError:
+    log.warning("Using native requests instead of curl_cffi: no impersonate")
+    import requests
+    CURL_REQUESTS = False
 
 from .utils import TOKEN_RATIO, match_name
 
@@ -40,7 +51,26 @@ generic_socialprofile_regexp = re.compile(
 
 MAX_RETRY = 3
 MAX_VISION_RESULTS = 20
+MAX_PARRALEL_REQUESTS = 10
 
+def ua_headers(random: bool=False) -> dict:
+    """
+    generate a random user-agent
+    basic techniques against bot blockers
+    """
+    ua = UserAgent()
+    if random:
+        user_agent = ua.random
+    else:
+        user_agent = ua.chrome
+    return {"user-agent": user_agent}
+
+# a private life is a happy life
+REQUESTS_PARAM = {
+        "headers": ua_headers(),
+        "timeout": 3,
+        "impersonate": IMPERSONATE_BROWSER,
+    }
 
 def find_pages_with_matching_images(
         image_url: str,
@@ -83,49 +113,43 @@ def find_pages_with_matching_images(
 
     return matching
 
-
-def random_ua_headers():
-    """
-    generate a random user-agent
-    basic techniques against bot blockers
-    """
-    ua = UserAgent()
-    return {"user-agent": ua.random}
-
-
-def is_valid_socialprofile(url, name, retry=0, max_retry=MAX_RETRY):
+# TODO: make it async
+def get_socialprofile(url, sn, name=None, params=REQUESTS_PARAM, session=None, retry=0, max_retry=MAX_RETRY):
     if retry > max_retry:
-        return None
+        return None, sn
 
-    # a private life is a happy life
-    params = {
-        "headers": random_ua_headers(),
-        "timeout": 1,
-    }
+    name = name or self._person["name"]
 
     # linkedin is giving us an hard time
     # if retry>0:
     #    params["proxies"] = rotating_proxy()
     #    params['proxies'] = {'http' : "https://localhost:8080"}
     #    log.info(f"Retry with proxy. Proxy: {params['proxies']}, URL: {url}")
-        
-    try:
-        r = requests.get(url, **params)
-    except requests.exceptions.ProxyError as e:
-        log.warning(f"Proxy error, let's retry. Params: {params}. Error {e}")
-        return is_valid_socialprofile(url, name, retry=retry+1)
-    except requests.exceptions.ConnectTimeout:
-        log.warning(f"Timeout error, let's retry. Params: {params}")
-        if params.get("proxies"):
-            return is_valid_socialprofile(url, name, retry=retry+1)
-        return None
-    except requests.RequestException as e:
-        log.error(f"Failed trying to reach Social Network. URL: {url}, Error: {e}")
-        return None
+
+    if CURL_REQUESTS:
+        #if not session:
+        #    session = requests.AsyncSession()
+        try:
+            #r = await session.get(url, **params)
+            r = requests.get(url, **params)
+        except requests.RequestsError as e:
+            log.error(f"Failed trying to reach Social Network. URL {url}, Error {e}")
+            return None, sn
+    else:
+        try:
+            r = requests.get(url, **params)
+        except requests.exceptions.ProxyError as e:
+            log.error(f"Proxy error. Params: {params}. Error {e}")
+        except requests.exceptions.ConnectTimeout:
+            log.error(f"Timeout error. Params: {params}")
+            return None, sn
+        except requests.RequestException as e:
+            log.error(f"Failed trying to reach Social Network. URL: {url}, Error: {e}")
+            return None, sn
 
     if not r.ok:
         log.debug(f"Social Network profile not found. URL: {url}, Error: {r.status_code}")
-        return False
+        return False, sn
     
     soup = BeautifulSoup(r.text, "html.parser")
 
@@ -134,8 +158,8 @@ def is_valid_socialprofile(url, name, retry=0, max_retry=MAX_RETRY):
 
     # something went wrong with scrapping?
     if not title:
-        log.warning(f"No title, possible antibot tactic. URL: {url}, Headers: {params}, Content: {r.text}")
-        return is_valid_socialprofile(url, name, retry=retry+1)  
+        log.error(f"No title, possible antibot tactic. URL: {url}, Headers: {params}, Content: {r.text}")
+        return False, sn
 
     og_title = soup.find("meta", attrs={"property": "og:title"})
     og_title = og_title['content'] if og_title else None
@@ -147,9 +171,9 @@ def is_valid_socialprofile(url, name, retry=0, max_retry=MAX_RETRY):
     title = title.string or og_title or ''
     if ratio_title < TOKEN_RATIO and ratio_ogtitle < TOKEN_RATIO and name not in title:
         log.debug(f"Name doesn't match with page title. Name: {name}, URL: {url}, Page title: {title.string} - {ratio_title}, OG Title {og_title} - {ratio_ogtitle}")
-        return False
+        return False, sn
 
-    return soup
+    return soup, sn
 
 
 def extract_socialprofile(soup, url, name):
@@ -192,7 +216,7 @@ class SocialNetworkMiner:
         'github': "https://github.com/{identifier}",
         'instagram': "https://instagram.com/{identifier}",
         # linkedin don't let you scrap at all :(
-        #'linkedin': "https://linkedin.com/in/{identifier}",
+        'linkedin': None,
         'pinterest': "https://pinterest.com/{identifier}",
         'snapchat':  "https://snapchat.com/add/{identifier}",   
         #false positive
@@ -246,7 +270,7 @@ class SocialNetworkMiner:
             if k not in self._original_person
             }        
         
-    def image(self, match_check: bool = True) -> dict:
+    async def image(self, match_check: bool = True) -> dict:
         """Look for social profiles using profile picture
 
         Returns:
@@ -256,7 +280,7 @@ class SocialNetworkMiner:
         for page in pages:
             url_matched = re.match(generic_socialprofile_regexp, page.url)
             #valid_sp = is_valid_socialprofile(url_matched.group(0), self._person['name'])  
-            if not url_matched or not url_matched["socialnetwork"] in self.socialnetworks_urls:
+            if not url_matched or url_matched["socialnetwork"] not in self.socialnetworks_urls:
                 log.debug(f"Invalid/existing social network profile: {page.url}")
                 continue
             page_title = BeautifulSoup(page.page_title, "html.parser").contents[0].text
@@ -264,15 +288,13 @@ class SocialNetworkMiner:
                 log.debug(f"Social Profile: {page_title} doesn't match name {self._person['name']}")
                 continue
     
-            log.debug(f"Social Network Profile found: {url_matched.group(0)}")
             m = url_matched.groupdict()
 
             # we only add new social networks URLs
             if m["socialnetwork"] not in self.profiles:
-                log.info(f"Social Network profile added: {m}")
+                log.debug(f"Social Network profile found by image: {m}")
                 self.add_profile(url_matched.group(0), **m)
 
-        log.debug(f"Profiles found by image: {self.profiles}")
         return self.profiles
     
     def add_profile(self, url, socialnetwork, identifier, tld, subdomain=None):
@@ -285,7 +307,60 @@ class SocialNetworkMiner:
         self._person['identifier'].add(identifier)
         self._person['sameAs'].add(url)
 
-    def identifier(self) -> dict:
+
+    async def _identifier(self, identifier) -> dict:
+        social = {}
+        for sn, url in self.socialnetworks_urls.items():
+            # pass existing social networks profiles
+            if sn in self.profiles:
+                continue
+            
+            # if not eligible to scrapping
+            if not url:
+                continue
+            
+            # priority for the alternative mirror if it exists
+            if f"{sn}#alt" in self.socialnetworks_urls:
+                continue
+            
+            # check if there is this person profile for this social network
+            url = url.format(identifier=identifier)
+            
+            social[sn] = url
+
+        socials = []
+        # TODO: make it async instead of threads
+        with ThreadPoolExecutor(max_workers=MAX_PARRALEL_REQUESTS) as executor:
+            for sn, url in social.items():
+                socials.append(executor.submit(
+                    get_socialprofile,
+                    url,
+                    sn
+                    ))
+
+            for future in as_completed(socials):
+                try:
+                    sp, sn = future.result()
+                except Exception as exc:
+                    log.warning(f"{url} generated an exception: {exc}")
+                    continue
+                    
+                if not sp:
+                    continue
+                
+                # replace alternative mirror URL with the original one
+                log.debug(f"{sn}")
+                if sn.endswith("#alt"):
+                    sn = sn.removesuffix("#alt")
+                    url = self.socialnetworks_urls[sn].format(identifier=identifier)
+                m = re.match(generic_socialprofile_regexp, url).groupdict()
+                
+                log.debug(f"Social Profile found by identifier: {m}")
+                self.add_profile(url, **m)
+                # extract_socialprofile(sp, url, self._person['name'])
+
+        
+    async def identifier(self) -> dict:
         """Look for social profiles using identifiers
 
         Returns:
@@ -295,26 +370,8 @@ class SocialNetworkMiner:
         identifiers = self._person['identifier'] or self._generate_identifiers()
             
         for idr in identifiers:
-            for sn, url in self.socialnetworks_urls.items():
-                # pass existing social networks profiles
-                if sn in self.profiles:
-                    continue
-                
-                url = url.format(identifier=idr)
-                # priority for the alternative mirror if it exists
-                if f"{sn}#alt" in self.socialnetworks_urls:
-                    continue
-                # check if there is this person profile for this social network
-                soup = is_valid_socialprofile(url, self._person['name'])
-                if soup:
-                    # replace alternative mirror URL with the original one
-                    if sn.endswith("#alt"):
-                        sn = sn.removesuffix("#alt")
-                        url = self.socialnetworks_urls[sn].format(identifier=idr)
-                    m = re.match(generic_socialprofile_regexp, url).groupdict()
-                    self.add_profile(url, **m)
-                    # extract_socialprofile(soup, url, self._person['name'])
-
+            await self._identifier(idr)
+    
         return self.profiles
 
     def _populate_profiles(self, email: bool = True):

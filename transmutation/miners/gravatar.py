@@ -6,7 +6,7 @@ __license__ = "AGPL"
 
 from hashlib import md5
 
-import requests
+from curl_cffi import requests
 
 # 400x400 is the de facto standard size for profile picture (linkedin, twitter)
 # make it easier for comparison purpose

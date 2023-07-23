@@ -19,7 +19,7 @@ from multiprocessing.sharedctypes import Value
 
 from pydantic import AnyHttpUrl
 
-import requests
+from curl_cffi import requests
 # log
 from loguru import logger as log
 

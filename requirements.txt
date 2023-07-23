@@ -3,7 +3,7 @@ fastapi>=0.79.1
 pydantic>=1.9.2
 PyYAML>=6.0
 redis>=4.3.4
-requests>=2.25.1
+#requests[socks]>=2.25.1
 uvicorn>=0.18.2
 whois>=0.9.16
 pydantic[dotenv]
@@ -16,3 +16,4 @@ pre-commit
 fake_useragent
 google-cloud-vision
 pydantic_settings
+curl_cffi

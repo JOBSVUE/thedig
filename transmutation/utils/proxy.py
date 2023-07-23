@@ -6,7 +6,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import sleep
 
-import requests
+from curl_cffi import requests
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 from loguru import logger as log

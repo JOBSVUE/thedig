@@ -151,16 +151,16 @@ BUSINESS_SEPARATOR = {
 RE_WHITESPACE = re.compile(r"\s+")
 RE_ALPHA = re.compile(r"\b[^\W\d_]+\b")
 
-def order(firstname: str, familyname: str) -> dict:
+def order(givenName: str, familyname: str) -> dict:
     # FAMILY NAME First Name (reversed)
-    if firstname.isupper() and not familyname.isupper():
+    if givenName.isupper() and not familyname.isupper():
         return {
-            'familyname': firstname,
-            'firstname': familyname,
+            'familyName': givenName,
+            'givenName': familyname,
         }
     return {
-       'familyname': familyname,
-       'firstname': firstname,
+       'familyName': familyname,
+       'givenName': givenName,
     }
 
 
@@ -195,8 +195,8 @@ def _split_fullname(fullname: str) -> dict:
     if len(fullname) < 4 or ' ' not in fullname.strip():
         log.debug("Too short or only one word")
         return {
-            'firstname': fullname,
-            'familyname': None,
+            'givenName': fullname,
+            'familyName': None,
         }
 
     # e.g FAMILY NAME, First Name
@@ -204,8 +204,8 @@ def _split_fullname(fullname: str) -> dict:
     if len(comma_format) == 2 and comma_format[0].isupper():
         log.debug("Comma format detected")
         return {
-            'familyname': comma_format[0],
-            'firstname': comma_format[1],
+            'familyName': comma_format[0],
+            'givenName': comma_format[1],
             }
 
     # normalize white spaces then split into words
@@ -222,7 +222,7 @@ def _split_fullname(fullname: str) -> dict:
             jobtitle = _jobtitle
             words.pop(0)
 
-    # e.g FirstName FamilyName
+    # e.g givenName FamilyName
     if len(words) == 2:
         log.debug("Only two words")
         return {**order(
@@ -232,7 +232,7 @@ def _split_fullname(fullname: str) -> dict:
         }
         
     # eg. First name FAMILY NAME (or the opposite)
-    firstname = words[0]
+    givenName = words[0]
     familyname = None
     
     last_word_upper = words[-1].isupper()
@@ -245,30 +245,30 @@ def _split_fullname(fullname: str) -> dict:
         for i in range(len(words)):
             if isfamily(words[i]):
                 break
-        firstname = ' '.join(words[:i])
+        givenName = ' '.join(words[:i])
         familyname = ' '.join(words[i:])
         if first_word_upper:
-            firstname, familyname = familyname, firstname
+            givenName, familyname = familyname, givenName
     else:
         # eg. First Name Van Family Name
         for i in range(1, len(words)-1):
             if words[i].lower() in FAMILYNAME_SEPARATOR:
                 log.debug(f"Familyname separator found: {words[i]}")
-                firstname = ' '.join(words[:i])
+                givenName = ' '.join(words[:i])
                 familyname = ' '.join(words[i:])
                 break
 
-    if firstname:
+    if givenName:
         return {
-                'firstname': firstname,
-                'familyname': familyname,
-  #               'familyname': familyname if is_organization(familyname) else None,
+                'givenName': givenName,
+                'familyName': familyname,
+  #               'familyName': familyname if is_organization(familyname) else None,
                 'jobtitle': jobtitle,
             }
 
 
 def split_fullname(fullname: str, domain: str = None) -> dict:
-    if is_company(fullname, domain):
+    if domain and is_company(fullname, domain):
         return None
  
     splitted = _split_fullname(fullname)
@@ -289,7 +289,7 @@ def split_fullname(fullname: str, domain: str = None) -> dict:
             splitted.pop(k)
             log.debug(f"Civility or Role detected {v}")
 
-    return splitted if splitted.get('firstname') else None
+    return splitted if splitted.get('givenName') else None
 
 
 if __name__ == "__main__":
@@ -298,7 +298,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(
                 prog='Fullname Splitter',
-                description='Split a fullname in a firstname and familyname')
+                description='Split a fullname in a givenName and familyname')
     parser.add_argument("-f", "--file")
     parser.add_argument("-n", "--name")
     parser.add_argument("-e", "--email")

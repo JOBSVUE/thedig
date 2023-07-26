@@ -10,6 +10,7 @@ __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"
 
 import asyncio
+from itertools import chain
 import re
 import urllib
 from random import choice
@@ -52,6 +53,14 @@ generic_socialprofile_regexp = re.compile(
 MAX_RETRY = 3
 MAX_VISION_RESULTS = 20
 MAX_PARRALEL_REQUESTS = 10
+OUTPUT_TAG = "#OptOut"
+
+DESCRIPTION_DEFAULTS = {
+    "has discovered on Pinterest, the world's biggest collection of ideas.",
+    "is on Facebook. Join Facebook to connect with Beau Lebens and others you may know. Facebook gives people the power to share and makes the world more open and connected.",
+    "is on Snapchat!",
+    "See Instagram photos and videos from",
+}
 
 def ua_headers(random: bool=False) -> dict:
     """
@@ -114,11 +123,9 @@ def find_pages_with_matching_images(
     return matching
 
 # TODO: make it async
-def get_socialprofile(url, sn, name=None, params=REQUESTS_PARAM, session=None, retry=0, max_retry=MAX_RETRY):
+def get_socialprofile(url, sn, name, params=REQUESTS_PARAM, session=None, retry=0, max_retry=MAX_RETRY):
     if retry > max_retry:
         return None, sn
-
-    name = name or self._person["name"]
 
     # linkedin is giving us an hard time
     # if retry>0:
@@ -175,36 +182,47 @@ def get_socialprofile(url, sn, name=None, params=REQUESTS_PARAM, session=None, r
 
     return soup, sn
 
+def right_to_optout(text):
+    return OUTPUT_TAG in text
 
 def extract_socialprofile(soup, url, name):
-    og_image_tag = soup.find("meta", attrs={"property": "og:image"})
-    if og_image_tag:
-        og_image = og_image_tag.content
-        og_image_url = urllib.parse.urljoin(url, og_image)
-        log.debug(f"og:image found. Name: {name}, URL: {url}, Image URL: {og_image_url}")
+    person = {}
 
-    twitter_image_tag = soup.find("meta", attrs={"property": "twitter:image"})
-    if twitter_image_tag:
-        twitter_image = twitter_image_tag.content
-        twitter_image_url = urllib.parse.urljoin(url, twitter_image)
-        log.debug(f"twitter:image found. Name: {name}, URL: {url}, Image URL: {twitter_image_url}")
+    og_image = soup.find("meta", attrs={"property": "og:image"})
+    # snapchat always gives a fake avatar called square.jpeg
+    if og_image and not og_image['content'].endswith('square.jpeg'):
+        person['image'] = og_image['content']
+        log.debug(f"og:image found. Name: {name}, URL: {url}, Image URL: {og_image['content']}")
+    else:
+        twitter_image = soup.find("meta", attrs={"property": "twitter:image"})
+        twitter_image_src = soup.find("meta", attrs={"property": "twitter:image:src"})
+        twitter_image = twitter_image or twitter_image_src
+        if twitter_image and not twitter_image['content'].endswith('square.jpeg'):
+            person['image'] = twitter_image['content']
+            log.debug(f"twitter:image found. Name: {name}, URL: {url}, Image URL: {twitter_image['content']}")
 
     og_description = soup.find("meta", attrs={"property": "og:description"})
-    if og_description:
-        og_description = og_description.content
-        log.debug(f"og_description found. Name: {name}, URL: {url}, Image URL: {og_description}")
+    if og_description and all([desc not in og_description['content'] for desc in DESCRIPTION_DEFAULTS]):
+        person['description'] = og_description['content']
+        log.debug(f"og_description found. Name: {name}, URL: {url}, Description: {og_description}")
+        
+        if right_to_optout(person['description']):
+            person['#OptOut'] = True
 
     schemaorg_name = soup.find("meta", attrs={"property": "name"})
     if schemaorg_name:
         schemaorg_name = schemaorg_name.get("content")
+        person['alternateName'] = schemaorg_name
         log.debug(f"Schema.org Name found. Name: {name}, URL: {url}, Schema.org Name: {schemaorg_name}")
 
     location = soup.find("div", class_="profile-location")
     if location:
         location = location.contents[3].text
+        person['location'] = location
         log.debug(f"Location {location}")
 
-        
+    return person
+
 class SocialNetworkMiner:
     """Mine for social network profiles related to a person
     """
@@ -212,6 +230,7 @@ class SocialNetworkMiner:
     # supported social networks and theirs urls
     socialnetworks_urls = {
         # 'crunchbase': "https://crunchbase.com/person/{identifier}",
+        'about.me' : "https://about.me/{identifier}",
         'facebook': "https://www.facebook.com/{identifier}",
         'github': "https://github.com/{identifier}",
         'instagram': "https://instagram.com/{identifier}",
@@ -241,6 +260,7 @@ class SocialNetworkMiner:
         # person init
         self._original_person = person
         self._person = person.copy()
+        
         if not 'identifier' in self._person:
             self._person['identifier'] = set()
         elif type(self._person['identifier']) == str:
@@ -249,6 +269,11 @@ class SocialNetworkMiner:
             self._person['identifier'] = set(self._person['identifier'])
         if not 'sameAs' in self._person:
             self._person['sameAs'] = set()
+
+        # ok let's pretend is always void
+        self._person['description'] = set()
+
+        self._person['image'] = {person['image'], } if person.get('image') else set()
 
         # one could choose to opt out some social networks
         if socialnetworks:
@@ -267,7 +292,7 @@ class SocialNetworkMiner:
     def person(self):
         return {
             k:v for k,v in self._person.items()
-            if k not in self._original_person
+            if v != self._original_person.get(k)
             }        
         
     async def image(self, match_check: bool = True) -> dict:
@@ -276,7 +301,11 @@ class SocialNetworkMiner:
         Returns:
             dict: dict of profiles urls by social network
         """
-        pages = find_pages_with_matching_images(self._person['image'])
+        
+        pages = []
+        for img in self._person['image']:
+            pages.extend(find_pages_with_matching_images(img))
+        
         for page in pages:
             url_matched = re.match(generic_socialprofile_regexp, page.url)
             #valid_sp = is_valid_socialprofile(url_matched.group(0), self._person['name'])  
@@ -297,7 +326,7 @@ class SocialNetworkMiner:
 
         return self.profiles
     
-    def add_profile(self, url, socialnetwork, identifier, tld, subdomain=None):
+    def add_profile(self, url, socialnetwork, identifier, tld, image=None, location=None, description=None, subdomain=None):
         self.profiles[socialnetwork] = {
                 'url': url,
                 'identifier': identifier,
@@ -306,7 +335,12 @@ class SocialNetworkMiner:
         }
         self._person['identifier'].add(identifier)
         self._person['sameAs'].add(url)
-
+        if image:
+            self._person['image'].add(image)
+        if location:
+            self._person['location'] = location
+        if description:
+            self._person['description'].add(description)
 
     async def _identifier(self, identifier) -> dict:
         social = {}
@@ -328,36 +362,42 @@ class SocialNetworkMiner:
             
             social[sn] = url
 
-        socials = []
+        getters = []
         # TODO: make it async instead of threads
         with ThreadPoolExecutor(max_workers=MAX_PARRALEL_REQUESTS) as executor:
             for sn, url in social.items():
-                socials.append(executor.submit(
+                getters.append(executor.submit(
                     get_socialprofile,
                     url,
-                    sn
+                    sn,
+                    self._person['name']
                     ))
 
-            for future in as_completed(socials):
+            for future in as_completed(getters):
                 try:
                     sp, sn = future.result()
                 except Exception as exc:
-                    log.warning(f"{url} generated an exception: {exc}")
+                    log.warning(f"{sp}: {sn} generated an exception: {exc}")
                     continue
-                    
+
                 if not sp:
                     continue
-                
+
                 # replace alternative mirror URL with the original one
-                log.debug(f"{sn}")
                 if sn.endswith("#alt"):
                     sn = sn.removesuffix("#alt")
-                    url = self.socialnetworks_urls[sn].format(identifier=identifier)
+                url = self.socialnetworks_urls[sn].format(identifier=identifier)
                 m = re.match(generic_socialprofile_regexp, url).groupdict()
-                
+
                 log.debug(f"Social Profile found by identifier: {m}")
+                
+                extr = extract_socialprofile(sp, url, self._person['name'])
+                if extr:
+                    log.debug(f"More data extracted from Social Profile: {extr}")
+                    m.update(extr)
+                    
                 self.add_profile(url, **m)
-                # extract_socialprofile(sp, url, self._person['name'])
+
 
         
     async def identifier(self) -> dict:

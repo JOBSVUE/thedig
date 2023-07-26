@@ -36,6 +36,7 @@ from ..miners.domainlogo import guess_country
 from ..miners.gravatar import gravatar
 from ..miners.vision import SocialNetworkMiner
 from ..miners.alchemist import Alchemist
+from ..miners.splitfullname import split_fullname
 
 # init fast api
 router = APIRouter()
@@ -52,14 +53,14 @@ cache = setup_cache(settings, 7)
 al = Alchemist()
 
 
-@al.register(element="name", output=("image", "sameAs", "location", "worksFor", "jobtitle", "identifier"))
+@al.register(element="name", output=("image", "sameAs", "location", "worksFor", "jobTitle", "identifier"))
 async def miner_linkedin(p: dict):
     miner = LinkedInSearch(search_api_params)
     person = miner.search(name=p['name'], email=p['email'])
     return person
 
 
-@al.register(element="email", output="image")
+@al.register(element="email", output=("image",))
 async def miner_gravatar(p: dict):
     p_new = {}
     avatar = gravatar(p['email'])
@@ -68,7 +69,13 @@ async def miner_gravatar(p: dict):
     return p_new
 
 
-@al.register(element="email", output=('sameAs','identifier'))
+@al.register(element="email", output=("location",))
+async def mine_country(p: dict):
+    country = guess_country(p['email'].split('@')[-1])
+    return {"location": country} if country else None
+
+
+@al.register(element="email", output=('sameAs', 'identifier', 'location', 'image', 'description'))
 async def mine_social(p: dict):
     snm = SocialNetworkMiner(p)
 
@@ -82,9 +89,14 @@ async def mine_social(p: dict):
     if 'image' in p:
         img_profiles = await snm.image()
     #asyncio.gather(id_profiles, img_profiles)
+    
+    if "#OptOut" in snm.person:
+        return None
+
     return snm.person
 
-@al.register(element="email", output='worksFor')
+
+@al.register(element="email", output=('worksFor',))
 async def mine_worksfor(p: dict):
     # otherwise, the domain will give us the org
     # except for public email providers
@@ -102,10 +114,12 @@ async def mine_worksfor(p: dict):
                 return p
 
 
-@al.register(element="email", output="location")
-async def mine_country(p: dict):
-    country = guess_country(p['email'].split('@')[-1])
-    return {"location": country} if country else None
+@al.register(element="name", output=('givenName', 'familyName'))
+async def mine_name(p: dict):
+    splitted = split_fullname(p['name'], p['email'].split('@')[1])
+    log.debug(splitted)
+    return splitted
+
 
 @router.get("/transmute/{email}")
 async def transmute_one(email: EmailStr, name: str) -> dict:
@@ -113,6 +127,7 @@ async def transmute_one(email: EmailStr, name: str) -> dict:
     if not al_status:
         raise HTTPException(status_code=404, detail="No result for this person")
     return transmuted
+
 
 @router.websocket("/transmute/{user_id}/websocket")
 async def websocket_endpoint(

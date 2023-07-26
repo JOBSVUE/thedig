@@ -8,20 +8,19 @@ import whois
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"
 
-TO_IGNORE = (
+TO_IGNORE = {
     "Statutory Masking Enabled",
     "Privacy service provided by Withheld for Privacy ehf",
     "Data Protected",
     "Whois Privacy Service",
     "Redacted for Privacy Purposes",
     "REDACTED FOR PRIVACY",
-)
+}
 
 log = logging.getLogger(__name__)
 
 def get_domain(email: str) -> str:
     return email.split("@")[1]
-
 
 def get_company(domain: str) -> str:
     try:

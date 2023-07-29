@@ -315,7 +315,7 @@ class SocialNetworkMiner:
                 else self._person['image']
                 )
         else:
-            self._persone['image'] = set()
+            self._person['image'] = set()
             
         # one could choose to opt out some social networks
         if socialnetworks:
@@ -334,7 +334,7 @@ class SocialNetworkMiner:
     def person(self):
         return {
             k:v for k,v in self._person.items()
-            if v != self._original_person.get(k)
+            if v != self._original_person.get(k) and v
             }
         
     async def image(self, match_check: bool = True) -> dict:

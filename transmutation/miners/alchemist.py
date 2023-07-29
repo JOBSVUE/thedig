@@ -54,7 +54,7 @@ class Alchemist:
             for miner in self.miners[el]:
                 log.debug(f"mining {el} with miner {miner}")
                 p_mined = await miner['func'](person)
-                if not p_mined:
+                if not p_mined or p_mined == person:
                     continue
                 if "OptOut" in p_mined:
                     return False, {"OptOut": True}
@@ -91,7 +91,7 @@ class Alchemist:
                         elements.append(k)  
                         log.debug(f"new element to mine: {k}")
                                                   
-        return modified, person
+        return modified, person if modified else None
 
     async def bulk(self, persons: list[dict]):
         """Bulk transmute

@@ -163,13 +163,14 @@ async def websocket_endpoint(
     ):
     await ws_manager.connect(websocket)
     transmuted_count = 0
-    log.debug(f"Websocket connected: {websocket} - {user_id}")
+    log.info(f"Websocket connected: {websocket} - {user_id}")
 
     # this async queue is for buffering results
-    # aqueue = asyncio.Queue(maxsize=20)
+    sem = asyncio.Semaphore(2)
+    #aqueue = asyncio.Queue(maxsize=settings.persons_bulk_max)
 
     try:
-        while transmuted_count < settings.persons_bulk_max:
+        while True:
             # Wait for any message from the client
             try:
                 person = await websocket.receive_json()
@@ -178,11 +179,6 @@ async def websocket_endpoint(
                 raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
             
             al_status = None
-
-            # data validation
-            if not type(person) is dict or not 'email' in person or not 'name' in person:
-                log.debug(f"invalid data: {person}")
-                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
 
             # person_c = cache.get(f"{user_id}-{person['email']}")
             # person_c = None
@@ -193,19 +189,31 @@ async def websocket_endpoint(
             # aqueue.put(person)
             # al_status, transmuted = await al.person(await aqueue.get())
             
-            al_status, transmuted = await al.person(person)
+            # data validation
+            try:
+                uid, person = person.popitem()
+            except:
+                log.debug(f"invalid data: {person}")
+                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
             
+            al_status, transmuted = await al.person(person)
+
             if al_status:
                 #cache.set(f"{user_id}-{person['email']}", transmuted.json(), ex=settings.cache_expiration)
                 transmuted_count += 1
-            
+
             # Send message when transmutation finished
-            await websocket.send_text(f"[{al_status}, {transmuted}]")
+            try:
+                await websocket.send_text(
+                    f"['{uid}': {{'status': {al_status}, 'person': {transmuted}}}]"
+                    )
+            except WebSocketDisconnect as e:
+                log.error("WebSocket has disconnected: {e}")
         
         # reached bulk limit
         log.debug(f"limit reached: {transmuted_count}/{settings.persons_bulk_max}")
         raise WebSocketException(code=status.WS_1009_MESSAGE_TOO_BIG)
     
     except WebSocketDisconnect:
-        log.debug(f"Websocket disconnected: {websocket}")
+        log.info(f"Websocket disconnected: {websocket}")
         ws_manager.disconnect(websocket)

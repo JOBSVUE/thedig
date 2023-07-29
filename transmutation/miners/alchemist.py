@@ -19,6 +19,7 @@ class Alchemist:
             'sameAs',
             'email',
             'image',
+            'description',
             'name',
     }
 
@@ -39,7 +40,7 @@ class Alchemist:
         """
         elements = list(person.keys() & self.elements)
 
-        log.debug(f"mining {elements} for {person}")
+        #log.debug(f"mining {elements} for {person}")
 
         modified = False
         # sync because we want to control the order of mining elements
@@ -55,9 +56,11 @@ class Alchemist:
                 p_mined = await miner['func'](person)
                 if not p_mined:
                     continue
+                if "OptOut" in p_mined:
+                    return False, {"OptOut": True}
                 
                 log.debug(f"miner {miner['func']} on {el} gave {p_mined}")
-
+                
                 if not modified:
                     modified = True
 
@@ -70,7 +73,7 @@ class Alchemist:
                     
                     # real update
                     # gymnastic to update/add set
-                    if not person.get(k):
+                    if k not in person:
                         person[k] = v
                     elif type(person[k]) is set:
                         if type(v) is set:

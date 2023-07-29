@@ -9,6 +9,7 @@ __license__ = "AGPL"
 
 # config
 import asyncio
+
 from .config import settings
 from .config import setup_cache
 
@@ -37,6 +38,7 @@ from ..miners.gravatar import gravatar
 from ..miners.vision import SocialNetworkMiner
 from ..miners.alchemist import Alchemist
 from ..miners.splitfullname import split_fullname
+from ..miners.bio import find_jobtitle
 
 # init fast api
 router = APIRouter()
@@ -53,7 +55,7 @@ cache = setup_cache(settings, 7)
 al = Alchemist()
 
 
-@al.register(element="name", output=("image", "sameAs", "location", "worksFor", "jobTitle", "identifier"))
+#@al.register(element="name", output=("image", "url", "sameAs", "location", "worksFor", "jobTitle", "identifier"))
 async def miner_linkedin(p: dict):
     miner = LinkedInSearch(search_api_params)
     person = miner.search(name=p['name'], email=p['email'])
@@ -63,34 +65,37 @@ async def miner_linkedin(p: dict):
 @al.register(element="email", output=("image",))
 async def miner_gravatar(p: dict):
     p_new = {}
-    avatar = gravatar(p['email'])
+    avatar = await gravatar(p['email'])
     if avatar:
         p_new['image'] = avatar
     return p_new
 
 
-@al.register(element="email", output=("location",))
+#@al.register(element="email", output=("location",))
 async def mine_country(p: dict):
     country = guess_country(p['email'].split('@')[-1])
     return {"location": country} if country else None
 
 
-@al.register(element="email", output=('sameAs', 'identifier', 'location', 'image', 'description'))
+@al.register(element="email", output=('sameAs', 'identifier', 'location', 'image', 'description', 'url'))
 async def mine_social(p: dict):
     snm = SocialNetworkMiner(p)
-
-    # fuzzy identifier miner
-    # it's not an independent miner since identifier can't be mined
-    # until confirmed social profiles are found
-    id_profiles = await snm.identifier()
 
     # if there is an image, let's vision mine it
     # it will ads other social network URLs
     if 'image' in p:
-        img_profiles = await snm.image()
-    #asyncio.gather(id_profiles, img_profiles)
+        await snm.image()
+        pass
     
-    if "#OptOut" in snm.person:
+    # fuzzy identifier miner
+    # it's not an independent miner since identifier can't be mined
+    # until confirmed social profiles are found
+    await snm.identifier()
+
+    snm.sameAs()
+    #log.debug(f"{snm._person}, {snm.profiles}")
+
+    if "OptOut" in snm.person:
         return None
 
     return snm.person
@@ -98,7 +103,7 @@ async def mine_social(p: dict):
 
 @al.register(element="email", output=('worksFor',))
 async def mine_worksfor(p: dict):
-    # otherwise, the domain will give us the org
+    # otherwise, the domain will give us the @org
     # except for public email providers
     if 'worksFor' not in p:
         domain = p['email'].split("@")[1]
@@ -114,10 +119,31 @@ async def mine_worksfor(p: dict):
                 return p
 
 
-@al.register(element="name", output=('givenName', 'familyName'))
+#@al.register(element="description", output=('jobTitle',))
+async def mine_bio(p: dict):
+    if 'description' not in p:
+        return None
+
+    if type(p['description']) is str:
+        desc = (p['description'], )
+    else:
+        desc = p['description']
+        
+    jt = set()
+    for d in desc:
+        jobtitle = find_jobtitle(d)
+        if jobtitle:
+            jt |= jobtitle
+        
+    if not jt:
+        return None
+        
+    return {'jobTitle': jt}
+
+#@al.register(element="name", output=('givenName', 'familyName'))
 async def mine_name(p: dict):
     splitted = split_fullname(p['name'], p['email'].split('@')[1])
-    log.debug(splitted)
+    #log.debug(splitted)
     return splitted
 
 

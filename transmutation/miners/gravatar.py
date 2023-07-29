@@ -6,7 +6,8 @@ __license__ = "AGPL"
 
 from hashlib import md5
 
-from curl_cffi import requests
+from loguru import logger as log
+from curl_cffi.requests import AsyncSession, RequestsError
 
 # 400x400 is the de facto standard size for profile picture (linkedin, twitter)
 # make it easier for comparison purpose
@@ -23,7 +24,7 @@ def email_hash(email: str) -> str:
     return md5(email.encode("utf-8").lower(), usedforsecurity=False).hexdigest()
 
 
-def gravatar(email: str, check: bool = True) -> str:
+async def gravatar(email: str, check: bool = True) -> str:
     """Returns a valid Gravatar URL or None if not found
 
     Args:
@@ -43,9 +44,14 @@ def gravatar(email: str, check: bool = True) -> str:
         return gravatar_image_url
 
     # let's check if the profile picture is available
-    r = requests.get(gravatar_image_url)
-    if r.ok:
-        return gravatar_image_url
+    async with AsyncSession() as s:
+        try:
+            r = await s.get(gravatar_image_url)
+        except RequestsError as e:
+            log.error(f" {e}. email: {email}, url: {gravatar_image_url}")
+            return None
+        if r.ok:
+            return gravatar_image_url
 
 
 # command line usage only for dev purpose

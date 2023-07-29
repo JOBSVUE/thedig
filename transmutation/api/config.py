@@ -36,8 +36,9 @@ class Settings(BaseSettings):
     public_email_providers_url: str = "https://raw.githubusercontent.com/ankaboot-source/email-open-data/main/public-email-providers.json"
     public_email_providers: Optional[set[str]] = None
     persons_bulk_max: int = 10000
+    jobtitles_list_file: str = "miners/jobtitles.json"
     model_config = SettingsConfigDict(env_file=".env")
-
+    
 
 settings = Settings()
 
@@ -80,6 +81,7 @@ if settings.redis_username:
     if settings.redis_password:
         redis_credentials += f":{settings.redis_password}"
     redis_credentials += "@"
+    
 # celery broker & backend based on redis
 celery_backend = (
     celery_broker

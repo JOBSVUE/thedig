@@ -84,6 +84,8 @@ try:
     class GunicornLogger(Logger):
         def setup(self, cfg) -> None:
             handler = InterceptHandler()
+            
+            log_settings = LoggingSettings()
 
             # Add log handler to logger and set log level
             self.error_log.addHandler(handler)

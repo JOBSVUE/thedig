@@ -108,7 +108,6 @@ async def find_pages_with_matching_images(
             settings.google_vision_credentials
             )
 
-    print(dir(client))
     response = await asyncio.to_thread(
         client.annotate_image,
         vision.AnnotateImageRequest({
@@ -133,6 +132,7 @@ async def find_pages_with_matching_images(
 
     return matching
 
+
 def is_socialprofile(url):
     m = re.match(RE_SOCIALPROFILE, url)
     if not m or m['socialnetwork'] not in SOCIALNETWORKS:
@@ -144,6 +144,7 @@ def is_socialprofile(url):
     return sp | {
         'url': url,
     }
+
 
 # TODO: make it async
 def get_socialprofile(url, sn, name, params=REQUESTS_PARAM, session=None, retry=0, max_retry=MAX_RETRY):
@@ -157,10 +158,10 @@ def get_socialprofile(url, sn, name, params=REQUESTS_PARAM, session=None, retry=
     #    log.info(f"Retry with proxy. Proxy: {params['proxies']}, URL: {url}")
 
     if CURL_REQUESTS:
-        #if not session:
+        # if not session:
         #    session = requests.AsyncSession()
         try:
-            #r = await session.get(url, **params)
+            # r = await session.get(url, **params)
             r = requests.get(url, **params)
         except requests.RequestsError as e:
             log.error(f"Failed trying to reach Social Network. URL {url}, Error {e}")
@@ -347,22 +348,22 @@ class SocialNetworkMiner:
         for img in self._person['image']:
             pages.extend(await find_pages_with_matching_images(img))
 
-        # for page in pages:
-        #     m = is_socialprofile(page.url)
-        #     #valid_sp = is_valid_socialprofile(url_matched.group(0), self._person['name'])  
-        #     if not m or m["socialnetwork"] not in self.socialnetworks_urls:
-        #         log.debug(f"Invalid/existing social network profile: {page.url}")
-        #         continue
-        #     page_title = BeautifulSoup(page.page_title, "html.parser").contents[0].text
-        #     if not match_name(self._person['name'], page_title):
-        #         log.debug(f"Social Profile: {page_title} doesn't match name {self._person['name']}")
-        #         continue
+        for page in pages:
+            m = is_socialprofile(page.url)
+            #valid_sp = is_valid_socialprofile(url_matched.group(0), self._person['name'])  
+            if not m or m["socialnetwork"] not in self.socialnetworks_urls:
+                log.debug(f"Invalid/existing social network profile: {page.url}")
+                continue
+            page_title = BeautifulSoup(page.page_title, "html.parser").contents[0].text
+            if not match_name(self._person['name'], page_title):
+                log.debug(f"Social Profile: {page_title} doesn't match name {self._person['name']}")
+                continue
     
-        #     log.debug(f"Social Network profile found by image: {m}")
+            log.debug(f"Social Network profile found by image: {m}")
 
-        #     self.add_profile(**m)
+            self.add_profile(**m)
 
-        # return self.profiles
+        return self.profiles
 
 
     def add_profile(
@@ -430,22 +431,22 @@ class SocialNetworkMiner:
             
             social[sn] = url
 
-        getters = []
+        getters = {}
         # TODO: make it async instead of threads
         with ThreadPoolExecutor(max_workers=MAX_PARRALEL_REQUESTS) as executor:
             for sn, url in social.items():
-                getters.append(executor.submit(
+                getters[executor.submit(
                     get_socialprofile,
                     url,
                     sn,
                     self._person['name']
-                    ))
+                )] = (sn, url)
 
             for future in as_completed(getters):
                 try:
                     sp, sn = future.result()
                 except Exception as exc:
-                    log.warning(f"{sp}: {sn} generated an exception: {exc}")
+                    log.warning(f"{getters[future][0]},{getters[future][1]} : {exc}")
                     continue
 
                 if not sp:

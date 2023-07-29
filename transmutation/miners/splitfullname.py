@@ -14,11 +14,9 @@ try:
     from .utils import match_name, normalize
 except ImportError:
     from utils import match_name, normalize
-# import spacy
-# import xx_ent_wiki_sm
+
 
 log = logging.getLogger(__name__)
-# nlp = xx_ent_wiki_sm.load()
 
 FAMILYNAME_SEPARATOR = {
     "إبن",
@@ -129,7 +127,7 @@ ROLE_NAMES = {
     "wordpress",    
 }
 
-JOBTITLES = {
+JOBTITLES_ABBRV = {
     "Dr": "Doctor",
     "Ing": "Engineer",
     "Eng": "Engineer",
@@ -144,12 +142,13 @@ BUSINESS_SEPARATOR = {
     'van',
     'von',
     'de',
-    'd',
+    'd', # only works if ' are removed
 }
 
 
 RE_WHITESPACE = re.compile(r"\s+")
 RE_ALPHA = re.compile(r"\b[^\W\d_]+\b")
+
 
 def order(givenName: str, familyname: str) -> dict:
     # FAMILY NAME First Name (reversed)
@@ -193,7 +192,6 @@ def _split_fullname(fullname: str) -> dict:
     # minimum to guess length is 4
     # needs a space somewhere in between    
     if len(fullname) < 4 or ' ' not in fullname.strip():
-        log.debug("Too short or only one word")
         return {
             'givenName': fullname,
             'familyName': None,
@@ -202,7 +200,6 @@ def _split_fullname(fullname: str) -> dict:
     # e.g FAMILY NAME, First Name
     comma_format = fullname.split(',')
     if len(comma_format) == 2 and comma_format[0].isupper():
-        log.debug("Comma format detected")
         return {
             'familyName': comma_format[0],
             'givenName': comma_format[1],
@@ -217,14 +214,12 @@ def _split_fullname(fullname: str) -> dict:
     if len(words[0]) > 1 and len(words[0]) < 5:
         # if last caracter end with a '.' we remove it for test purpose
         _jobtitle = words[0] if words[0][-1] != "." else words[0][:-1]
-        if _jobtitle in JOBTITLES:
-            log.debug(f"Jobtitle detected {_jobtitle}")
+        if _jobtitle in JOBTITLES_ABBRV:
             jobtitle = _jobtitle
             words.pop(0)
 
     # e.g givenName FamilyName
     if len(words) == 2:
-        log.debug("Only two words")
         return {**order(
             words[0],
             words[1]
@@ -239,7 +234,6 @@ def _split_fullname(fullname: str) -> dict:
     first_word_upper = words[0].isupper()
 
     if first_word_upper ^ last_word_upper:
-        log.debug("One of words is uppercase")
         # trick to reverse test
         isfamily = str.isupper if last_word_upper else lambda f: not str.isupper(f)
         for i in range(len(words)):
@@ -253,7 +247,6 @@ def _split_fullname(fullname: str) -> dict:
         # eg. First Name Van Family Name
         for i in range(1, len(words)-1):
             if words[i].lower() in FAMILYNAME_SEPARATOR:
-                log.debug(f"Familyname separator found: {words[i]}")
                 givenName = ' '.join(words[:i])
                 familyname = ' '.join(words[i:])
                 break
@@ -262,7 +255,6 @@ def _split_fullname(fullname: str) -> dict:
         return {
                 'givenName': givenName,
                 'familyName': familyname,
-  #               'familyName': familyname if is_organization(familyname) else None,
                 'jobtitle': jobtitle,
             }
 
@@ -280,14 +272,11 @@ def split_fullname(fullname: str, domain: str = None) -> dict:
             splitted.pop(k)
         # needs to look like a word somehow
         elif not re.match(RE_ALPHA, v):
-            log.debug(f"Not a word {k}: {v}")
             splitted.pop(k)
         elif domain and is_company(v, domain):
             splitted.pop(k)
-            log.debug(f"Company detected {v}:{domain}")
         elif v.lower() in CIVILITY | ROLE_NAMES:
             splitted.pop(k)
-            log.debug(f"Civility or Role detected {v}")
 
     return splitted if splitted.get('givenName') else None
 

@@ -305,6 +305,11 @@ class SocialNetworkMiner:
             self._person['identifier'] = set(self._person['identifier'])
         if not 'sameAs' in self._person:
             self._person['sameAs'] = set()
+        
+        if not 'location' in self._person:
+            self._person['location'] = set()
+        elif not type(self._person['location']) is set:
+            self._person['location'] = {self._person['location'], }
 
         # ok let's pretend is always void
         self._person['description'] = set()
@@ -403,7 +408,7 @@ class SocialNetworkMiner:
         if image:
             self._person['image'].add(image)
         if location:
-            self._person['location'] = location
+            self._person['location'].add(location)
         if description:
             self._person['description'].add(description)
         if alternateName:

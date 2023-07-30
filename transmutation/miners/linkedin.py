@@ -144,7 +144,7 @@ class LinkedInSearch:
             self.persons = []
         self.person = None
 
-    def _search_google(self, query: str):
+    async def _search_google(self, query: str):
         """Search a query on Google and return the first result
 
         Args:
@@ -154,15 +154,20 @@ class LinkedInSearch:
             dict: first result
         """
         search_url_complete = f"{self.google_search_url}={query}"
-        r = requests.get(search_url_complete)
-        if not r.ok:
-            r.raise_for_status()
+        async with requests.AsyncSession() as s:
+            try:
+                r = await s.get(search_url_complete)
+            except requests.RequestsError as e:
+                log.error(f"{query}: {e}")
+                return None
+            if not r.ok:
+                r.raise_for_status()
 
-        result_raw = r.json()
+            result_raw = r.json()
 
-        # if a data is missing, that means probably that there is no results
-        if "items" in result_raw and len(result_raw["items"]) > 0:
-            return result_raw["items"]
+            # if a data is missing, that means probably that there is no results
+            if "items" in result_raw and len(result_raw["items"]) > 0:
+                return result_raw["items"]
 
         log.debug(f"No results found for query: {query}")
 
@@ -253,7 +258,7 @@ class LinkedInSearch:
 
         return person_d
     
-    def extract(
+    async def extract(
         self, name: str, email: str = None, company: str = None, google: bool = True
     ) -> dict:
         """
@@ -271,7 +276,7 @@ class LinkedInSearch:
         """
         query_string = email or f"{name} {company}"
         results = (
-            self._search_google(query_string)
+            await self._search_google(query_string)
             if google
             else self._search_bing(query_string)
         )
@@ -317,11 +322,11 @@ class LinkedInSearch:
 
         return self.person
 
-    def search(self, name, email: str = None, company: str = None) -> dict:
+    async def search(self, name, email: str = None, company: str = None) -> dict:
         """
         search and return the public data for an email and/or company
         """
-        self.person = dict(name=name)
+        self.person = {'name': name}
         if email:
             log.debug("Searching by name %s and email %s" % (name, email))
 
@@ -341,13 +346,13 @@ class LinkedInSearch:
                 google.join()
                 bing.join()  # usually add location
             elif self.google:
-                self.extract(name, email)
+                await self.extract(name, email)
             elif self.bing:
                 self.extract(name, email, google=False)
         if company:
             self.person['worksFor'] = company
             log.debug("Searching by name %s and company %s" % (name, company))
-            self.extract(name, company=company)
+            await self.extract(name, company=company)
 
         self._add_country()
 

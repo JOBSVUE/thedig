@@ -1,7 +1,7 @@
 # Copyright 2022 Badreddine LEJMI.
 # SPDX-License-Identifier: 	AGPL-3.0-or-later
 
-"""LinkedIn Miner API"""
+"""Transmuter API"""
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
@@ -55,14 +55,14 @@ cache = setup_cache(settings, 7)
 al = Alchemist()
 
 
-#@al.register(element="name", output=("image", "url", "sameAs", "location", "worksFor", "jobTitle", "identifier"))
+@al.register(element="name")
 async def miner_linkedin(p: dict):
     miner = LinkedInSearch(search_api_params)
-    person = miner.search(name=p['name'], email=p['email'])
+    person = await miner.search(name=p['name'], email=p.get('email'), company=p.get('worksFor'))
     return person
 
 
-@al.register(element="email", output=("image",))
+@al.register(element="email", update=("image",))
 async def miner_gravatar(p: dict):
     p_new = {}
     avatar = await gravatar(p['email'])
@@ -71,13 +71,7 @@ async def miner_gravatar(p: dict):
     return p_new
 
 
-#@al.register(element="email", output=("location",))
-async def mine_country(p: dict):
-    country = guess_country(p['email'].split('@')[-1])
-    return {"location": country} if country else None
-
-
-@al.register(element="email", output=('sameAs', 'identifier', 'location', 'image', 'description', 'url'))
+@al.register(element="email")
 async def mine_social(p: dict):
     snm = SocialNetworkMiner(p)
 
@@ -93,7 +87,7 @@ async def mine_social(p: dict):
     await snm.identifier()
 
     snm.sameAs()
-    #log.debug(f"{snm._person}, {snm.profiles}")
+    log.debug(f"{snm._person}, {snm.profiles}")
 
     if "OptOut" in snm.person:
         return None
@@ -101,7 +95,7 @@ async def mine_social(p: dict):
     return snm.person
 
 
-@al.register(element="email", output=('worksFor',))
+@al.register(element="email", update=('worksFor',))
 async def mine_worksfor(p: dict):
     # otherwise, the domain will give us the @org
     # except for public email providers
@@ -119,7 +113,7 @@ async def mine_worksfor(p: dict):
                 return p
 
 
-#@al.register(element="description", output=('jobTitle',))
+@al.register(element="description", update=('jobTitle',))
 async def mine_bio(p: dict):
     if 'description' not in p:
         return None
@@ -134,17 +128,23 @@ async def mine_bio(p: dict):
         jobtitle = find_jobtitle(d)
         if jobtitle:
             jt |= jobtitle
-        
+
     if not jt:
         return None
-        
+
     return {'jobTitle': jt}
 
-#@al.register(element="name", output=('givenName', 'familyName'))
+
+@al.register(element="name", update=('givenName', 'familyName'))
 async def mine_name(p: dict):
     splitted = split_fullname(p['name'], p['email'].split('@')[1])
-    #log.debug(splitted)
+    log.debug(splitted)
     return splitted
+
+@al.register(element="email", insert=("location",))
+async def mine_country(p: dict):
+    country = guess_country(p['email'].split('@')[-1])
+    return {"location": country} if country else None
 
 
 @router.get("/transmute/{email}")
@@ -164,10 +164,6 @@ async def websocket_endpoint(
     await ws_manager.connect(websocket)
     transmuted_count = 0
     log.info(f"Websocket connected: {websocket} - {user_id}")
-
-    # this async queue is for buffering results
-    sem = asyncio.Semaphore(2)
-    #aqueue = asyncio.Queue(maxsize=settings.persons_bulk_max)
 
     try:
         while True:
@@ -203,17 +199,10 @@ async def websocket_endpoint(
                 transmuted_count += 1
 
             # Send message when transmutation finished
-            try:
-                await websocket.send_text(
+            await websocket.send_text(
                     f"['{uid}': {{'status': {al_status}, 'person': {transmuted}}}]"
                     )
-            except WebSocketDisconnect as e:
-                log.error("WebSocket has disconnected: {e}")
-        
-        # reached bulk limit
-        log.debug(f"limit reached: {transmuted_count}/{settings.persons_bulk_max}")
-        raise WebSocketException(code=status.WS_1009_MESSAGE_TOO_BIG)
-    
+                
     except WebSocketDisconnect:
         log.info(f"Websocket disconnected: {websocket}")
         ws_manager.disconnect(websocket)

@@ -6,7 +6,6 @@ __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
-from collections import OrderedDict
 from functools import wraps
 from loguru import logger as log
 
@@ -25,9 +24,9 @@ class Alchemist:
 
     def __init__(self):
         self.elements = set()
-        self.miners = OrderedDict({
+        self.miners = {
             k: [] for k in self._ordered_elements
-        })
+        }
 
     async def person(self, person: dict) -> tuple[bool, dict]:
         """Transmute one person
@@ -40,7 +39,7 @@ class Alchemist:
         """
         elements = list(person.keys() & self.elements)
 
-        #log.debug(f"mining {elements} for {person}")
+        log.debug(f"mining {elements} for {person}")
 
         modified = False
         # sync because we want to control the order of mining elements
@@ -65,27 +64,31 @@ class Alchemist:
                     modified = True
 
                 for k, v in p_mined.items():
-                    # eligibility to update
-                    if miner['output'] and k not in miner['output']:
-                        continue
                     if not v:
                         continue
-                    
+                    # eligibility to update
+                    if (
+                        not miner['catchall']
+                        and k not in miner['update']
+                        and k not in miner['insert']
+                        ):
+                        continue
+
                     # real update
-                    # gymnastic to update/add set
                     if k not in person:
                         person[k] = v
-                    elif type(person[k]) is set:
-                        if type(v) is set:
-                            person[k] |= v
-                        else:
-                            person[k].add(v)
-                    elif type(v) is set:
-                        person[k] = {person[k],} | v
+                        log.debug(f"{miner['func']} add {k} : {v}")
+                    elif k in miner['update'] or miner['catchall']:
+                        # gymnastic to update/add set
+                        if type(person[k]) is not set:
+                            person[k] = {person[k], }
+                        if type(v) is not set:
+                            v = {v, }
+                        person[k] |= v
+                        log.debug(f"{miner['func']} update {k} : {v}")
                     else:
-                        person[k] = {person[k], v}
-                            
-                    log.debug(f"updated {k} : {v}")
+                        log.debug(f"{miner['func']} does nothing - already exists or insert mode {k} : {v}")
+                    
                     # eligibility to mine
                     if k in self.elements:
                         elements.append(k)  
@@ -105,7 +108,7 @@ class Alchemist:
         for person in persons:
             yield self.person(person)
 
-    def register(self, element: str, output: tuple):
+    def register(self, **kw):
         """register a function as a miner for an element field
 
         Args:
@@ -114,14 +117,16 @@ class Alchemist:
 
         Returns:
             function: miner
-        """
+        """        
         def decorator(miner_func):
-            if element in self._ordered_elements:
-                log.debug(f"add {miner_func} to miners for {element}")
-                self.miners[element].append({
+            if kw['element'] in self._ordered_elements:
+                log.debug(f"add {miner_func} to miners with parameters: {kw}")
+                self.miners[kw['element']].append({
                     'func': miner_func,
-                    'output': output
+                    'update': kw.get('update') or [],
+                    'insert': kw.get('insert') or [],
+                    'catchall': not kw.get('insert') and not kw.get('update'),
                      })
-                self.elements.add(element)
+                self.elements.add(kw['element'])
             return miner_func
         return decorator

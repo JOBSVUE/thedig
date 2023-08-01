@@ -8,25 +8,30 @@ __license__ = "AGPL"
 
 from functools import wraps
 from loguru import logger as log
+from ..api.types import Person, person_ta
 
 
 class Alchemist:
     """Enrich iteratively persons using miners"""
 
-    _ordered_elements = {
+    _ordered_elements: list = [
             'url',
             'sameAs',
             'email',
             'image',
             'description',
             'name',
-    }
+    ]
 
     def __init__(self):
-        self.elements = set()
-        self.miners = {
+        self.elements: set = set()
+        self.miners: dict = {
             k: [] for k in self._ordered_elements
         }
+        
+        # we don't mine again with the same miner, the same element/value
+        # so we keep an history of what element/value was used for what miner
+        self._mined: dict = {}
 
     async def person(self, person: dict) -> tuple[bool, dict]:
         """Transmute one person
@@ -49,36 +54,48 @@ class Alchemist:
             if el not in self.miners:
                 log.debug(f"no miner for {el}")
                 continue
-
+            
+            if el not in self._mined:
+                self._mined[el] = {}
+            
             for miner in self.miners[el]:
-                log.debug(f"mining {el} with miner {miner}")
-                p_mined = await miner['func'](person)
-                if not p_mined or p_mined == person:
+                # do not mine twice the same elemnt/value with the same miner
+                if miner['func'] not in self._mined[el]:
+                    self._mined[el] = {miner['func']: []}
+                elif person[el] in self._mined[el][miner['func']]:
                     continue
+                self._mined[el][miner['func']].append(person[el])
+                
+                log.debug(f"mining {el} with miner {miner}")
+                p_mined: Person = await miner['func'](person)
+                if not p_mined:
+                    continue
+
+                person_ta.validate_python(p_mined)
+
                 if "OptOut" in p_mined:
                     return False, {"OptOut": True}
-                
+
                 log.debug(f"miner {miner['func']} on {el} gave {p_mined}")
-                
-                if not modified:
-                    modified = True
 
                 for k, v in p_mined.items():
                     if not v:
                         continue
                     # eligibility to update
-                    if (
-                        not miner['catchall']
+                    if (not miner['catchall']
                         and k not in miner['update']
-                        and k not in miner['insert']
-                        ):
+                        and k not in miner['insert']):
                         continue
 
                     # real update
                     if k not in person:
                         person[k] = v
                         log.debug(f"{miner['func']} add {k} : {v}")
+                    elif person[k] == v:
+                        log.debug(f"{miner['func']} does nothing - existing value {k} : {v}")
+                        continue
                     elif k in miner['update'] or miner['catchall']:
+                        modified = True
                         # gymnastic to update/add set
                         if type(person[k]) is not set:
                             person[k] = {person[k], }
@@ -91,22 +108,11 @@ class Alchemist:
                     
                     # eligibility to mine
                     if k in self.elements:
-                        elements.append(k)  
+                        elements.append(k) 
                         log.debug(f"new element to mine: {k}")
                                                   
         return modified, person if modified else None
-
-    async def bulk(self, persons: list[dict]):
-        """Bulk transmute
-
-        Args:
-            persons (list[dict]): list of persons to transmute
-
-        Yields:
-            Iterator[AsyncIterator]: iterator over transmuted person
-        """
-        for person in persons:
-            yield self.person(person)
+    
 
     def register(self, **kw):
         """register a function as a miner for an element field

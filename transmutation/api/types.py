@@ -9,7 +9,7 @@ from pydantic import EmailStr, HttpUrl
 from typing_extensions import TypedDict
 
 class Person(TypedDict, total=False):
-    name: str | set[str]
+    name: str
     email: EmailStr | set[EmailStr]
     homeLocation: str | set[str]
     alternateName: str | set[str]
@@ -34,5 +34,6 @@ class PersonResponse(TypedDict):
     person: Person | None
 
 
+person_ta = TypeAdapter(Person)
 person_request_ta = TypeAdapter(PersonRequest)
 person_response_ta = TypeAdapter(PersonResponse)

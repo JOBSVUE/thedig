@@ -50,8 +50,10 @@ COUNTRY_TLD_EXCLUSION = {
     'tk',
 }
 
+
 def get_tld(domain: str) -> str:
     return domain.split('.')[-1]
+
 
 def guess_country(domain: str) -> str:
     tld = get_tld(domain)
@@ -59,6 +61,7 @@ def guess_country(domain: str) -> str:
     if tld in COUNTRY_TLD_EXCLUSION:
         return None
     return ISO3166.get(tld.upper())
+
 
 def domain_to_urls(domain: str) -> list[str]:
     """Build hypothetical websites URL from a domain

@@ -69,6 +69,13 @@ async def miner_linkedin(p: dict):
     return person
 
 
+@al.register(element="url", update=('worksFor', 'jobTitle', 'workLocation', ), insert=('givenName', 'familyName'))
+async def miner_from_linkedin_url(p: dict):
+    if "linkedin" in p['url']:
+        miner = LinkedInSearch(search_api_params)
+        person = await miner.search(name=p['name'], linkedin_url=p['url'])
+        return person
+
 @al.register(element="email", update=("image",))
 async def miner_gravatar(p: dict):
     p_new = {}
@@ -145,7 +152,6 @@ async def mine_bio(p: dict):
 @al.register(element="name", update=('givenName', 'familyName'))
 async def mine_name(p: dict):
     splitted = split_fullname(p['name'], p['email'].split('@')[1])
-    log.debug(splitted)
     return splitted
 
 

@@ -17,7 +17,7 @@ import threading
 # needed for memory sharing between threads
 from multiprocessing.sharedctypes import Value
 
-from pydantic import AnyHttpUrl
+from pydantic import HttpUrl
 
 from curl_cffi import requests
 # log
@@ -27,24 +27,9 @@ from loguru import logger as log
 from thefuzz import fuzz
 
 # linkedin profile url with an ISO3166 country code regular expression
-LINKEDIN_URL_RE = re.compile(r"https:\/\/(?P<countrycode>\w{2})?(www)?\.?linkedin\.com\/in\/(?P<identifier>\w+)")
-
-def url_to_socialprofile(url: AnyHttpUrl) -> tuple:
-    """Extract from an url a social network profile
-
-    Args:
-        url (AnyHttpUrl): social network profile url
-
-    Returns:
-        socialnetwork, identifier: social network domain, identifier on this social network 
-    """
-    socialnetwork, identifier = None, None
-    url_matched = re.match(SOCIALPROFILE_RE, url)
-    if url_matched:
-        socialnetwork = url_matched.groupdict()['socialnetwork']
-        identifier = url_matched.groupdict()['identifier']
-    return socialnetwork, identifier
-
+RE_LINKEDIN_URL = re.compile(
+    r"^https?:\/\/((?P<countrycode>\w{2})|(:?www))\.linkedin\.com\/(?:public\-profile\/in|in|people)\/(?P<identifier>\w+(?:(?:\.|\-)\w+)?(?:(?:\-)\w+)?)/?$"
+)
 
 def country_from_url(linkedin_url: str) -> str:
     """Country name based on the xx.linkedin.com profile url
@@ -56,13 +41,13 @@ def country_from_url(linkedin_url: str) -> str:
     Returns:
         str: country name
     """
-    match = LINKEDIN_URL_RE.match(linkedin_url)
+    match = RE_LINKEDIN_URL.match(linkedin_url)
 
     if match and match['countrycode']:
         return ISO3166[match["countrycode"].upper()]
 
 
-def parse_linkedin_title(title):
+def parse_linkedin_title(title, name: str = None):
     """parse LinkedIn Title that has this form
         Full Name - Title - Company | LinkedIn
         and sometimes (Google only):
@@ -70,15 +55,30 @@ def parse_linkedin_title(title):
     Args:
         title (str): title from LinkedIn page
     """
-    result = {}
     full_title = title.split("|")[0].split(" - ")
-    result["name"] = full_title[0]
+    
+    if name and full_title[0] != name:
+        return None
 
-    if len(full_title) > 1:
-        # when it's long, LinkedIn add a '...' suffix
+    result = {"name": full_title[0]}
+
+    # when it's long, LinkedIn add a '...' suffix
+    if len(full_title) > 2:
+        secondpart = full_title[2].removesuffix("...").strip()
+        firstpart = full_title[1].removesuffix("...").strip()
+        # if last word got LinkedIn in it, it's not his company
+        # except if this person does work for LinkedIn
+        # this last case won't work
+        if "LinkedIn" not in secondpart:
+            result['jobTitle'] = firstpart
+            result['worksFor'] = secondpart
+        else:
+            result['worksFor'] = firstpart
+    elif len(full_title) > 1:
         result["jobTitle"] = full_title[1].removesuffix("...").strip()
-        if len(full_title) > 2:
-            result["worksFor"] = full_title[2].removesuffix("...").strip()
+    else:
+        return None
+    
     return result
 
 
@@ -161,7 +161,7 @@ class LinkedInSearch:
                 log.error(f"{query}: {e}")
                 return None
             if not r.ok:
-                r.raise_for_status()
+                log.error(f"{r.status_code} : {r.reason}")
 
             result_raw = r.json()
 
@@ -233,16 +233,19 @@ class LinkedInSearch:
         # build initial dict
         person_d = {
             'givenName': result["pagemap"]["metatags"][0]["profile:first_name"],
-            'familyName': result["pagemap"]["metatags"][0]["profile:last_name"], 
+            'familyName': result["pagemap"]["metatags"][0]["profile:last_name"],
             'url': result["link"],
-            'identifier': re.match(LINKEDIN_URL_RE, result['link'])['identifier'],
+            'identifier': re.match(RE_LINKEDIN_URL, result['link'])['identifier'],
         }
-        person_d['name'] = f"{person_d['givenName']} {person_d['familyName']}"
 
+        person_d['name'] = f"{person_d['givenName']} {person_d['familyName']}"
         # enrich with parsed from linkedin title
-        full_title = parse_linkedin_title(result["title"])
+        full_title = parse_linkedin_title(
+            result["title"],
+            person_d['name']
+            )
         # the parsing worked only if name parsed is the same
-        if full_title['name'] == person_d['name']:
+        if full_title:
             person_d.update(full_title)
         
         # add the image, yet
@@ -253,7 +256,11 @@ class LinkedInSearch:
         return person_d
     
     async def extract(
-        self, name: str, email: str = None, company: str = None, google: bool = True
+        self, name: str,
+        email: str = None,
+        company: str = None,
+        linkedin_url: HttpUrl = None,
+        google: bool = True
     ) -> dict:
         """
         Search engine then update and return the personal data accordingly
@@ -263,12 +270,19 @@ class LinkedInSearch:
             name (str): name
             email (str): email
             company (str): company's name
+            url (HttpUrl): URL's of LinkedIn
             google (bool): extract with Google, if false Bing
 
         Returns:
             person (str) : person JSON-LD filled with the infos mined
         """
-        query_string = email or f"{name} {company}"
+        query_string = (email
+                        or linkedin_url
+                        or (f"{name} {company}" if company else None)
+                        )
+        if not query_string:
+            raise ValueError
+        
         results = (
             await self._search_google(query_string)
             if google
@@ -276,7 +290,7 @@ class LinkedInSearch:
         )
 
         if not results:
-            log.debug("No result found")
+            log.debug("LinkedIn: No result found")
             # self.person = None
             return None
 
@@ -286,7 +300,7 @@ class LinkedInSearch:
         persons_d = {}
         for r in results:
             # must be a valid profile link
-            if not re.match(LINKEDIN_URL_RE, r['link']):
+            if not re.match(RE_LINKEDIN_URL, r['link']):
                 log.debug(f"This url isn't a valid Linkedin Profile {r['link']}")
                 continue
 
@@ -295,17 +309,18 @@ class LinkedInSearch:
             # the full name from the result must be the same that the name itself
             # 96 seems a good ratio for difference between ascii and latin characters
             # should do fine tuning here trained on a huge international dataset
-            if fuzz.token_set_ratio(person_d["name"], name.strip()) < 96:
-                log.info(
-                    f"The full name mined doesn't match the name given as a parameter: {person_d['name']}, {name}"
+            if fuzz.token_set_ratio(person_d["name"], name) < 96:
+                log.debug(
+                    f"The name mined doesn't match the name given: {person_d['name']}, {name}"
                 )
                 continue
 
             # check homonymous
             if name in persons_d:
-                return None            
+                return None
 
             persons_d[name] = person_d
+            break
         
         # not found, bye
         if name not in persons_d:
@@ -316,59 +331,22 @@ class LinkedInSearch:
 
         return self.person
 
-    async def search(self, name, email: str = None, company: str = None) -> dict:
+    async def search(self,
+                     name,
+                     email: str = None,
+                     company: str = None,
+                     linkedin_url: HttpUrl = None
+                     ) -> dict:
         """
         search and return the public data for an email and/or company
         """
         self.person = {'name': name}
-        if email:
-            log.debug("Searching by name %s and email %s" % (name, email))
-
-            self.person['email'] = email
-            if self.bing and self.google:
-                # creating threads
-                google = threading.Thread(
-                    target=self.extract_google, args=(name, email)
-                )
-                bing = threading.Thread(target=self.extract_bing, args=(name, email))
-
-                # starting threads
-                google.start()
-                bing.start()
-
-                # wait until all threads finish
-                google.join()
-                bing.join()  # usually add location
-            elif self.google:
-                await self.extract(name, email)
-            elif self.bing:
-                self.extract(name, email, google=False)
-        if company:
-            self.person['worksFor'] = company
-            log.debug("Searching by name %s and company %s" % (name, company))
-            await self.extract(name, company=company)
-
-        self._add_country()
+        await self.extract(name, email, company, linkedin_url)
 
         # answer only if we found something
         if 'url' in self.person:
+            self._add_country()
             return self.person
-
-    def bulk(self, persons: list[dict]) -> list:
-        """Bulk search
-
-        Args:
-            persons (list[dicts]): list of dicts
-
-        Returns:
-            list: list of dicts
-        """
-        for person in persons:
-            p_enrich = self.search(person['name'], person['email'])
-            if p_enrich:
-                self.persons.append(p_enrich)
-
-        return self.persons
 
 
 if __name__ == "__main__":

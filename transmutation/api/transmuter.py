@@ -14,15 +14,17 @@ from .config import settings
 from .config import setup_cache
 
 # fast api
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
+from fastapi_limiter.depends import WebSocketRateLimiter
 
 # websocket manager
 from .websocketmanager import manager as ws_manager
 
 # types
 from pydantic import EmailStr
-from typing import Set, Annotated
+from .types import PersonRequest, PersonResponse
+from .types import person_request_ta, person_response_ta
 
 # logger
 from loguru import logger as log
@@ -49,8 +51,13 @@ search_api_params = {
     "query_type": settings.query_type,
 }
 
+MAX_REQUESTS_PER_SEC = {'times': 10, 'seconds': 10}
+
 # init cache for transmuter
-cache = setup_cache(settings, 7)
+cache = asyncio.get_event_loop().run_until_complete(
+    setup_cache(settings, 7)
+)
+
 
 al = Alchemist()
 
@@ -102,12 +109,12 @@ async def mine_worksfor(p: dict):
     if 'worksFor' not in p:
         domain = p['email'].split("@")[1]
         if domain not in settings.public_email_providers:
-            company = cache.get(domain)
+            company = await cache.get(domain)
             if not company:
                 company = get_company(domain)
                 # redis refuses to store None so we'll use a void string instead
                 # we won't check for this domain again for some time 
-                cache.set(domain, company or '', ex=settings.cache_expiration)
+                await cache.set(domain, company or '', ex=settings.cache_expiration)
             if company:
                 p['worksFor'] = company
                 return p
@@ -141,10 +148,11 @@ async def mine_name(p: dict):
     log.debug(splitted)
     return splitted
 
-@al.register(element="email", insert=("location",))
+
+@al.register(element="email", insert=("workLocation",))
 async def mine_country(p: dict):
     country = guess_country(p['email'].split('@')[-1])
-    return {"location": country} if country else None
+    return {"workLocation": country} if country else None
 
 
 @router.get("/transmute/{email}")
@@ -156,12 +164,9 @@ async def transmute_one(email: EmailStr, name: str) -> dict:
 
 
 @router.websocket("/transmute/{user_id}/websocket")
-async def websocket_endpoint(
-    websocket: WebSocket,
-    user_id: int,
-    q: int | None = None
-    ):
+async def websocket_endpoint(websocket: WebSocket, user_id: int):
     await ws_manager.connect(websocket)
+    ratelimit = WebSocketRateLimiter(**MAX_REQUESTS_PER_SEC)
     transmuted_count = 0
     log.info(f"Websocket connected: {websocket} - {user_id}")
 
@@ -169,11 +174,16 @@ async def websocket_endpoint(
         while True:
             # Wait for any message from the client
             try:
-                person = await websocket.receive_json()
+                person: PersonRequest = await websocket.receive_json()
+                person_request_ta.validate_python(person)
             except json.JSONDecodeError as e:
                 log.debug(f"JSON malformed: {e}")
                 raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
-            
+            except ValidationError:
+                log.debug(f"invalid data: {person}")
+                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
+     
+            await ratelimit(websocket, context_key=person)  # NB: context_key is optional
             al_status = None
 
             # person_c = cache.get(f"{user_id}-{person['email']}")
@@ -182,27 +192,24 @@ async def websocket_endpoint(
             #    al_status = True
             #    person = dict(**json.loads(person_c))
             #    log.debug(f"{person['email']} found: {person_c}")
-            # aqueue.put(person)
-            # al_status, transmuted = await al.person(await aqueue.get())
-            
-            # data validation
-            try:
-                uid, person = person.popitem()
-            except:
-                log.debug(f"invalid data: {person}")
-                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
-            
-            al_status, transmuted = await al.person(person)
+
+            al_status, transmuted = await al.person(person['person'])
 
             if al_status:
                 #cache.set(f"{user_id}-{person['email']}", transmuted.json(), ex=settings.cache_expiration)
                 transmuted_count += 1
 
+            response: PersonResponse = {
+                'status': al_status,
+                'person': transmuted
+                }
+            person_response_ta.validate_python(response)
+
             # Send message when transmutation finished
-            await websocket.send_text(
-                    f"['{uid}': {{'status': {al_status}, 'person': {transmuted}}}]"
+            await ws_manager.message(
+                    websocket,
+                    {person['uid']: response}
                     )
-                
     except WebSocketDisconnect:
         log.info(f"Websocket disconnected: {websocket}")
         ws_manager.disconnect(websocket)

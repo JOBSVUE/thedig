@@ -207,8 +207,6 @@ class LinkedInSearch:
             country = country_from_url(self.person['url'])
             if country:
                 self.person['workLocation'] = country
-                # TOFIX: do not work for unknown reason
-                # self.person['workLocation'] = PostalAddress(addressCountry=country)
 
     def _extract_bing_specific(self, result):
         # sometimes it's an useless thumbnail : 404 Error
@@ -219,11 +217,7 @@ class LinkedInSearch:
         address = result["richFacts"][0]["items"][0]["text"].split(", ")
         # however sometimes the address isn't correctly identified by Bing
         if len(address) >= 3:
-            self.person['workLocation'] = PostalAddress(
-                addressLocation=address[0],
-                addressRegion=address[1],
-                addressCountry=address[2],
-            )
+            self.person['workLocation'] = ', '.join(address)
 
     def _extract_google_specific(self, result):
         self.person['givenName'] = result["pagemap"]["metatags"][0]["profile:first_name"]

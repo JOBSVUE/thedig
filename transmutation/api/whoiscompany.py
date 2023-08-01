@@ -24,7 +24,7 @@ router = APIRouter()
 cache = setup_cache(settings, settings.cache_redis_db)
 
 @router.get("/whoiscompany/{domain}")
-def whois_unique(domain: str) -> str:
+async def whois_unique(domain: str) -> str:
     """Give company name based on the domain's owner
 
     Args:
@@ -36,7 +36,7 @@ def whois_unique(domain: str) -> str:
     if domain in settings.public_email_providers:
         return None
     
-    company = cache.get(domain)
+    company = await cache.get(domain)
     if company:
         log.debug("Cache found for domain: %s" % domain)
         return company
@@ -52,32 +52,32 @@ def whois_unique(domain: str) -> str:
         # we won't check for this domain again for some time
         company = ""
 
-    cache.set(domain, company, ex=settings.cache_expiration)
+    await cache.set(domain, company, ex=settings.cache_expiration)
 
     return company or None
 
 
 @router.post("/whoiscompany")
-def whois_bulk(body: Dict[str, List[str]]) -> dict:
+async def whois_bulk(body: Dict[str, List[str]]) -> dict:
     companies = {}
     for domain in body["domains"]:
         if domain in settings.public_email_providers:
             company = None
         else:
-            company = cache.get(domain)
+            company = await cache.get(domain)
         if company is None:
             log.debug("The following domain is not cached: %s" % domain)
             company = whoiscompany.get_company(domain)
             if company is None:
                 log.debug("No valid data for this domain: %s" % domain)
                 company = ""
-            cache.set(domain, company, ex=settings.cache_expiration)
+            await cache.set(domain, company, ex=settings.cache_expiration)
         log.info(f"Domain:company - {domain}:{company}")
         companies[domain] = company or None
     return companies
 
 
 @router.delete("/whoiscompany/cache")
-def _whois_flushcache():
+async def _whois_flushcache():
     """Flush cache"""
-    return cache.flushdb()
+    return await cache.flushdb()

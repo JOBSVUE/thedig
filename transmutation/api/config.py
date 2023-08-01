@@ -7,7 +7,7 @@ from requests.exceptions import ConnectionError
 
 from loguru import logger as log
 
-from redis import Redis
+from redis.asyncio import Redis
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     persons_bulk_max: int = 10000
     jobtitles_list_file: str = "miners/jobtitles.json"
     model_config = SettingsConfigDict(env_file=".env")
-    
+
 
 settings = Settings()
 
@@ -52,7 +52,16 @@ if not settings.public_email_providers:
         log.info(f"Impossible to GET public_email_providers_url: {e}")
 
 
-def setup_cache(settings: Settings, db: int) -> Redis:
+# build connection string for redis
+redis_credentials = ""
+if settings.redis_username:
+    redis_credentials += settings.redis_username
+    if settings.redis_password:
+        redis_credentials += f":{settings.redis_password}"
+    redis_credentials += "@"
+redis_url = f"redis://{redis_credentials}{settings.redis_host}:{settings.redis_port}"
+
+async def setup_cache(settings: Settings, db: int) -> Redis:
     """setup cache based on Redis
 
     Args:
@@ -60,7 +69,7 @@ def setup_cache(settings: Settings, db: int) -> Redis:
         db (str): database name
 
     Returns:
-        Redis: redis database instance
+        redis: redis database instance
     """
     # redis parameters
     redis_parameters = {
@@ -70,19 +79,12 @@ def setup_cache(settings: Settings, db: int) -> Redis:
     }
     redis_parameters["db"] = db
     redis_parameters["decode_responses"] = True
-    cache = Redis(**redis_parameters)
-    log.info(f"Set-up Redis cache for {db}")
+    redis_parameters["encoding"] = "utf-8"
+    cache = await Redis(**redis_parameters)
+    log.info(f"Set-up redis cache for {db}")
     return cache
-
-# build connection string for redis
-redis_credentials = ""
-if settings.redis_username:
-    redis_credentials += settings.redis_username
-    if settings.redis_password:
-        redis_credentials += f":{settings.redis_password}"
-    redis_credentials += "@"
     
 # celery broker & backend based on redis
 celery_backend = (
     celery_broker
-) = f"redis://{redis_credentials}{settings.redis_host}:{settings.redis_port}/{settings.celery_redis_db}"
+) = "{redis_url}/{settings.celery_redis_db}"

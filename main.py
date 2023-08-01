@@ -14,16 +14,26 @@ __license__ = "AGPL"
 __version__ = "0.1"
 
 # fast api
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi_limiter import FastAPILimiter
 
 # import other apis
 from transmutation.api import router
-from transmutation.api.config import settings
+from transmutation.api.config import settings, setup_cache
 from transmutation.api.logsetup import setup_logger_from_settings
 
 # X-API-KEY protection
 from transmutation.security import get_api_key
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    setup_logger_from_settings()
+    await FastAPILimiter.init(await setup_cache(settings, 8))
+    yield
+
 
 # routing composition
 app = FastAPI(
@@ -33,21 +43,21 @@ app = FastAPI(
     contact={"name": __copyright__, "email": __author__.split("<")[1][:-1]},
     license_info={"name": __license__},
     dependencies=[Security(get_api_key)],
+    lifespan=lifespan,
 )
-# origins = [f"http://localhost:{settings.server_port}""]
+
+
+# origins = [f"http://{settings.server}:{settings.server_port}""]
 app.add_middleware(
     CORSMiddleware,
     #    allow_origins=origins,
     allow_credentials=True,
-    #    allow_methods=["*"],
-    #    allow_headers=["*"],
 )
 
 
 app.include_router(router)
-setup_logger_from_settings()
 
-    
+
 # launching this app as a module is for dev purpose
 if __name__ == "__main__":
     import uvicorn

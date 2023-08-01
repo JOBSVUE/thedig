@@ -25,9 +25,12 @@ def get_domain(email: str) -> str:
 def get_company(domain: str) -> str:
     try:
         result = whois.query(domain, ignore_returncode=True)
-    except whois.exceptions.WhoisPrivateRegistry as e:
-        log.debug(f"Whois failed: {e}")
+    except whois.WhoisPrivateRegistry as e:
+        log.error(f"Whois failed: {e}")
         return None
+    except whois.WhoisCommandFailed as e:
+        log.error(f"Whois failed: {e}")
+        return None 
     
     # if the whois request does answer a proper string
     if not result:

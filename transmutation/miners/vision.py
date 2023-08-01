@@ -59,6 +59,7 @@ DESCRIPTION_DEFAULTS = {
     "See Instagram photos and videos from",
     "I use about.me to show people what matters most to me.",
     "Follow their code on GitHub",
+    "on TikTok | Watch the latest video from",
 }
 
 SOCIALNETWORKS = {
@@ -270,7 +271,7 @@ def extract_socialprofile(soup, url, name):
                 or soup.find("span", class_="p-label")
                 or soup.find("span", class_="location"))
     if location:
-        person['location'] = location.text.strip()
+        person['homeLocation'] = location.text.strip()
         log.debug(f"Location found. Name: {name}, URL: {url} : {location}")
 
     return person
@@ -306,10 +307,10 @@ class SocialNetworkMiner:
         if not 'sameAs' in self._person:
             self._person['sameAs'] = set()
         
-        if not 'location' in self._person:
-            self._person['location'] = set()
-        elif not type(self._person['location']) is set:
-            self._person['location'] = {self._person['location'], }
+        if not 'homeLocation' in self._person:
+            self._person['homeLocation'] = set()
+        elif not type(self._person['homeLocation']) is set:
+            self._person['homeLocation'] = {self._person['homeLocation'], }
 
         # ok let's pretend is always void
         self._person['description'] = set()
@@ -381,7 +382,7 @@ class SocialNetworkMiner:
         alternateName=None,
         sameAs=None,
         image=None,
-        location=None,
+        homeLocation=None,
         description=None,
         subdomain=None
         ):
@@ -407,8 +408,8 @@ class SocialNetworkMiner:
                 self._person['sameAs'].remove(url)
         if image:
             self._person['image'].add(image)
-        if location:
-            self._person['location'].add(location)
+        if homeLocation:
+            self._person['homeLocation'].add(homeLocation)
         if description:
             self._person['description'].add(description)
         if alternateName:

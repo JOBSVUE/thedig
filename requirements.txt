@@ -17,3 +17,4 @@ fake_useragent
 google-cloud-vision
 pydantic_settings
 curl_cffi
+fastapi-limiter

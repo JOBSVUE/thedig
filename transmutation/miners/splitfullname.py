@@ -1,8 +1,6 @@
 #!/bin/env python3
 """
-Enrichment related to a domain
-- favicon
-- country (exclusion list for country tld misused like .io)
+Split fullname into givenName and familyName
 """
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"

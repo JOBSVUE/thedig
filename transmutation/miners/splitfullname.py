@@ -192,9 +192,9 @@ def _split_fullname(fullname: str) -> dict:
             "familyName": None,
         }
 
-    # e.g FAMILY NAME, First Name
+    # e.g Family Name, First Name
     comma_format = fullname.split(",")
-    if len(comma_format) == 2 and comma_format[0].isupper():
+    if len(comma_format) == 2 and comma_format[0][0].isupper():
         return {
             "familyName": comma_format[0],
             "givenName": comma_format[1],

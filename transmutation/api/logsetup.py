@@ -84,7 +84,7 @@ try:
     class GunicornLogger(Logger):
         def setup(self, cfg) -> None:
             handler = InterceptHandler()
-            
+
             log_settings = LoggingSettings()
 
             # Add log handler to logger and set log level
@@ -182,6 +182,7 @@ def setup_logger(
 
     return logger
 
+
 # monkey patch for an issue regarding loguru and async
 # https://github.com/Delgan/loguru/issues/504#issuecomment-917365972
 def patcher(record):
@@ -189,6 +190,7 @@ def patcher(record):
     if exception is not None:
         fixed = Exception(str(exception.value))
         record["exception"] = exception._replace(value=fixed)
+
 
 def setup_logger_from_settings(log_settings: Optional[LoggingSettings] = None):
     """Define the global logger to be used by your entire service.
@@ -205,7 +207,7 @@ def setup_logger_from_settings(log_settings: Optional[LoggingSettings] = None):
     if not log_settings:
         log_settings = LoggingSettings()
 
-    logger.configure(patcher=patcher) 
+    logger.configure(patcher=patcher)
 
     # Return logger even though it's not necessary
     return setup_logger(

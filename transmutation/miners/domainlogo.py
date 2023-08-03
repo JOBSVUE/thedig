@@ -25,34 +25,34 @@ log = logging.getLogger(__name__)
 FAVICON_RE = re.compile("^(shortcut icon|icon)$", re.I)
 
 COUNTRY_TLD_EXCLUSION = {
-    'io',
-    're',
-    'tv',
-    'sk',
-    'ly',
-    'in',
-    'me',
-    'sh',
-    'ws',
-    'ai',
-    'cc',
-    'bz',
-    'co',
-    'fm',
-    'im',
-    'to',
-    'am',
-    'it',
-    'at',
-    'mu',
-    'nu',
-    'is',
-    'tk',
+    "io",
+    "re",
+    "tv",
+    "sk",
+    "ly",
+    "in",
+    "me",
+    "sh",
+    "ws",
+    "ai",
+    "cc",
+    "bz",
+    "co",
+    "fm",
+    "im",
+    "to",
+    "am",
+    "it",
+    "at",
+    "mu",
+    "nu",
+    "is",
+    "tk",
 }
 
 
 def get_tld(domain: str) -> str:
-    return domain.split('.')[-1]
+    return domain.split(".")[-1]
 
 
 def guess_country(domain: str) -> str:

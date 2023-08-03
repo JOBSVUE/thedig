@@ -11,6 +11,7 @@ from typing_extensions import TypedDict
 RE_COUNTRY = r"^[A-Z]{2}$"
 RE_LANGUAGE = r"^[a-z]{2}$"
 
+
 class Person(TypedDict, total=False):
     name: str
     email: EmailStr | set[EmailStr]

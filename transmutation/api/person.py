@@ -4,9 +4,12 @@ Person Types
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __license__ = "AGPL"
 
-from pydantic import TypeAdapter
-from pydantic import EmailStr, HttpUrl
+from pydantic import TypeAdapter, ValidationError
+from pydantic import EmailStr, HttpUrl, constr
 from typing_extensions import TypedDict
+
+RE_COUNTRY = r"^[A-Z]{2}$"
+RE_LANGUAGE = r"^[a-z]{2}$"
 
 class Person(TypedDict, total=False):
     name: str
@@ -17,6 +20,8 @@ class Person(TypedDict, total=False):
     identifier: str | set[str]
     image: HttpUrl | set[HttpUrl]
     jobTitle: str | set[str]
+    knowsLanguage: constr(pattern=RE_LANGUAGE) | set[constr(pattern=RE_LANGUAGE)]
+    nationality: constr(pattern=RE_COUNTRY) | set[constr(pattern=RE_COUNTRY)]
     OptOut: bool
     sameAs: set[HttpUrl]
     url: HttpUrl | set[HttpUrl]

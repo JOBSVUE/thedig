@@ -18,10 +18,16 @@ from .config import setup_cache
 # log
 from loguru import logger as log
 
+import asyncio
+
 # set-up router
 router = APIRouter()
 
-cache = setup_cache(settings, settings.cache_redis_db)
+
+cache = asyncio.get_event_loop().run_until_complete(
+    setup_cache(settings, settings.cache_redis_db)
+)
+
 
 @router.get("/whoiscompany/{domain}")
 async def whois_unique(domain: str) -> str:

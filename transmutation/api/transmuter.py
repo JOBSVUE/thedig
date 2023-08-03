@@ -23,8 +23,8 @@ from .websocketmanager import manager as ws_manager
 
 # types
 from pydantic import EmailStr
-from .types import PersonRequest, PersonResponse
-from .types import person_request_ta, person_response_ta
+from .person import PersonRequest, PersonResponse
+from .person import person_request_ta, person_response_ta, ValidationError
 
 # logger
 from loguru import logger as log
@@ -51,7 +51,7 @@ search_api_params = {
     "query_type": settings.query_type,
 }
 
-MAX_REQUESTS_PER_SEC = {'times': 10, 'seconds': 10}
+MAX_REQUESTS_PER_SEC = {'times': 3, 'seconds': 10}
 
 # init cache for transmuter
 cache = asyncio.get_event_loop().run_until_complete(
@@ -101,7 +101,6 @@ async def mine_social(p: dict):
     await snm.identifier()
 
     snm.sameAs()
-    log.debug(f"{snm._person}, {snm.profiles}")
 
     if "OptOut" in snm.person:
         return None
@@ -179,6 +178,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
     try:
         while True:
             # Wait for any message from the client
+            await ratelimit(websocket)
+
             try:
                 person: PersonRequest = await websocket.receive_json()
                 person_request_ta.validate_python(person)
@@ -188,8 +189,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
             except ValidationError:
                 log.debug(f"invalid data: {person}")
                 raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
-     
-            await ratelimit(websocket, context_key=person)  # NB: context_key is optional
+                  
             al_status = None
 
             # person_c = cache.get(f"{user_id}-{person['email']}")

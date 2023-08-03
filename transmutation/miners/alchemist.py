@@ -8,7 +8,7 @@ __license__ = "AGPL"
 
 from functools import wraps
 from loguru import logger as log
-from ..api.types import Person, person_ta
+from ..api.person import Person, person_ta
 
 
 class Alchemist:
@@ -32,6 +32,7 @@ class Alchemist:
         # we don't mine again with the same miner, the same element/value
         # so we keep an history of what element/value was used for what miner
         self._mined: dict = {}
+
 
     async def person(self, person: dict) -> tuple[bool, dict]:
         """Transmute one person
@@ -87,8 +88,13 @@ class Alchemist:
                         and k not in miner['insert']):
                         continue
 
+                    # skip alternateName if same as name
+                    if k == "alternateName" and v == person.get("name"):
+                        continue
+                    
                     # real update
                     if k not in person:
+                        modified = True
                         person[k] = v
                         log.debug(f"{miner['func']} add {k} : {v}")
                     elif person[k] == v:

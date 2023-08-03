@@ -76,7 +76,7 @@ repos:
             LICENSES/.*
           )$
 
-  - repo: https://github.com/dosisod/refurb
-    rev: v1.3.0
-    hooks:
-      - id: refurb
+#  - repo: https://github.com/dosisod/refurb
+#    rev: v1.18.0
+#    hooks:
+#      - id: refurb

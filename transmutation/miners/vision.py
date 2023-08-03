@@ -78,7 +78,7 @@ SOCIALNETWORKS = {
     # twitter is full javascript, needs a headless browser
     'twitter': "https://twitter.com/{identifier}",
     # that's why we're using nitter as a proxy
-    "twitter#alt": "https://nitter.net/{identifier}",
+    "twitter#alt": "%s/{identifier}" % settings.nitter_instance_server,
     'youtube': "https://youtube.com/{identifier}",
 }
 
@@ -88,6 +88,7 @@ REQUESTS_PARAM = {
         "timeout": 10,
         "impersonate": IMPERSONATE_BROWSER,
     }
+
 
 async def find_pages_with_matching_images(
         image_url: str,
@@ -207,8 +208,10 @@ def get_socialprofile(url, sn, name, params=REQUESTS_PARAM, session=None, retry=
 
     return soup, sn
 
+
 def right_to_optout(text):
     return OUTPUT_TAG in text
+
 
 def extract_socialprofile(soup, url, name):
     person = {}
@@ -238,12 +241,20 @@ def extract_socialprofile(soup, url, name):
             person['OptOut'] = True
 
     # JSON-LD in script tag (eg. instagram)
-    jsonld = soup.find("script", attrs={'type' : "application/ld+json"})
+    jsonld = (
+        soup.find("script", attrs={'type': "application/ld+json", 'id': "Person"})
+        or soup.find("script", attrs={'type': "application/ld+json"})
+        )
     if jsonld:
         jsonld = loads(jsonld.text)
-        if jsonld.get("author"):
-            person['alternateName'] = jsonld["author"]["name"]
-            log.debug(f"Alternate name found: {person['alternateName']}")
+        try:
+            jsonld = jsonld.get("author") or jsonld
+            person['alternateName'] = jsonld["name"]
+            person['nationality'] =  jsonld["nationality"]
+            person['knowsLanguage'] = jsonld["knowsLanguage"]
+            log.debug(f"JSON-LD found: {jsonld}")
+        except KeyError:
+            log.warning(f"Unknown JSON-LD format: {jsonld}")
 
     # Social links
     links = soup.find_all(
@@ -255,7 +266,6 @@ def extract_socialprofile(soup, url, name):
         )
     if links:
         person['sameAs'] = set()
-        log.debug(f"Social links found: {links}")
         for link in links:
             sp = is_socialprofile(link['href'])
             person['sameAs'].add(sp['url'] if sp else link['href'])
@@ -273,7 +283,7 @@ def extract_socialprofile(soup, url, name):
     if location:
         person['homeLocation'] = location.text.strip()
         log.debug(f"Location found. Name: {name}, URL: {url} : {location}")
-
+    
     return person
 
 class SocialNetworkMiner:
@@ -306,7 +316,10 @@ class SocialNetworkMiner:
             self._person['identifier'] = set(self._person['identifier'])
         if not 'sameAs' in self._person:
             self._person['sameAs'] = set()
-        
+        if not 'nationality' in self._person:
+            self._person['nationality'] = set()
+        if not 'knowsLanguage' in self._person:
+            self._person['knowsLanguage'] = set()
         if not 'homeLocation' in self._person:
             self._person['homeLocation'] = set()
         elif not type(self._person['homeLocation']) is set:
@@ -384,7 +397,9 @@ class SocialNetworkMiner:
         image=None,
         homeLocation=None,
         description=None,
-        subdomain=None
+        subdomain=None,
+        knowsLanguage=None,
+        nationality=None,
         ):
         # no duplicates
         # we only add new social networks URLs
@@ -416,6 +431,10 @@ class SocialNetworkMiner:
             self._person['alternateName'] = alternateName
         if sameAs:
             self._person['sameAs'].update(sameAs)
+        if nationality:
+            self._person['nationality'].add(nationality)
+        if knowsLanguage:
+            self._person['knowsLanguage'].add(knowsLanguage)
 
     async def _identifier(self, identifier) -> dict:
         social = {}

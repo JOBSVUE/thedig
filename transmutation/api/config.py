@@ -4,11 +4,23 @@ from logging import DEBUG
 from typing import Optional
 from requests import get
 from requests.exceptions import ConnectionError
+from random import choice
 
 from loguru import logger as log
 
 from redis.asyncio import Redis
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def pick_nitter_instance(instances_url="https://status.d420.de/api/v1/instances"):
+    instances = {
+        instance['ping_avg'] : instance['url']
+        for instance in get(instances_url).json()['hosts']
+        if instance["points"]>50
+        }
+    return instances[
+        choice(sorted(instances.keys())[:5])
+        ]
 
 
 class Settings(BaseSettings):
@@ -38,6 +50,7 @@ class Settings(BaseSettings):
     persons_bulk_max: int = 10000
     jobtitles_list_file: str = "miners/jobtitles.json"
     model_config = SettingsConfigDict(env_file=".env")
+    nitter_instance_server: str = pick_nitter_instance()
 
 
 settings = Settings()

@@ -14,7 +14,7 @@ class SetEncoder(json.JSONEncoder):
 
 class WebSocketManager:
     def __init__(self):
-        self.connections: Set[WebSocket] = set()
+        self.connections: set[WebSocket] = set()
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()

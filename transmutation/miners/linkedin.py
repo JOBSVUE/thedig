@@ -13,9 +13,7 @@ except ImportError:
     from ISO3166 import ISO3166
 
 import re
-import threading
 # needed for memory sharing between threads
-from multiprocessing.sharedctypes import Value
 
 from pydantic import HttpUrl
 

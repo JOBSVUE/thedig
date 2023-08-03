@@ -308,21 +308,21 @@ class SocialNetworkMiner:
         self._original_person = person
         self._person = person.copy()
         
-        if not 'identifier' in self._person:
+        if 'identifier' not in self._person:
             self._person['identifier'] = set()
         elif type(self._person['identifier']) == str:
             self._person['identifier'] = {self._person['identifier']}
         elif type(self._person['identifier']) == list:
             self._person['identifier'] = set(self._person['identifier'])
-        if not 'sameAs' in self._person:
+        if 'sameAs' not in self._person:
             self._person['sameAs'] = set()
-        if not 'nationality' in self._person:
+        if 'nationality' not in self._person:
             self._person['nationality'] = set()
-        if not 'knowsLanguage' in self._person:
+        if 'knowsLanguage' not in self._person:
             self._person['knowsLanguage'] = set()
-        if not 'homeLocation' in self._person:
+        if 'homeLocation' not in self._person:
             self._person['homeLocation'] = set()
-        elif not type(self._person['homeLocation']) is set:
+        elif type(self._person['homeLocation']) is not set:
             self._person['homeLocation'] = {self._person['homeLocation'], }
 
         # ok let's pretend is always void

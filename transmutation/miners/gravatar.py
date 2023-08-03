@@ -86,7 +86,8 @@ if __name__ == "__main__":
         return "\x1b[48;5;{}m \x1b[0m".format(int(get_ansi_color_code(r, g, b)))
 
     def show_image(url_image: str, height: int = 100):
-        response = requests.get(url_image)
+        s = AsyncSession()
+        response = await s.get(url_image)
         img = Image.open(BytesIO(response.content))
         img.convert('RGB')
 

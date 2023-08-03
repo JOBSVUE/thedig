@@ -9,11 +9,10 @@ __license__ = "AGPL"
 
 import re
 import logging
-from contextlib import suppress
 try:
-    from .utils import match_name, normalize
+    from .utils import normalize
 except ImportError:
-    from utils import match_name, normalize
+    from utils import normalize
 
 
 log = logging.getLogger(__name__)

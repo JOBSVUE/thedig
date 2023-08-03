@@ -9,12 +9,11 @@ __license__ = "AGPL"
 __version__ = "0.1"
 
 # fast api
-from fastapi import Security, WebSocketException, status, Cookie, Query, WebSocket, Request
+from fastapi import Security, status, WebSocket, Request
 from fastapi.exceptions import HTTPException
 from fastapi.security.api_key import APIKeyHeader, APIKeyQuery
 from transmutation.api.config import settings
 
-from typing import Annotated
 
 
 # logging modules

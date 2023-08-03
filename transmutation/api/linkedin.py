@@ -87,17 +87,10 @@ async def linkedin_callback(
     # persons = list(filter(lambda p: p.name, persons))
     persons = [p.dict(exclude_unset=True) for p in persons if p.name]
 
-    callback_secret = x_callback_secret.get_secret_value()
-    callback_headers = {
-        "apikey": callback_secret,
-        "Authorization": f"Bearer {callback_secret}",
-        "Prefer": "resolution=merge-duplicates",
-        "Content-type": "application/json",
-    }
-    callback_params = {"endpoint": x_callback_endpoint, "headers": callback_headers}
+    x_callback_secret.get_secret_value()
 
     # background.add_task(patch_personDB, x_callback_endpoint, callback_headers, persons)
-    miner = LinkedInSearch(bulk=True, search_api_params=search_api_params)
+    LinkedInSearch(bulk=True, search_api_params=search_api_params)
 
     # t = patch_person['delay'](persons[0].name, persons[0].email, search_api_params, callback_params)
     # t = patch_persons.delay(x_callback_endpoint, callback_headers, persons)

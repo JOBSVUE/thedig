@@ -6,7 +6,6 @@ __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
-from functools import wraps
 from loguru import logger as log
 from ..api.person import Person, person_ta
 

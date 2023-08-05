@@ -14,9 +14,9 @@ from .config import settings
 from .config import setup_cache
 
 # fast api
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
-from fastapi_limiter.depends import WebSocketRateLimiter
+from fastapi_limiter.depends import WebSocketRateLimiter, RateLimiter
 
 # websocket manager
 from .websocketmanager import manager as ws_manager
@@ -169,8 +169,8 @@ async def mine_country(p: dict):
     return {"workLocation": country} if country else None
 
 
-@router.get("/transmute/{email}")
-async def transmute_one(email: EmailStr, name: str) -> dict:
+@router.get("/transmute/{email}", dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+async def transmute_email(email: EmailStr, name: str) -> dict:
     al_status, transmuted = await al.person({"email": email, "name": name})
     if not al_status:
         raise HTTPException(status_code=404, detail="No result for this person")

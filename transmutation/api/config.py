@@ -11,14 +11,18 @@ from loguru import logger as log
 from redis.asyncio import Redis
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+NITTER_INSTANCES = "https://status.d420.de/api/v1/instances"
 
-def pick_nitter_instance(instances_url="https://status.d420.de/api/v1/instances"):
+
+def pick_nitter_instance(instances_url=NITTER_INSTANCES):
     instances = {
         instance["ping_avg"]: instance["url"]
         for instance in get(instances_url).json()["hosts"]
         if instance["points"] > 50
     }
-    return instances[choice(sorted(instances.keys())[:5])]
+    return instances[
+        choice(sorted(instances.keys())[:5])
+        ]
 
 
 class Settings(BaseSettings):

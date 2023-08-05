@@ -57,7 +57,7 @@ MAX_REQUESTS_PER_SEC = {"times": 3, "seconds": 10}
 cache = asyncio.get_event_loop().run_until_complete(setup_cache(settings, 7))
 
 
-al = Alchemist()
+al = Alchemist(router)
 
 
 @al.register(element="name")

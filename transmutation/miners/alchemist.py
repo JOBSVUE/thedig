@@ -1,4 +1,4 @@
-# Copyright 2022 Badreddine LEJMI.
+s# Copyright 2022 Badreddine LEJMI.
 # SPDX-License-Identifier: 	AGPL-3.0-or-later
 
 """Base Alchemist"""
@@ -7,6 +7,7 @@ __copyright__ = "Ankaboot"
 __license__ = "AGPL"
 
 from loguru import logger as log
+from fastapi import APIRouter
 from ..api.person import Person, person_ta
 
 
@@ -22,9 +23,16 @@ class Alchemist:
         "name",
     ]
 
-    def __init__(self):
+    default_route: dict = {
+        'methods': ["GET",],
+        'path': "{operation}/{func_name}/{element}"
+    }
+
+    def __init__(self, router: APIRouter=None):
         self.elements: set = set()
         self.miners: dict = {k: [] for k in self._ordered_elements}
+        self.router = router
+
 
         # we don't mine again with the same miner, the same element/value
         # so we keep an history of what element/value was used for what miner
@@ -138,16 +146,30 @@ class Alchemist:
 
         def decorator(miner_func):
             if kw["element"] in self._ordered_elements:
+                
+                miner_param = {
+                    'element': kw.pop('element', []),
+                    'update': kw.pop('update', []),
+                    'insert': kw.pop('insert', []),
+                    'transmute': kw.pop('transmute', False),
+                }
+                miner_param['catchall'] = not miner_param['insert'] and not miner_param['update']
+
                 log.debug(f"add {miner_func} to miners with parameters: {kw}")
-                self.miners[kw["element"]].append(
-                    {
-                        "func": miner_func,
-                        "update": kw.get("update") or [],
-                        "insert": kw.get("insert") or [],
-                        "catchall": not kw.get("insert") and not kw.get("update"),
-                    }
-                )
+                self.miners[kw["element"]].append(miner_param)
                 self.elements.add(kw["element"])
+
+
+                if self.router:
+                    route_param = self.default_route | kw
+                    route_param['path'] = route_param['path'].format(
+                            operation="transmute" if miner_param['transmute'] else "enrich",
+                            element=miner_param['element'],
+                            func_name=miner_func.__name__
+                            )
+                    route_para['endpoint'] = miner_func
+                    self.router.add_api_route(**route_param)
+
             return miner_func
 
         return decorator

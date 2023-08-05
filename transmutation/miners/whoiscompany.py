@@ -94,10 +94,6 @@ def bulk_companies_from_emails(emails: list) -> dict:
     return companies
 
 
-def bulk_company_from_person(persons: list) -> list:
-    return None
-
-
 if __name__ == "__main__":
     import sys
 

@@ -87,12 +87,11 @@ async def miner_from_linkedin_url(name: str, url: HttpUrl) -> Person:
 
 @al.register(element="email", update=("image",))
 async def miner_gravatar(email) -> Person:
-    p_new = {}
     avatar = await gravatar(email)
-    if avatar:
-        p_new["image"] = avatar
-    return p_new
-
+    return (
+        {'image': avatar} if avatar
+        else {}
+    )
 
 @al.register(element="email")
 async def mine_social(p: dict) -> Person:

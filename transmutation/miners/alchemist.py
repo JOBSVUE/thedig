@@ -10,6 +10,7 @@ from loguru import logger as log
 from inspect import signature
 from fastapi import APIRouter
 from ..api.person import Person, person_ta
+from pydantic import HttpUrl
 
 
 def person_set_field(person: Person, field: str, value: str | set) -> Person:
@@ -24,8 +25,12 @@ def person_set_field(person: Person, field: str, value: str | set) -> Person:
     Returns:
         Person: person's dict
     """
-    dest_set = (Person.__annotations__[field] == set
-                or Person.__annotations__[field] == str | set[str])
+    dest_set = (
+        Person.__annotations__[field] == set[str]
+        or Person.__annotations__[field] == str | set[str]
+        or Person.__annotations__[field] == set[HttpUrl]
+        or Person.__annotations__[field] == HttpUrl | set[HttpUrl]
+        )
     if dest_set:
         if field not in person:
             person[field] = set()
@@ -34,7 +39,7 @@ def person_set_field(person: Person, field: str, value: str | set) -> Person:
         if type(value) is set:
             person[field] |= value
         else:
-            person[field] = {value, }
+            person[field] |= {value, }
     else:
         person[field] = value
 

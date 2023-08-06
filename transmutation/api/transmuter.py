@@ -22,8 +22,8 @@ from fastapi_limiter.depends import WebSocketRateLimiter, RateLimiter
 from .websocketmanager import manager as ws_manager
 
 # types
-from pydantic import EmailStr
-from .person import PersonRequest, PersonResponse
+from pydantic import EmailStr, HttpUrl
+from .person import Person, PersonRequest, PersonResponse
 from .person import person_request_ta, person_response_ta, ValidationError
 
 # logger
@@ -61,10 +61,10 @@ al = Alchemist(router)
 
 
 @al.register(element="name")
-async def miner_linkedin(p: dict):
+async def miner_linkedin(name: str, email: EmailStr=None, worksFor: str=None) -> Person:
     miner = LinkedInSearch(search_api_params)
     person = await miner.search(
-        name=p["name"], email=p.get("email"), company=p.get("worksFor")
+        name=name, email=email, company=worksFor
     )
     return person
 
@@ -78,7 +78,7 @@ async def miner_linkedin(p: dict):
     ),
     insert=("givenName", "familyName"),
 )
-async def miner_from_linkedin_url(p: dict):
+async def miner_from_linkedin_url(name: str, url: HttpUrl) -> Person:
     if "linkedin" in p["url"]:
         miner = LinkedInSearch(search_api_params)
         person = await miner.search(name=p["name"], linkedin_url=p["url"])
@@ -86,16 +86,16 @@ async def miner_from_linkedin_url(p: dict):
 
 
 @al.register(element="email", update=("image",))
-async def miner_gravatar(p: dict):
+async def miner_gravatar(email) -> Person:
     p_new = {}
-    avatar = await gravatar(p["email"])
+    avatar = await gravatar(email)
     if avatar:
         p_new["image"] = avatar
     return p_new
 
 
 @al.register(element="email")
-async def mine_social(p: dict):
+async def mine_social(p: dict) -> Person:
     snm = SocialNetworkMiner(p)
 
     # if there is an image, let's vision mine it
@@ -118,32 +118,24 @@ async def mine_social(p: dict):
 
 
 @al.register(element="email", update=("worksFor",))
-async def mine_worksfor(p: dict):
+async def mine_worksfor(email: EmailStr) -> Person:
     # otherwise, the domain will give us the @org
     # except for public email providers
-    if "worksFor" not in p:
-        domain = p["email"].split("@")[1]
-        if domain not in settings.public_email_providers:
-            company = await cache.get(domain)
-            if not company:
-                company = get_company(domain)
-                # redis refuses to store None so we'll use a void string instead
-                # we won't check for this domain again for some time
-                await cache.set(domain, company or "", ex=settings.cache_expiration)
-            if company:
-                p["worksFor"] = company
-                return p
+    domain = email.split("@")[1]
+    if domain not in settings.public_email_providers:
+        company = await cache.get(domain)
+        if not company:
+            company = get_company(domain)
+            # redis refuses to store None so we'll use a void string instead
+            # we won't check for this domain again for some time
+            await cache.set(domain, company or "", ex=settings.cache_expiration)
+        if company:
+            return {'worksFor': company}
 
 
 @al.register(element="description", update=("jobTitle",))
-async def mine_bio(p: dict):
-    if "description" not in p:
-        return None
-
-    if type(p["description"]) is str:
-        desc = (p["description"],)
-    else:
-        desc = p["description"]
+async def mine_bio(description: str=None) -> Person:
+    desc: set[str] = {description, }
 
     jt = set()
     for d in desc:
@@ -158,19 +150,27 @@ async def mine_bio(p: dict):
 
 
 @al.register(element="name", update=("givenName", "familyName"))
-async def mine_name(p: dict):
-    splitted = split_fullname(p["name"], p["email"].split("@")[1])
+async def mine_name(name: str, email: EmailStr) -> Person:
+    splitted = split_fullname(name, email.split("@")[1])
     return splitted
 
 
 @al.register(element="email", insert=("workLocation",))
-async def mine_country(p: dict):
-    country = guess_country(p["email"].split("@")[-1])
+async def mine_country(email: EmailStr) -> Person:
+    country = guess_country(email.split("@")[-1])
     return {"workLocation": country} if country else None
 
 
 @router.get("/transmute/{email}", dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
-async def transmute_email(email: EmailStr, name: str) -> dict:
+async def transmute_email(email: EmailStr, name: str) -> Person:
+    al_status, transmuted = await al.person({"email": email, "name": name})
+    if not al_status:
+        raise HTTPException(status_code=404, detail="No result for this person")
+    return transmuted
+
+
+@router.post("/transmute/{email}", dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+async def transmute_person(person: Person) -> Person:
     al_status, transmuted = await al.person({"email": email, "name": name})
     if not al_status:
         raise HTTPException(status_code=404, detail="No result for this person")

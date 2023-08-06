@@ -56,6 +56,7 @@ async def gravatar(email: str, check: bool = True) -> str:
 # command line usage only for dev purpose
 if __name__ == "__main__":
     import sys
+    import requests
 
     url = gravatar(sys.argv[1])
 
@@ -91,8 +92,7 @@ if __name__ == "__main__":
         return "\x1b[48;5;{}m \x1b[0m".format(int(get_ansi_color_code(r, g, b)))
 
     def show_image(url_image: str, height: int = 100):
-        s = AsyncSession()
-        response = await s.get(url_image)
+        response = requests.get(url_image)
         img = Image.open(BytesIO(response.content))
         img.convert("RGB")
 

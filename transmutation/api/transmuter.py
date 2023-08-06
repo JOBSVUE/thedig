@@ -93,6 +93,7 @@ async def miner_gravatar(email) -> Person:
         else {}
     )
 
+
 @al.register(element="email")
 async def mine_social(p: dict) -> Person:
     snm = SocialNetworkMiner(p)

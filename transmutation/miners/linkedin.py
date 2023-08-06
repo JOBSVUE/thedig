@@ -19,6 +19,7 @@ import re
 from pydantic import HttpUrl
 
 from curl_cffi import requests
+from urllib.parse import quote
 
 # log
 from loguru import logger as log
@@ -158,8 +159,11 @@ class LinkedInSearch:
         async with requests.AsyncSession() as s:
             try:
                 r = await s.get(search_url_complete)
+                #import requests as req
+                #r = req.get(search_url_complete)
             except requests.RequestsError as e:
-                log.error(f"{query}: {e}")
+            #except req.RequestException as e:
+                log.error(f"{search_url_complete}: {e}")
                 return None
             if not r.ok:
                 log.error(f"{r.status_code} : {r.reason}")
@@ -278,8 +282,8 @@ class LinkedInSearch:
         Returns:
             person (str) : person JSON-LD filled with the infos mined
         """
-        query_string = (
-            email or linkedin_url or (f"{name} {company}" if company else None)
+        query_string = quote(
+            email or linkedin_url or (f"{name} {company}" if company else name)
         )
         if not query_string:
             raise ValueError

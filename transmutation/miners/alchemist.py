@@ -25,7 +25,7 @@ def person_set_field(person: Person, field: str, value: str | set) -> Person:
         Person: person's dict
     """
     dest_set = (Person.__annotations__[field] == set
-                or Person.__annotations__[field] == set | str)
+                or Person.__annotations__[field] == str | set[str])
     if dest_set:
         if field not in person:
             person[field] = set()
@@ -234,9 +234,6 @@ class Alchemist:
                 log.debug(f"add {miner_func.__name__} to miners with parameters: {miner_param}")
                 self.miners[miner_param['element']].append(miner_param)
                 self.elements.add(miner_param['element'])
-
-
-
             return miner_func
 
         return decorator

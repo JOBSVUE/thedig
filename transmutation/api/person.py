@@ -21,12 +21,12 @@ class Person(TypedDict, total=False):
     familyName: str
     givenName: str
     identifier: str | set[str]
-    image: set[HttpUrl]
+    image: HttpUrl | set[HttpUrl]
     jobTitle: str | set[str]
     knowsLanguage: constr(pattern=RE_LANGUAGE) | set[constr(pattern=RE_LANGUAGE)]
     nationality: constr(pattern=RE_COUNTRY) | set[constr(pattern=RE_COUNTRY)]
     OptOut: bool
-    sameAs: set[HttpUrl]
+    sameAs: HttpUrl | set[HttpUrl]
     url: HttpUrl
     workLocation: str | set[str]
     worksFor: str | set[str]

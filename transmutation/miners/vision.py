@@ -272,9 +272,12 @@ def extract_socialprofile(soup, url, name):
         jsonld = loads(jsonld.text)
         try:
             jsonld = jsonld.get("author") or jsonld
-            person["alternateName"] = jsonld["name"]
-            person["nationality"] = jsonld["nationality"]
-            person["knowsLanguage"] = jsonld["knowsLanguage"]
+            if jsonld.get("name"):
+                person["alternateName"] = jsonld["name"]
+            if jsonld.get('nationality'):
+                person["nationality"] = jsonld["nationality"]
+            if jsonld.get('knowsLanguage'):
+                person["knowsLanguage"] = jsonld["knowsLanguage"]
             log.debug(f"JSON-LD found: {jsonld}")
         except KeyError:
             log.warning(f"Unknown JSON-LD format: {jsonld}")

@@ -216,7 +216,9 @@ def get_socialprofile(
     ratio_title = fuzz.partial_token_sort_ratio(name, title.string)
     ratio_ogtitle = fuzz.partial_token_sort_ratio(name, og_title)
     title = title.string or og_title or ""
-    if ratio_title < TOKEN_RATIO and ratio_ogtitle < TOKEN_RATIO and name not in title:
+    if (ratio_title < TOKEN_RATIO
+        and ratio_ogtitle < TOKEN_RATIO
+        and name not in title):
         log.debug(
             f"Name doesn't match with page title. Name: {name}, URL: {url}, Page title: {title} - {ratio_title}, OG Title {og_title} - {ratio_ogtitle}"
         )

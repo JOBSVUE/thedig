@@ -8,10 +8,13 @@ __license__ = "AGPL"
 
 from loguru import logger as log
 from inspect import signature
+import re
+
 from fastapi import APIRouter
 from ..api.person import Person, person_ta
 from pydantic import HttpUrl
 
+RE_SET = re.compile(r"(\W|^)set\W")
 
 def person_set_field(person: Person, field: str, value: str | set) -> Person:
     """Set while transform field into set when the value or the dest is not set
@@ -25,13 +28,9 @@ def person_set_field(person: Person, field: str, value: str | set) -> Person:
     Returns:
         Person: person's dict
     """
-    dest_set = (
-        Person.__annotations__[field] == set[str]
-        or Person.__annotations__[field] == str | set[str]
-        or Person.__annotations__[field] == set[HttpUrl]
-        or Person.__annotations__[field] == HttpUrl | set[HttpUrl]
-        )
-    if dest_set:
+    # quirky hack to check if one of annotation could be a set of something
+    is_dest_set = RE_SET.match(str(Person.__annotations__[field]))
+    if is_dest_set:
         if field not in person:
             person[field] = set()
         elif not type(person[field]) is set:

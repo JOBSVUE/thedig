@@ -195,7 +195,7 @@ def get_socialprofile(
             f"Social Network profile not found. URL: {url}, Error: {r.status_code}"
         )
         return False, sn
-
+        
     soup = BeautifulSoup(r.text, "html.parser")
 
     # the title from the profile must contains the person's name itself
@@ -218,7 +218,7 @@ def get_socialprofile(
     title = title.string or og_title or ""
     if ratio_title < TOKEN_RATIO and ratio_ogtitle < TOKEN_RATIO and name not in title:
         log.debug(
-            f"Name doesn't match with page title. Name: {name}, URL: {url}, Page title: {title.string} - {ratio_title}, OG Title {og_title} - {ratio_ogtitle}"
+            f"Name doesn't match with page title. Name: {name}, URL: {url}, Page title: {title} - {ratio_title}, OG Title {og_title} - {ratio_ogtitle}"
         )
         return False, sn
 
@@ -510,7 +510,7 @@ class SocialNetworkMiner:
                 try:
                     sp, sn = future.result()
                 except Exception as exc:
-                    log.warning(f"{getters[future][0]},{getters[future][1]} : {exc}")
+                    log.error(f"{getters[future][0]},{getters[future][1]} : {exc}")
                     continue
 
                 if not sp:
@@ -567,13 +567,15 @@ class SocialNetworkMiner:
             ):
                 self.add_profile(**m)
 
-    def _generate_identifiers(self):
-        id_email = self._generate_identifier_from_email()
-        id_name = self._generate_identifier_from_name()
-        return {id_email, id_name} if id_email else {id_name}
-
-    def _generate_identifier_from_name(self):
-        return (
+    def _generate_identifiers(self) -> set[str]:
+        idr: set = (
+            self._generate_identifier_from_email()
+            | self._generate_identifier_from_name()
+        )
+        return idr
+    
+    def _generate_identifier_from_name(self) -> set[str]:
+        idr = (
             self._person["name"]
             .encode("ASCII", "ignore")
             .strip()
@@ -581,16 +583,19 @@ class SocialNetworkMiner:
             .decode()
             .replace(" ", "")
         )
-
-    def _generate_identifier_from_email(self):
-        id_email = "".join(
+        return {idr, idr.replace('.', '')}
+        
+    def _generate_identifier_from_email(self) -> set[str]:
+        idr_email = "".join(
             filter(str.isalnum, self._person["email"].split("@")[0].split("+")[0])
         )
+        idr = {idr_email, idr_email.replace('.', '')}
         # useful only if really different from name
         # otherwise, it gives too much false positive
-        if fuzz.partial_token_sort_ratio(id_email, self._person["name"]) > 81:
-            return None
-        return id_email
+        if any(fuzz.partial_token_sort_ratio(i, self._person["name"]) > 81
+               for i in idr):
+            return set()
+        return idr
 
 
 if __name__ == "__main__":

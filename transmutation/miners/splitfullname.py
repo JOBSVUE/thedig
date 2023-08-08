@@ -16,6 +16,9 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
+RE_WHITESPACE = re.compile(r"\s+")
+RE_ALPHA = re.compile(r"\s?'?\w+")
+
 FAMILYNAME_SEPARATOR = {
     "إبن",
     "بن",
@@ -144,10 +147,6 @@ BUSINESS_SEPARATOR = {
 }
 
 
-RE_WHITESPACE = re.compile(r"\s+")
-RE_ALPHA = re.compile(r"\b[^\W\d_]+\b")
-
-
 def order(givenName: str, familyname: str) -> dict:
     # FAMILY NAME First Name (reversed)
     if givenName.isupper() and not familyname.isupper():
@@ -174,8 +173,10 @@ def is_company(name: str, domain: str) -> bool:
 
 def _split_fullname(fullname: str) -> dict:
     # needs to look like a word somehow
-    if not re.match(RE_ALPHA, fullname):
+    matched = re.match(RE_ALPHA, fullname)
+    if not matched:
         return None
+    fullname = matched.group(0)
 
     # minimum to guess length is 4
     # needs a space somewhere in between

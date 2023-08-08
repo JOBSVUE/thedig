@@ -15,7 +15,7 @@ from fastapi.responses import Response, JSONResponse
 from ..api.person import Person, person_ta
 from pydantic import HttpUrl
 
-RE_SET = re.compile(r"(\W|^)set\W")
+RE_SET = re.compile(r"(\s|^)set\W")
 
 
 class JSONorNoneResponse(JSONResponse):

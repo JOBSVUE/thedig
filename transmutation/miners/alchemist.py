@@ -12,7 +12,7 @@ import re
 
 from fastapi import APIRouter, status
 from fastapi.responses import Response, JSONResponse 
-from ..api.person import Person, person_ta
+from ..api.person import Person, person_ta, person_set_field
 from pydantic import HttpUrl
 
 RE_SET = re.compile(r"(\s|^)set\W")
@@ -24,35 +24,6 @@ class JSONorNoneResponse(JSONResponse):
             self.status_code = status.HTTP_204_NO_CONTENT
             return None
         return super(JSONorNoneResponse, self).render(content)
-
-
-def person_set_field(person: Person, field: str, value: str | set) -> Person:
-    """Set while transform field into set when the value or the dest is not set
-    WARNING: only works with set/str
-
-    Args:
-        person (Person): person's dict
-        field (str): field name to set
-        value (str | set): value
-
-    Returns:
-        Person: person's dict
-    """
-    # quirky hack to check if one of annotation could be a set of something
-    is_dest_set = RE_SET.match(str(Person.__annotations__[field]))
-    if is_dest_set:
-        if field not in person:
-            person[field] = set()
-        elif not type(person[field]) is set:
-            person[field] = {person[field], }
-        if type(value) is set:
-            person[field] |= value
-        else:
-            person[field] |= {value, }
-    else:
-        person[field] = value
-
-    return person
 
     
 class Alchemist:

@@ -286,6 +286,7 @@ class LinkedInSearch:
             email or linkedin_url or (f"{name} {company}" if company else name)
         )
         if not query_string:
+            log.error("No query string could be built")
             raise ValueError
 
         results = (

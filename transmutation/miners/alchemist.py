@@ -10,11 +10,21 @@ from loguru import logger as log
 from inspect import signature
 import re
 
-from fastapi import APIRouter
+from fastapi import APIRouter, status
+from fastapi.responses import Response, JSONResponse 
 from ..api.person import Person, person_ta
 from pydantic import HttpUrl
 
 RE_SET = re.compile(r"(\W|^)set\W")
+
+
+class JSONorNoneResponse(JSONResponse):
+    def render(self, content: any) -> bytes:
+        if not content:
+            self.status_code = status.HTTP_204_NO_CONTENT
+            return None
+        return super(JSONorNoneResponse, self).render(content)
+
 
 def person_set_field(person: Person, field: str, value: str | set) -> Person:
     """Set while transform field into set when the value or the dest is not set
@@ -227,12 +237,29 @@ class Alchemist:
                 # add to FastAPI Router
                 if self.router:
                     route_param.update(kw)
-                    route_param['path'] = self.default_path.format(
-                            operation="transmute" if miner_param['transmute'] else "enrich",
+                    route_param.update({
+                        'path': self.default_path.format(
+                            operation=(
+                                "transmute"
+                                if miner_param['transmute']
+                                else "enrich"
+                                ),
                             element=miner_param['element'],
-                            func_name=miner_func.__name__
-                            )
-                    route_param['endpoint'] = miner_func
+                            func_name=miner_func.__name__,),
+                        'endpoint': miner_func,
+                        'response_model': (
+                            miner_func.__annotations__['return']
+                            | None
+                            ),
+                        'response_class': JSONorNoneResponse,
+                        'responses': (
+                            {204: {
+                                'description': "No results found.",
+                                'model': None,
+                                }
+                             }
+                            ),
+                    })
                     self.router.add_api_route(**route_param)
                     
                 log.debug(f"add {miner_func.__name__} to miners with parameters: {miner_param}")

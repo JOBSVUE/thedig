@@ -15,6 +15,7 @@ from .config import setup_cache
 
 # fast api
 from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi.responses import JSONResponse, Response
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
 from fastapi_limiter.depends import WebSocketRateLimiter, RateLimiter
 
@@ -79,10 +80,11 @@ async def miner_linkedin(name: str, email: EmailStr=None, worksFor: str=None) ->
     insert=("givenName", "familyName"),
 )
 async def miner_from_linkedin_url(name: str, url: HttpUrl) -> Person:
+    person: Person = {}
     if "linkedin" in p["url"]:
         miner = LinkedInSearch(search_api_params)
-        person = await miner.search(name=p["name"], linkedin_url=p["url"])
-        return person
+        person.update(await miner.search(name=p["name"], linkedin_url=p["url"]))
+    return person
 
 
 @al.register(element="email", update=("image",))
@@ -112,7 +114,7 @@ async def mine_social(p: dict) -> Person:
     snm.sameAs()
 
     if "OptOut" in snm.person:
-        return None
+        return {'OptOut': True}
 
     return snm.person
 
@@ -122,6 +124,7 @@ async def mine_worksfor(email: EmailStr) -> Person:
     # otherwise, the domain will give us the @org
     # except for public email providers
     domain = email.split("@")[1]
+    works_for = {}
     if domain not in settings.public_email_providers:
         company = await cache.get(domain)
         if not company:
@@ -130,35 +133,35 @@ async def mine_worksfor(email: EmailStr) -> Person:
             # we won't check for this domain again for some time
             await cache.set(domain, company or "", ex=settings.cache_expiration)
         if company:
-            return {'worksFor': company}
-
+            works_for['worksFor'] = company
+    return works_for
 
 @al.register(element="description", update=("jobTitle",))
 async def mine_bio(description: str=None) -> Person:
     desc: set[str] = {description, }
-
+    job_title = {}
     jt = set()
     for d in desc:
         jobtitle = find_jobtitle(d)
         if jobtitle:
             jt |= jobtitle
 
-    if not jt:
-        return None
+    if jt:
+        job_title['jobTitle'] = jt
 
-    return {"jobTitle": jt}
+    return job_title
 
 
 @al.register(element="name", update=("givenName", "familyName"))
 async def mine_name(name: str, email: EmailStr) -> Person:
-    splitted = split_fullname(name, email.split("@")[1])
+    splitted: Person = split_fullname(name, email.split("@")[1])
     return splitted
 
 
 @al.register(element="email", insert=("workLocation",))
 async def mine_country(email: EmailStr) -> Person:
     country = guess_country(email.split("@")[-1])
-    return {"workLocation": country} if country else None
+    return {"workLocation": country} if country else {}
 
 
 @router.get("/transmute/{email}", dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])

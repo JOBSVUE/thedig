@@ -54,9 +54,7 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-
 app.include_router(router)
-
 
 # launching this app as a module is for dev purpose
 if __name__ == "__main__":

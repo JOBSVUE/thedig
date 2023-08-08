@@ -12,17 +12,28 @@ from redis.asyncio import Redis
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 NITTER_INSTANCES = "https://status.d420.de/api/v1/instances"
+NITTER_BACKUP_INSTANCE = "https://nitter.net"
 
 
-def pick_nitter_instance(instances_url=NITTER_INSTANCES):
-    instances = {
-        instance["ping_avg"]: instance["url"]
-        for instance in get(instances_url).json()["hosts"]
-        if instance["points"] > 50
-    }
-    return instances[
-        choice(sorted(instances.keys())[:5])
-        ]
+def pick_nitter_instance(
+    instances_url=NITTER_INSTANCES,
+    backup_instance=NITTER_BACKUP_INSTANCE,
+    timeout=3,
+    min_points=50
+) -> str:
+    instance = ""
+    try:
+        instances = {
+            instance["ping_avg"]: instance["url"]
+            for instance in get(instances_url, timeout=timeout).json()["hosts"]
+            if instance["points"] > min_points
+        }
+        instance = instances[
+            choice(sorted(instances.keys())[:5])
+            ]
+    except ConnectionError:
+        instance = backup_instance
+    return instance
 
 
 class Settings(BaseSettings):

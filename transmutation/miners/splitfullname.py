@@ -172,13 +172,6 @@ def is_company(name: str, domain: str) -> bool:
     return _name in (domain.split(".")[-2], domain, ".".join(domain.split(".")[-2:]))
 
 
-# def is_organization(familyname: str) -> bool:
-#    return any(
-#        map(lambda e: e.label_ == "ORG",
-#        nlp(familyname).ents
-#        ))
-
-
 def _split_fullname(fullname: str) -> dict:
     # needs to look like a word somehow
     if not re.match(RE_ALPHA, fullname):

@@ -11,9 +11,9 @@ from inspect import signature
 import re
 
 from fastapi import APIRouter, status
-from fastapi.responses import Response, JSONResponse 
+from fastapi.responses import JSONResponse 
 from ..api.person import Person, person_ta, person_set_field
-from pydantic import HttpUrl
+
 
 RE_SET = re.compile(r"(\s|^)set\W")
 

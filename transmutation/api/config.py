@@ -26,11 +26,9 @@ def pick_nitter_instance(
         instances = {
             instance["ping_avg"]: instance["url"]
             for instance in get(instances_url, timeout=timeout).json()["hosts"]
-            if instance["points"] > min_points
+            if instance["points"] > min_points and instance['ping_avg']
         }
-        instance = instances[
-            choice(sorted(instances.keys())[:5])
-            ]
+        instance = instances[choice(sorted(instances.keys())[:5])]
     except ConnectionError:
         instance = backup_instance
     return instance

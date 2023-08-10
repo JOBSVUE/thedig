@@ -17,11 +17,37 @@ TO_IGNORE = {
     "REDACTED FOR PRIVACY",
 }
 
+COMPANY_TYPE_ABBR = {
+    'Co',
+    'Corp',
+    'EURL',
+    'Inc',
+    'LLC',
+    'Ltd',
+    'SA',
+    'SARL',
+    'SAS',
+    'SASU',
+}
+
+
 log = logging.getLogger(__name__)
 
 
 def get_domain(email: str) -> str:
     return email.split("@")[1]
+
+
+def remove_company_type_abbrv(company: str) -> str:
+    last_word = company.split(', ')[-1].split(' ')[-1].removesuffix('.')
+    if last_word in COMPANY_TYPE_ABBR:
+        return (
+            company
+            .removesuffix('.')
+            .removesuffix(last_word)
+            .removesuffix(", ")
+            .strip()
+            )
 
 
 def get_company(domain: str) -> str:
@@ -46,7 +72,7 @@ def get_company(domain: str) -> str:
         log.debug(f"Registrant in ignore list: {company}")
         return None
 
-    return company
+    return remove_company_type_abbrv(company)
 
 
 def get_company_from_email(email: str) -> str:

@@ -33,8 +33,7 @@ class LoggingSettings(BaseSettings):
     Arguments:
 
         level (str): the minimum log-level to log. (default: "DEBUG")
-        format (str): the logformat to use. (default: "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | <level>{message}</level>")
-        filepath (Path): the path where to store the logfiles. (default: None)
+        format (str): the logformat to use.
         rotation (str): when to rotate the logfile. (default: "1 days")
         retention (str): when to remove logfiles. (default: "1 months")
         serialize (bool): serialize to JSON. (default: False)
@@ -98,8 +97,8 @@ try:
                 handlers=[{"sink": sys.stdout, "level": log_settings.log_level}]
             )
 
-except:
-    logger.info("No gunicorn here")
+except ImportError:
+    logger.warning("No gunicorn here")
 
 
 def setup_logger(

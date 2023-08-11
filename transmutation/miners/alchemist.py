@@ -11,7 +11,7 @@ from inspect import signature
 import re
 
 from fastapi import APIRouter, status
-from fastapi.responses import JSONResponse 
+from fastapi.responses import JSONResponse
 from ..api.person import Person, person_ta, person_set_field
 
 
@@ -25,7 +25,7 @@ class JSONorNoneResponse(JSONResponse):
             return None
         return super(JSONorNoneResponse, self).render(content)
 
-    
+
 class Alchemist:
     """Enrich iteratively persons using miners"""
 
@@ -40,11 +40,10 @@ class Alchemist:
 
     default_path: str = "/{operation}/{func_name}/{{{element}}}"
 
-    def __init__(self, router: APIRouter=None):
+    def __init__(self, router: APIRouter = None):
         self.elements: set = set()
         self.miners: dict = {k: [] for k in self._ordered_elements}
         self.router = router
-
 
         # we don't mine again with the same miner, the same element/value
         # so we keep an history of what element/value was used for what miner
@@ -78,9 +77,9 @@ class Alchemist:
             upgraded = set()
             for miner in self.miners[el]:
                 upgraded.update(await self.mine_element(el, miner, person))
-            
+
             modified = True if upgraded else modified
-            
+
             # eligibility to mine
             to_mine = upgraded & self.elements
             if upgraded and to_mine:
@@ -100,16 +99,16 @@ class Alchemist:
         self._mined[el][miner["endpoint"]].append(person[el])
 
         log.debug(f"mining {el} with miner {miner}")
-        
+
         if miner['person_param']:
             p_mined: Person = await miner["endpoint"](person)
         else:
             person_eligible = {
-                k:v for k, v in person.items()
+                k: v for k, v in person.items()
                 if k in miner['parameters'] & person.keys()
-                }  
+                }
             p_mined: Person = await miner["endpoint"](**person_eligible)
-        
+
         if not p_mined:
             return upgraded
 
@@ -122,7 +121,7 @@ class Alchemist:
         log.debug(f"miner {miner['endpoint']} on {el} gave {p_mined}")
 
         p_eligible = {
-            k:v for k,v in p_mined.items()
+            k: v for k, v in p_mined.items()
             if (v and (
                 miner['catchall']
                 or k in miner['update']
@@ -140,7 +139,7 @@ class Alchemist:
 
     def upgrade_person(self, miner, person, k, v):
         modified = False
-        
+
         # skip alternateName if same as name
         if k == "alternateName" and v == person.get("name"):
             log.debug(
@@ -166,7 +165,6 @@ class Alchemist:
             )
         return modified
 
-    
     def register(self, **kw):
         """register a function as a miner
 
@@ -175,18 +173,18 @@ class Alchemist:
             update (set): elements updated or added by the miner
             insert (set): elements inserted only by the miner
             transmute (bool): if miner is part of transmute, default to True
-            
+
         Returns:
             function: miner
         """
 
         def decorator(miner_func):
             if kw['element'] in self._ordered_elements:
-                
+
                 # Check if this is dict/person
                 parameters = signature(miner_func).parameters
                 route_param = {}
-                                    
+
                 # Register as miner
                 miner_param = {
                     'element': kw.pop('element'),
@@ -232,7 +230,7 @@ class Alchemist:
                             ),
                     })
                     self.router.add_api_route(**route_param)
-                    
+
                 log.debug(f"add {miner_func.__name__} to miners with parameters: {miner_param}")
                 self.miners[miner_param['element']].append(miner_param)
                 self.elements.add(miner_param['element'])

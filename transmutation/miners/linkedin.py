@@ -159,10 +159,10 @@ class LinkedInSearch:
         async with requests.AsyncSession() as s:
             try:
                 r = await s.get(search_url_complete)
-                #import requests as req
-                #r = req.get(search_url_complete)
+                # import requests as req
+                # r = req.get(search_url_complete)
             except requests.RequestsError as e:
-            #except req.RequestException as e:
+            # except req.RequestException as e:
                 log.error(f"{search_url_complete}: {e}")
                 return None
             if not r.ok:

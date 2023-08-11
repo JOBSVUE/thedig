@@ -74,8 +74,7 @@ SOCIALNETWORKS = {
     "linkedin": None,
     "pinterest": "https://pinterest.com/{identifier}",
     "snapchat": "https://snapchat.com/add/{identifier}",
-    # false positive
-    #'telegram': "https://telegram.me/{identifier}",
+    # no telegram, false positive
     "tiktok": "https://tiktok.com/@{identifier}",
     # twitter is full javascript, needs a headless browser
     "twitter": "https://twitter.com/{identifier}",

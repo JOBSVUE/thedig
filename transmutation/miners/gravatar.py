@@ -13,6 +13,7 @@ from curl_cffi.requests import AsyncSession, RequestsError
 # make it easier for comparison purpose
 GRAVATAR_SIZE = 400
 GRAVATAR_URL = "https://www.gravatar.com/avatar/{hashed_email}?d=404&s={size}"
+GRAVATAR_TIMEOUT = 3
 
 
 def email_hash(email: str) -> str:
@@ -45,7 +46,7 @@ async def gravatar(email: str, check: bool = True) -> str:
     # let's check if the profile picture is available
     async with AsyncSession() as s:
         try:
-            r = await s.get(gravatar_image_url)
+            r = await s.get(gravatar_image_url, timeout=GRAVATAR_TIMEOUT)
         except RequestsError as e:
             log.error(f" {e}. email: {email}, url: {gravatar_image_url}")
             return None

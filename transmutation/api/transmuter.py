@@ -15,7 +15,6 @@ from .config import setup_cache
 
 # fast api
 from fastapi import APIRouter, HTTPException, status, Depends
-from fastapi.responses import JSONResponse, Response
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
 from fastapi_limiter.depends import WebSocketRateLimiter, RateLimiter
 
@@ -81,9 +80,9 @@ async def miner_linkedin(name: str, email: EmailStr=None, worksFor: str=None) ->
 )
 async def miner_from_linkedin_url(name: str, url: HttpUrl) -> Person:
     person: Person = {}
-    if "linkedin" in p["url"]:
+    if "linkedin" in url:
         miner = LinkedInSearch(search_api_params)
-        person.update(await miner.search(name=p["name"], linkedin_url=p["url"]))
+        person.update(await miner.search(name=name, linkedin_url=url))
     return person
 
 
@@ -172,9 +171,9 @@ async def transmute_email(email: EmailStr, name: str) -> Person:
     return transmuted
 
 
-@router.post("/transmute/{email}", dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+@router.post("/transmute/", dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
 async def transmute_person(person: Person) -> Person:
-    al_status, transmuted = await al.person({"email": email, "name": name})
+    al_status, transmuted = await al.person({"email": person['email'], "name": person['name']})
     if not al_status:
         raise HTTPException(status_code=404, detail="No result for this person")
     return transmuted

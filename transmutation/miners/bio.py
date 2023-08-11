@@ -31,13 +31,13 @@ def find_jobtitle(text: str) -> set[str]:
     i = 0
     while i < len(words):
         if (i + 2) < len(words):
-            three_w = " ".join(words[i : i + 3])
+            three_w = " ".join(words[i: i + 3])
             if normalize(three_w) in JOBTITLES:
                 jobtitles.append(three_w)
                 i += 3
                 continue
         if (i + 1) < len(words):
-            two_w = " ".join(words[i : i + 2])
+            two_w = " ".join(words[i: i + 2])
             if normalize(two_w) in JOBTITLES:
                 jobtitles.append(two_w)
                 i += 2

@@ -7,6 +7,7 @@ __license__ = "AGPL"
 from pydantic import TypeAdapter, ValidationError
 from pydantic import EmailStr, HttpUrl, constr
 from typing_extensions import TypedDict
+import re
 
 RE_COUNTRY = r"^[A-Z]{2}$"
 RE_LANGUAGE = r"^[a-z]{2}$"

@@ -10,6 +10,7 @@ from typing_extensions import TypedDict
 
 RE_COUNTRY = r"^[A-Z]{2}$"
 RE_LANGUAGE = r"^[a-z]{2}$"
+RE_SET = re.compile(r"(\s|^)set\W")
 
 
 class Person(TypedDict, total=False):

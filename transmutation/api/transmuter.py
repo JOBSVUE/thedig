@@ -61,7 +61,7 @@ al = Alchemist(router)
 
 
 @al.register(element="name")
-async def miner_linkedin(name: str, email: EmailStr=None, worksFor: str=None) -> Person:
+async def miner_linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
     miner = LinkedInSearch(search_api_params)
     person = await miner.search(
         name=name, email=email, company=worksFor
@@ -136,7 +136,7 @@ async def mine_worksfor(email: EmailStr) -> Person:
     return works_for
 
 @al.register(element="description", update=("jobTitle",))
-async def mine_bio(description: str=None) -> Person:
+async def mine_bio(description: str = None) -> Person:
     desc: set[str] = {description, }
     job_title = {}
     jt = set()

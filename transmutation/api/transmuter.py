@@ -137,7 +137,7 @@ async def mine_worksfor(email: EmailStr) -> Person:
 
 @al.register(element="description", update=("jobTitle",))
 async def mine_bio(description: str = None) -> Person:
-    desc: set[str] = {description, }
+    desc: set[str] = {description, } if type(description) is str else description
     job_title = {}
     jt = set()
     for d in desc:

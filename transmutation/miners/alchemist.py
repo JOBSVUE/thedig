@@ -12,7 +12,7 @@ import re
 
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
-from ..api.person import Person, person_ta, person_set_field
+from ..api.person import Person, person_ta, person_set_field, dict_to_person
 
 
 RE_SET = re.compile(r"(\s|^)set\W")
@@ -45,8 +45,9 @@ class MinerField:
 
         log.debug(f"miner {self.miner['endpoint']} on {self.field} gave {p_mined}")
 
+        p_mined.update(dict_to_person(p_mined))
         person_ta.validate_python(p_mined)
-    
+
         return p_mined
 
     async def mine(self):

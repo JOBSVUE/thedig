@@ -9,6 +9,7 @@ __license__ = "AGPL"
 from loguru import logger as log
 from inspect import signature
 import re
+from collections import defaultdict
 
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
@@ -24,6 +25,7 @@ class JSONorNoneResponse(JSONResponse):
             self.status_code = status.HTTP_204_NO_CONTENT
             return None
         return super(JSONorNoneResponse, self).render(content)
+
 
 
 class MinerField:
@@ -128,7 +130,6 @@ class Alchemist:
 
         # we don't mine again with the same miner, the same field/value
         # so we keep an history of what field/value was used for what miner
-        self._mined: dict = {}
 
     async def person(self, person: dict) -> tuple[bool, dict]:
         """Transmute one person
@@ -140,6 +141,7 @@ class Alchemist:
             bool, dict: succeed or not, enriched person
         """
         fields = list(person.keys() & self.fields)
+        mined: dict = defaultdict(list)
 
         log.debug(f"mining {fields} for {person}")
 
@@ -152,20 +154,16 @@ class Alchemist:
                 log.debug(f"no miner for {field}")
                 continue
 
-            if field not in self._mined:
-                self._mined[field] = {}
-
             upgraded = set()
             for miner in self.miners[field]:
-                # do not mine twice the same elemnt/value with the same miner
-                if miner["endpoint"] not in self._mined[field]:
-                    self._mined[field] = {miner["endpoint"]: []}
-                elif person[field] in self._mined[field][miner["endpoint"]]:
-                    return upgraded
+                # do not mine twice the same field/value with the same miner
+                if (field, person[field]) in mined[miner["endpoint"]]:
+                    log.error(f"{miner['endpoint']} already mined {field} with value {person[field]}")
+                    continue
                 
-                self._mined[field][miner["endpoint"]].append(person[field])
+                mined[miner["endpoint"]].append((field, person[field]))
 
-                miner_f = MinerField(miner, field, person)
+                miner_f = MinerField(miner, field, person)                
                 upgraded.update(await miner_f.mine())
 
             modified = True if upgraded else modified
@@ -176,7 +174,7 @@ class Alchemist:
                 fields.extend(to_mine)
                 log.debug(f"new fields to mine: {to_mine}")
 
-        return modified, person if modified else None
+        return modified, (person if modified else {})
 
     def register(self, **kw):
         """register a function as a miner

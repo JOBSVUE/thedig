@@ -168,7 +168,7 @@ async def mine_country(email: EmailStr) -> Person:
 async def transmute_email(email: EmailStr, name: str) -> Person:
     al_status, transmuted = await al.person({"email": email, "name": name})
     if not al_status:
-        raise HTTPException(status_code=404, detail="No result for this person")
+        raise HTTPException(status_code=204)
     return transmuted
 
 
@@ -176,7 +176,7 @@ async def transmute_email(email: EmailStr, name: str) -> Person:
 async def transmute_person(person: Person) -> Person:
     al_status, transmuted = await al.person({"email": person['email'], "name": person['name']})
     if not al_status:
-        raise HTTPException(status_code=404, detail="No result for this person")
+        raise HTTPException(status_code=204)
     return transmuted
 
 

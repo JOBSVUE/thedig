@@ -144,7 +144,7 @@ class LinkedInSearch:
 
         if bulk:
             self.persons = []
-        self.person = None
+        self.person = {}
 
     async def _search_google(self, query: str):
         """Search a query on Google and return the first result
@@ -343,13 +343,13 @@ class LinkedInSearch:
         """
         search and return the public data for an email and/or company
         """
-        self.person = {"name": name}
         await self.extract(name, email, company, linkedin_url)
 
         # answer only if we found something
         if "url" in self.person:
             self._add_country()
-            return self.person
+        
+        return self.person
 
 
 if __name__ == "__main__":

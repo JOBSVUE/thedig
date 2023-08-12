@@ -60,7 +60,7 @@ cache = asyncio.get_event_loop().run_until_complete(setup_cache(settings, 7))
 al = Alchemist(router)
 
 
-@al.register(element="name")
+@al.register(field="name")
 async def miner_linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
     miner = LinkedInSearch(search_api_params)
     person = await miner.search(
@@ -70,7 +70,7 @@ async def miner_linkedin(name: str, email: EmailStr = None, worksFor: str = None
 
 
 @al.register(
-    element="url",
+    field="url",
     update=(
         "worksFor",
         "jobTitle",
@@ -86,7 +86,7 @@ async def miner_from_linkedin_url(name: str, url: HttpUrl) -> Person:
     return person
 
 
-@al.register(element="email", update=("image",))
+@al.register(field="email", update=("image",))
 async def miner_gravatar(email) -> Person:
     avatar = await gravatar(email)
     return (
@@ -95,7 +95,7 @@ async def miner_gravatar(email) -> Person:
     )
 
 
-@al.register(element="email")
+@al.register(field="email")
 async def mine_social(p: dict) -> Person:
     snm = SocialNetworkMiner(p)
 
@@ -118,7 +118,7 @@ async def mine_social(p: dict) -> Person:
     return snm.person
 
 
-@al.register(element="email", update=("worksFor",))
+@al.register(field="email", update=("worksFor",))
 async def mine_worksfor(email: EmailStr) -> Person:
     # otherwise, the domain will give us the @org
     # except for public email providers
@@ -135,7 +135,8 @@ async def mine_worksfor(email: EmailStr) -> Person:
             works_for['worksFor'] = company
     return works_for
 
-@al.register(element="description", update=("jobTitle",))
+
+@al.register(field="description", update=("jobTitle",))
 async def mine_bio(description: str = None) -> Person:
     desc: set[str] = {description, } if type(description) is str else description
     job_title = {}
@@ -151,13 +152,13 @@ async def mine_bio(description: str = None) -> Person:
     return job_title
 
 
-@al.register(element="name", update=("givenName", "familyName"))
+@al.register(field="name", update=("givenName", "familyName"))
 async def mine_name(name: str, email: EmailStr) -> Person:
     splitted: Person = split_fullname(name, email.split("@")[1])
     return splitted
 
 
-@al.register(element="email", insert=("workLocation",))
+@al.register(field="email", insert=("workLocation",))
 async def mine_country(email: EmailStr) -> Person:
     country = guess_country(email.split("@")[-1])
     return {"workLocation": country} if country else {}

@@ -50,7 +50,7 @@ def remove_company_type_abbrv(company: str) -> str:
             )
 
 
-def get_company(domain: str) -> str:
+def get_company(domain: str) -> str | None:
     try:
         result = whois.query(domain, ignore_returncode=True)
     except whois.WhoisPrivateRegistry as e:
@@ -72,7 +72,7 @@ def get_company(domain: str) -> str:
         log.debug(f"Registrant in ignore list: {company}")
         return None
 
-    return remove_company_type_abbrv(company)
+    return remove_company_type_abbrv(company) if company else company
 
 
 def get_company_from_email(email: str) -> str:

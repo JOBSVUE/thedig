@@ -2,8 +2,7 @@
 # go to .env to modify configuration variables or use environment variables
 from logging import DEBUG
 from typing import Optional
-from requests import get
-from requests.exceptions import ConnectionError
+import requests
 from random import choice
 
 from loguru import logger as log
@@ -25,11 +24,11 @@ def pick_nitter_instance(
     try:
         instances = {
             instance["ping_avg"]: instance["url"]
-            for instance in get(instances_url, timeout=timeout).json()["hosts"]
+            for instance in requests.get(instances_url, timeout=timeout).json()["hosts"]
             if instance["points"] > min_points and instance['ping_avg']
         }
         instance = instances[choice(sorted(instances.keys())[:5])]
-    except ConnectionError:
+    except requests.RequestException:
         instance = backup_instance
     return instance
 
@@ -68,9 +67,9 @@ settings = Settings()
 
 if not settings.public_email_providers:
     try:
-        public_email_providers = get(settings.public_email_providers_url).json()
+        public_email_providers = requests.get(settings.public_email_providers_url).json()
         settings.public_email_providers = set(public_email_providers)
-    except ConnectionError as e:
+    except requests.RequestException as e:
         log.info(f"Impossible to GET public_email_providers_url: {e}")
 
 

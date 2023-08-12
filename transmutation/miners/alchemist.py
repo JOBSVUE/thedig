@@ -26,6 +26,86 @@ class JSONorNoneResponse(JSONResponse):
         return super(JSONorNoneResponse, self).render(content)
 
 
+class MinerField:
+
+    def __init__(self, miner: dict, field: str, person: Person):
+        self.miner: dict = miner
+        self.field: str = field
+        self.person: Person = person
+
+    async def run(self) -> Person | None:
+        if not self.miner['person_param']:
+            p_eligible = {
+                k: v for k, v in self.person.items()
+                if k in self.miner['parameters'] & self.person.keys()
+                }
+            p_mined: Person = await self.miner["endpoint"](**p_eligible)
+        else:
+            p_mined: Person = await self.miner["endpoint"](self.person)
+
+        log.debug(f"miner {self.miner['endpoint']} on {self.field} gave {p_mined}")
+
+        person_ta.validate_python(p_mined)
+    
+        return p_mined
+
+    async def mine(self):
+        upgraded = set()
+
+        log.debug(f"mining {self.field} with miner {self.miner}")
+        p_mined: Person = await self.run()
+
+        if "OptOut" in p_mined:
+            upgraded.add("Optout")
+            log.warning(f"{self.miner['endpoint']} gave OptOut for {self.person}")
+            return upgraded
+
+        p_eligible = {
+            k: v for k, v in p_mined.items()
+            if (v and (
+                self.miner['catchall']
+                or k in self.miner['update']
+                or k in self.miner['insert']
+                )
+                )
+        }
+
+        upgraded = {
+            k for k, v in p_eligible.items()
+            if self.upgrade(k, v)
+            }
+
+        return upgraded
+
+    def upgrade(self, k, v):
+        modified = False
+
+        # skip alternateName if same as name
+        if k == "alternateName" and v == self.person.get("name"):
+            log.debug(
+                f"{self.miner['endpoint']} does nothing - alternateName == name: {v}"
+                )
+        # real update
+        elif k not in self.person:
+            modified = True
+            person_set_field(self.person, k, v)
+            log.debug(f"{self.miner['endpoint']} add {k} : {v}")
+        elif self.person[k] == v:
+            log.debug(
+                f"{self.miner['endpoint']} does nothing - existing value {k} : {v}"
+            )
+            return None
+        elif k in self.miner["update"] or self.miner["catchall"]:
+            modified = True
+            person_set_field(self.person, k, v)
+            log.debug(f"{self.miner['endpoint']} update {k} : {v}")
+        else:
+            log.debug(
+                f"{self.miner['endpoint']} does nothing - already exists or insert mode {k} : {v}"
+            )
+        return modified
+
+
 class Alchemist:
     """Enrich iteratively persons using miners"""
 
@@ -38,15 +118,15 @@ class Alchemist:
         "name",
     ]
 
-    default_path: str = "/{operation}/{func_name}/{{{element}}}"
+    default_path: str = "/{operation}/{func_name}/{{{field}}}"
 
     def __init__(self, router: APIRouter = None):
-        self.elements: set = set()
+        self.fields: set = set()
         self.miners: dict = {k: [] for k in self._ordered_elements}
         self.router = router
 
-        # we don't mine again with the same miner, the same element/value
-        # so we keep an history of what element/value was used for what miner
+        # we don't mine again with the same miner, the same field/value
+        # so we keep an history of what field/value was used for what miner
         self._mined: dict = {}
 
     async def person(self, person: dict) -> tuple[bool, dict]:
@@ -58,120 +138,52 @@ class Alchemist:
         Returns:
             bool, dict: succeed or not, enriched person
         """
-        elements = list(person.keys() & self.elements)
+        fields = list(person.keys() & self.fields)
 
-        log.debug(f"mining {elements} for {person}")
+        log.debug(f"mining {fields} for {person}")
 
         modified = False
-        # sync because we want to control the order of mining elements
-        for el in elements:
-            log.debug(f"mining {el}: {person.get(el)}")
+        # sync because we want to control the order of mining fields
+        for field in fields:
+            log.debug(f"mining {field}: {person.get(field)}")
 
-            if el not in self.miners:
-                log.debug(f"no miner for {el}")
+            if field not in self.miners:
+                log.debug(f"no miner for {field}")
                 continue
 
-            if el not in self._mined:
-                self._mined[el] = {}
+            if field not in self._mined:
+                self._mined[field] = {}
 
             upgraded = set()
-            for miner in self.miners[el]:
-                upgraded.update(await self.mine_element(el, miner, person))
+            for miner in self.miners[field]:
+                # do not mine twice the same elemnt/value with the same miner
+                if miner["endpoint"] not in self._mined[field]:
+                    self._mined[field] = {miner["endpoint"]: []}
+                elif person[field] in self._mined[field][miner["endpoint"]]:
+                    return upgraded
+                
+                self._mined[field][miner["endpoint"]].append(person[field])
+
+                miner_f = MinerField(miner, field, person)
+                upgraded.update(await miner_f.mine())
 
             modified = True if upgraded else modified
 
             # eligibility to mine
-            to_mine = upgraded & self.elements
+            to_mine = upgraded & self.fields
             if upgraded and to_mine:
-                elements.extend(to_mine)
-                log.debug(f"new elements to mine: {to_mine}")
+                fields.extend(to_mine)
+                log.debug(f"new fields to mine: {to_mine}")
 
         return modified, person if modified else None
-
-    async def mine_element(self, el, miner, person):
-        upgraded = set()
-
-        # do not mine twice the same elemnt/value with the same miner
-        if miner["endpoint"] not in self._mined[el]:
-            self._mined[el] = {miner["endpoint"]: []}
-        elif person[el] in self._mined[el][miner["endpoint"]]:
-            return upgraded
-        self._mined[el][miner["endpoint"]].append(person[el])
-
-        log.debug(f"mining {el} with miner {miner}")
-
-        if miner['person_param']:
-            p_mined: Person = await miner["endpoint"](person)
-        else:
-            person_eligible = {
-                k: v for k, v in person.items()
-                if k in miner['parameters'] & person.keys()
-                }
-            p_mined: Person = await miner["endpoint"](**person_eligible)
-
-        if not p_mined:
-            return upgraded
-
-        person_ta.validate_python(p_mined)
-
-        if "OptOut" in p_mined:
-            upgraded.add("Optout")
-            return upgraded
-
-        log.debug(f"miner {miner['endpoint']} on {el} gave {p_mined}")
-
-        p_eligible = {
-            k: v for k, v in p_mined.items()
-            if (v and (
-                miner['catchall']
-                or k in miner['update']
-                or k in miner['insert']
-                )
-                )
-        }
-
-        upgraded = {
-            k for k, v in p_eligible.items()
-            if self.upgrade_person(miner, person, k, v)
-            }
-
-        return upgraded
-
-    def upgrade_person(self, miner, person, k, v):
-        modified = False
-
-        # skip alternateName if same as name
-        if k == "alternateName" and v == person.get("name"):
-            log.debug(
-                f"miner['endpoint'] does nothing - alternateName == name: {v}"
-                )
-        # real update
-        elif k not in person:
-            modified = True
-            person_set_field(person, k, v)
-            log.debug(f"{miner['endpoint']} add {k} : {v}")
-        elif person[k] == v:
-            log.debug(
-                f"{miner['endpoint']} does nothing - existing value {k} : {v}"
-            )
-            return None
-        elif k in miner["update"] or miner["catchall"]:
-            modified = True
-            person_set_field(person, k, v)
-            log.debug(f"{miner['endpoint']} update {k} : {v}")
-        else:
-            log.debug(
-                f"{miner['endpoint']} does nothing - already exists or insert mode {k} : {v}"
-            )
-        return modified
 
     def register(self, **kw):
         """register a function as a miner
 
         Args:
-            element (str): schema.org element to mine
-            update (set): elements updated or added by the miner
-            insert (set): elements inserted only by the miner
+            field (str): schema.org field to mine
+            update (set): fields updated or added by the miner
+            insert (set): fields inserted only by the miner
             transmute (bool): if miner is part of transmute, default to True
 
         Returns:
@@ -179,7 +191,7 @@ class Alchemist:
         """
 
         def decorator(miner_func):
-            if kw['element'] in self._ordered_elements:
+            if kw['field'] in self._ordered_elements:
 
                 # Check if this is dict/person
                 parameters = signature(miner_func).parameters
@@ -187,7 +199,7 @@ class Alchemist:
 
                 # Register as miner
                 miner_param = {
-                    'element': kw.pop('element'),
+                    'field': kw.pop('field'),
                     'update': kw.pop('update', []),
                     'insert': kw.pop('insert', []),
                     'transmute': kw.pop('transmute', False),
@@ -213,7 +225,7 @@ class Alchemist:
                                 if miner_param['transmute']
                                 else "enrich"
                                 ),
-                            element=miner_param['element'],
+                            field=miner_param['field'],
                             func_name=miner_func.__name__,),
                         'endpoint': miner_func,
                         'response_model': (
@@ -232,8 +244,8 @@ class Alchemist:
                     self.router.add_api_route(**route_param)
 
                 log.debug(f"add {miner_func.__name__} to miners with parameters: {miner_param}")
-                self.miners[miner_param['element']].append(miner_param)
-                self.elements.add(miner_param['element'])
+                self.miners[miner_param['field']].append(miner_param)
+                self.fields.add(miner_param['field'])
             return miner_func
 
         return decorator

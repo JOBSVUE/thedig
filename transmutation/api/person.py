@@ -16,28 +16,22 @@ RE_SET = re.compile(r"(\s|^)set\W")
 
 class Person(TypedDict, total=False):
     name: str
-    email: EmailStr | set[EmailStr]
-    homeLocation: str | set[str]
-    alternateName: str | set[str]
-    description: str | set[str]
+    email: EmailStr
+    homeLocation: set[str]
+    alternateName: set[str]
+    description: set[str]
     familyName: str
     givenName: str
-    identifier: str | set[str]
-    image: HttpUrl | set[HttpUrl]
-    jobTitle: str | set[str]
-    knowsLanguage: (
-        constr(pattern=RE_LANGUAGE) |
-        set[constr(pattern=RE_LANGUAGE)]
-        )
-    nationality: (
-        constr(pattern=RE_COUNTRY) |
-        set[constr(pattern=RE_COUNTRY)]
-        )
+    identifier: set[str]
+    image: set[HttpUrl]
+    jobTitle: set[str]
+    knowsLanguage: set[constr(pattern=RE_LANGUAGE)]
+    nationality: set[constr(pattern=RE_COUNTRY)]
     OptOut: bool
-    sameAs: HttpUrl | set[HttpUrl]
+    sameAs: set[HttpUrl]
     url: HttpUrl
-    workLocation: str | set[str]
-    worksFor: str | set[str]
+    workLocation: set[str]
+    worksFor: set[str]
 
 
 class PersonRequest(TypedDict):
@@ -63,8 +57,8 @@ def person_set_field(person: Person, field: str, value: str | set) -> Person:
         Person: person's dict
     """
     # quirky hack to check if one of annotation could be a set of something
-    is_dest_set = RE_SET.match(str(Person.__annotations__[field]))
-    if is_dest_set:
+    is_field_set = RE_SET.match(str(Person.__annotations__[field]))
+    if is_field_set:
         if field not in person:
             person[field] = set()
         elif not type(person[field]) is set:
@@ -77,6 +71,18 @@ def person_set_field(person: Person, field: str, value: str | set) -> Person:
         person[field] = value
 
     return person
+
+
+def dict_to_person(person_dict: dict) -> Person:
+    for k, v in person_dict.items():
+        is_k_set = RE_SET.match(str(Person.__annotations__[k]))
+        if is_k_set and not is_pure_iterable(v):
+            person_dict[k] = {v, }
+    return person_dict
+
+
+def is_pure_iterable(obj) -> bool:
+    return hasattr(obj, "__iter__") and type(obj) is not str
 
 
 person_ta = TypeAdapter(Person)

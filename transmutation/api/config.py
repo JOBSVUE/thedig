@@ -1,6 +1,5 @@
 """Configuration loader"""
 # go to .env to modify configuration variables or use environment variables
-from logging import INFO
 from typing import Optional
 import requests
 from random import choice

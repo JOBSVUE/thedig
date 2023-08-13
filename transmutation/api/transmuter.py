@@ -11,7 +11,6 @@ __license__ = "AGPL"
 import asyncio
 
 from .config import settings
-from .config import setup_cache
 
 # fast api
 from fastapi import APIRouter, HTTPException, status, Depends
@@ -52,9 +51,6 @@ search_api_params = {
 }
 
 MAX_REQUESTS_PER_SEC = {"times": 3, "seconds": 10}
-
-# init cache for transmuter
-cache = asyncio.get_event_loop().run_until_complete(setup_cache(settings, 7))
 
 
 al = Alchemist(router)
@@ -125,12 +121,7 @@ async def mine_worksfor(email: EmailStr) -> Person:
     domain = email.split("@")[1]
     works_for = {}
     if domain not in settings.public_email_providers:
-        company = await cache.get(domain)
-        if not company:
-            company = get_company(domain)
-            # redis refuses to store None so we'll use a void string instead
-            # we won't check for this domain again for some time
-            await cache.set(domain, company or "", ex=settings.cache_expiration)
+        company = get_company(domain)
         if company:
             works_for['worksFor'] = company
     return works_for

@@ -176,6 +176,30 @@ class Alchemist:
 
         return modified, (person if modified else {})
 
+    def add_route(self, miner_func, miner_param: dict, is_person_param: bool, route_kwargs: dict):
+        route_param = {}
+        route_param.update(route_kwargs)
+        route_param.update({
+            'path': self.default_path.format(
+                operation="enrich",
+                field=miner_param['field'],
+                func_name=miner_func.__name__,),
+            'endpoint': miner_func,
+            'response_model': (
+                miner_func.__annotations__['return']
+                | None
+                ),
+            'response_class': JSONorNoneResponse,
+            'responses': (
+                {204: {
+                    'description': "No results found.",
+                    'model': None,
+                    }
+                 }),
+            'methods': ['POST' if is_person_param else 'GET', ],
+        })
+        self.router.add_api_route(**route_param)
+    
     def register(self, **kw):
         """register a function as a miner
 
@@ -190,61 +214,37 @@ class Alchemist:
         """
 
         def decorator(miner_func):
-            if kw['field'] in self._ordered_elements:
+            if not kw['field'] in self._ordered_elements:
+                raise ValueError("This field can't be mined")
 
-                # Check if this is dict/person
-                parameters = signature(miner_func).parameters
-                route_param = {}
+            # Check if this is dict/person
+            parameters = signature(miner_func).parameters
 
-                # Register as miner
-                miner_param = {
-                    'field': kw.pop('field'),
-                    'update': kw.pop('update', []),
-                    'insert': kw.pop('insert', []),
-                    'transmute': kw.pop('transmute', False),
-                    'endpoint': miner_func,
-                    'parameters': parameters,
-                }
-                miner_param['catchall'] = not miner_param['insert'] and not miner_param['update']
+            # Register as miner
+            miner_param = {
+                'field': kw.pop('field'),
+                'update': kw.pop('update', []),
+                'insert': kw.pop('insert', []),
+                'transmute': kw.pop('transmute', False),
+                'endpoint': miner_func,
+                'parameters': parameters,
+            }
+            miner_param['catchall'] = not miner_param['insert'] and not miner_param['update']
 
-                if any(param.annotation is dict for param in parameters.values()):
-                    route_param['methods'] = ['POST', ]
-                    miner_param['person_param'] = True
-                else:
-                    route_param['methods'] = ['GET', ]
-                    miner_param['person_param'] = False
+            is_person_param = any(param.annotation is dict for param in parameters.values())
 
-                # add to FastAPI Router
-                if self.router:
-                    route_param.update(kw)
-                    route_param.update({
-                        'path': self.default_path.format(
-                            operation=(
-                                "transmute"
-                                if miner_param['transmute']
-                                else "enrich"
-                                ),
-                            field=miner_param['field'],
-                            func_name=miner_func.__name__,),
-                        'endpoint': miner_func,
-                        'response_model': (
-                            miner_func.__annotations__['return']
-                            | None
-                            ),
-                        'response_class': JSONorNoneResponse,
-                        'responses': (
-                            {204: {
-                                'description': "No results found.",
-                                'model': None,
-                                }
-                             }
-                            ),
-                    })
-                    self.router.add_api_route(**route_param)
+            if is_person_param:
+                miner_param['person_param'] = True
+            else:
+                miner_param['person_param'] = False
 
-                log.debug(f"add {miner_func.__name__} to miners with parameters: {miner_param}")
-                self.miners[miner_param['field']].append(miner_param)
-                self.fields.add(miner_param['field'])
+            # add to FastAPI Router
+            if self.router:
+                self.add_route(miner_func, miner_param, is_person_param, route_kwargs=kw)
+
+            log.debug(f"add {miner_func.__name__} to miners with parameters: {miner_param}")
+            self.miners[miner_param['field']].append(miner_param)
+            self.fields.add(miner_param['field'])
             return miner_func
 
         return decorator

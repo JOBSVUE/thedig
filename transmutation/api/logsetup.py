@@ -50,7 +50,7 @@ class LoggingSettings(BaseSettings):
     rotation: str = "1 days"
     retention: str = "1 months"
     serialize: bool = False
-    model_config = SettingsConfigDict(env_prefix="logging_")
+    model_config = SettingsConfigDict(env_prefix="log_", env_file=".env")
 
 
 class InterceptHandler(logging.Handler):
@@ -191,7 +191,7 @@ def patcher(record):
         record["exception"] = exception._replace(value=fixed)
 
 
-def setup_logger_from_settings(log_settings: Optional[LoggingSettings] = None):
+def setup_logger_from_settings(log_level: Optional[str] = None, log_settings: Optional[LoggingSettings] = None):
     """Define the global logger to be used by your entire service.
 
     Arguments:
@@ -210,7 +210,7 @@ def setup_logger_from_settings(log_settings: Optional[LoggingSettings] = None):
 
     # Return logger even though it's not necessary
     return setup_logger(
-        log_settings.level,
+        log_level or log_settings.level,
         log_settings.format,
         log_settings.filepath,
         log_settings.rotation,

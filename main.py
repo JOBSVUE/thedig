@@ -24,7 +24,7 @@ from transmutation.security import get_api_key
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    setup_logger_from_settings()
+    setup_logger_from_settings(log_level=settings.log_level)
     await FastAPILimiter.init(await setup_cache(settings, 8))
     yield
 

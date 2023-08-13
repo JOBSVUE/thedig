@@ -13,21 +13,19 @@ from fastapi import FastAPI, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_limiter import FastAPILimiter
 
-# import other apis
-from transmutation.api import router
 from transmutation.api.config import settings, setup_cache
+
 from transmutation.api.logsetup import setup_logger_from_settings
 
-# X-API-KEY protection
+# import other apis
+from transmutation.api import transmuter_router
 from transmutation.security import get_api_key
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logger_from_settings(log_level=settings.log_level)
     await FastAPILimiter.init(await setup_cache(settings, 8))
     yield
-
 
 # routing composition
 app = FastAPI(
@@ -41,14 +39,13 @@ app = FastAPI(
 )
 
 
-# origins = [f"http://{settings.server}:{settings.server_port}""]
 app.add_middleware(
     CORSMiddleware,
     #    allow_origins=origins,
     allow_credentials=True,
 )
 
-app.include_router(router)
+app.include_router(transmuter_router)
 
 # launching this app as a module is for dev purpose
 if __name__ == "__main__":

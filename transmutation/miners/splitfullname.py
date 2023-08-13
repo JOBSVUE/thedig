@@ -119,7 +119,10 @@ CIVILITY = {
 
 ROLE_NAMES = {
     "contact",
+    "communication",
+    "events",
     "forum",
+    "meeting",
     "secretariat",
     "secretario",
     "service",
@@ -209,7 +212,7 @@ def _split_fullname(fullname: str) -> dict:
 
     # e.g givenName FamilyName
     if len(words) == 2:
-        return {**order(words[0], words[1]), **{"jobtitle": jobtitle}}
+        return {**order(words[0], words[1]), **{"jobTitle": jobtitle}}
 
     # eg. First name FAMILY NAME (or the opposite)
     givenName = words[0]

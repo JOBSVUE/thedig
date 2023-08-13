@@ -1,12 +1,6 @@
 #!/bin/python3
 """
-Microservices for data enrichment :
-- /linkedin (JSON-LD schema.org format): full name and email ->
-  fist name, last name, title, company, location, image, linkedin URL
-- /whoiscompany : list of domains -> dict of domain : company name
-- /emailvalidation : list of emails address -> dict of validation status
-- /...
-- future: /socialprofiles : person (JSON-LD) -> list of social profiles
+Microservices for data enrichment using determinist, IA and legit OSINT techniques on your contacts
 """
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"

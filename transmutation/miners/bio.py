@@ -17,6 +17,16 @@ def normalize(text: str) -> str:
     return text.encode("ASCII", "ignore").lower().decode()
 
 
+def find_gender(text: str) -> str | None:
+    txt = text.lower()
+    gender = None
+    if "she/her" in txt:
+        gender = "she/her"
+    elif "he/him" in txt:
+        gender = "he/him"
+    return gender
+
+
 def find_jobtitle(text: str) -> set[str]:
     # split text in words
     words = re.findall(RE_WORDS, text)

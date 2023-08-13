@@ -2,9 +2,6 @@ __license__ = "AGPL"
 __author__ = "Badreddine Lejmi <badreddine@ankaboot.fr>"
 __version__ = "0.1dev"
 
-# import miners to being available in the API scope
-# from transmutation import miners
-
 # import API
 from .transmuter import router as transmuter_router
 

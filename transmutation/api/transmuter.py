@@ -204,17 +204,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
 
             al_status = None
 
-            # person_c = cache.get(f"{user_id}-{person['email']}")
-            # person_c = None
-            # if person_c:
-            #    al_status = True
-            #    person = dict(**json.loads(person_c))
-            #    log.debug(f"{person['email']} found: {person_c}")
-
             al_status, transmuted = await al.person(person["person"])
 
             if al_status:
-                # cache.set(f"{user_id}-{person['email']}", transmuted.json(), ex=settings.cache_expiration)
                 transmuted_count += 1
 
             response: PersonResponse = {"status": al_status, "person": transmuted}

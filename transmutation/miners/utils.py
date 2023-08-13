@@ -1,8 +1,6 @@
 """
 Various utilities
 """
-__author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
-__license__ = "AGPL"
 
 from thefuzz import fuzz
 from fake_useragent import UserAgent

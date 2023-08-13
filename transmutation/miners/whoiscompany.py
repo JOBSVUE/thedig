@@ -5,8 +5,6 @@ Return company name based on domain's email address whois
 import logging
 import whoisdomain as whois
 
-__author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
-__license__ = "AGPL"
 
 TO_IGNORE = {
     "Statutory Masking Enabled",

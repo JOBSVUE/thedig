@@ -2,8 +2,6 @@
 """
 Split fullname into givenName and familyName
 """
-__author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
-__license__ = "AGPL"
 
 import re
 import logging

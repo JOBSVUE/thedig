@@ -1,8 +1,6 @@
 """
 Person Types
 """
-__author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
-__license__ = "AGPL"
 
 from pydantic import TypeAdapter, ValidationError
 from pydantic import EmailStr, HttpUrl, constr

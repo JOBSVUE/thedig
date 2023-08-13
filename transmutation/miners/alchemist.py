@@ -1,10 +1,4 @@
-# Copyright 2022 Badreddine LEJMI.
-# SPDX-License-Identifier: 	AGPL-3.0-or-later
-
-"""Base Alchemist"""
-__author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
-__copyright__ = "Ankaboot"
-__license__ = "AGPL"
+"""Alchemist"""
 
 from loguru import logger as log
 from inspect import signature

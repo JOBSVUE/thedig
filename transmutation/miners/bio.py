@@ -1,8 +1,6 @@
 """
 Mine bio from social network profiles
 """
-__author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
-__license__ = "AGPL"
 
 import re
 from json import load

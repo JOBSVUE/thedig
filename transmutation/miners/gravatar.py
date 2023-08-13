@@ -1,8 +1,5 @@
 #!/bin/env python
 """Gravatar profile picture"""
-__author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
-__copyright__ = "Ankaboot"
-__license__ = "AGPL"
 
 from hashlib import md5
 

@@ -3,11 +3,6 @@ Security
 """
 import secrets
 
-__author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
-__copyright__ = "Ankaboot"
-__license__ = "AGPL"
-__version__ = "0.1"
-
 # fast api
 from fastapi import Security, status, WebSocket, Request
 from fastapi.exceptions import HTTPException

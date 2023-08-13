@@ -6,8 +6,6 @@ Google Vision API Limits:
 - 1800 requests/minute
 - 8000 simultaneous requests
 """
-__author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
-__license__ = "AGPL"
 
 import asyncio
 import re

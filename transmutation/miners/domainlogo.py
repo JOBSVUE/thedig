@@ -4,8 +4,6 @@ Enrichment related to a domain
 - favicon
 - country (exclusion list for country tld misused like .io)
 """
-__author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
-__license__ = "AGPL"
 
 import re
 from bs4 import BeautifulSoup

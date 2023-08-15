@@ -30,7 +30,7 @@ from ..miners.whoiscompany import get_company
 from ..miners.domainlogo import guess_country
 from ..miners.gravatar import gravatar
 from ..miners.vision import SocialNetworkMiner
-from ..miners.alchemist import Alchemist
+from ..miners.railway import Railway
 from ..miners.splitfullname import split_fullname
 from ..miners.bio import find_jobtitle
 
@@ -46,10 +46,10 @@ search_api_params = {
 MAX_REQUESTS_PER_SEC = {"times": 3, "seconds": 10}
 
 
-al = Alchemist(router)
+rw = Railway(router)
 
 
-@al.register(field="name")
+@rw.register(field="name")
 async def miner_linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
     miner = LinkedInSearch(search_api_params)
     person = await miner.search(
@@ -58,7 +58,7 @@ async def miner_linkedin(name: str, email: EmailStr = None, worksFor: str = None
     return person
 
 
-@al.register(
+@rw.register(
     field="url",
     update=(
         "worksFor",
@@ -75,7 +75,7 @@ async def miner_from_linkedin_url(name: str, url: HttpUrl) -> Person:
     return person
 
 
-@al.register(field="email", update=("image",))
+@rw.register(field="email", update=("image",))
 async def miner_gravatar(email) -> Person:
     avatar = await gravatar(email)
     return (
@@ -84,7 +84,7 @@ async def miner_gravatar(email) -> Person:
     )
 
 
-@al.register(field="email")
+@rw.register(field="email")
 async def mine_social(p: dict) -> Person:
     snm = SocialNetworkMiner(p)
 
@@ -107,7 +107,7 @@ async def mine_social(p: dict) -> Person:
     return snm.person
 
 
-@al.register(field="email", update=("worksFor",))
+@rw.register(field="email", update=("worksFor",))
 async def mine_worksfor(email: EmailStr) -> Person:
     # otherwise, the domain will give us the @org
     # except for public email providers
@@ -120,7 +120,7 @@ async def mine_worksfor(email: EmailStr) -> Person:
     return works_for
 
 
-@al.register(field="description", update=("jobTitle",))
+@rw.register(field="description", update=("jobTitle",))
 async def mine_bio(description: str = None) -> Person:
     desc: set[str] = {description, } if type(description) is str else description
     job_title = {}
@@ -136,13 +136,13 @@ async def mine_bio(description: str = None) -> Person:
     return job_title
 
 
-@al.register(field="name", update=("givenName", "familyName"))
+@rw.register(field="name", update=("givenName", "familyName"))
 async def mine_name(name: str, email: EmailStr) -> Person:
     splitted: Person = split_fullname(name, email.split("@")[1])
     return splitted
 
 
-@al.register(field="email", insert=("workLocation",))
+@rw.register(field="email", insert=("workLocation",))
 async def mine_country(email: EmailStr) -> Person:
     country = guess_country(email.split("@")[-1])
     return {"workLocation": country} if country else {}
@@ -150,16 +150,16 @@ async def mine_country(email: EmailStr) -> Person:
 
 @router.get("/transmute/{email}", dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
 async def transmute_email(email: EmailStr, name: str) -> Person:
-    al_status, transmuted = await al.person({"email": email, "name": name})
-    if not al_status:
+    rw_status, transmuted = await rw.person({"email": email, "name": name})
+    if not rw_status:
         raise HTTPException(status_code=204)
     return transmuted
 
 
 @router.post("/transmute/", dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
 async def transmute_person(person: Person) -> Person:
-    al_status, transmuted = await al.person({"email": person['email'], "name": person['name']})
-    if not al_status:
+    rw_status, transmuted = await rw.person({"email": person['email'], "name": person['name']})
+    if not rw_status:
         raise HTTPException(status_code=204)
     return transmuted
 
@@ -186,17 +186,17 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
                 log.debug(f"invalid data: {person}")
                 raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
 
-            al_status = None
+            rw_status = None
 
-            al_status, transmuted = await al.person(person["person"])
+            rw_status, transmuted = await rw.person(person["person"])
 
-            if al_status:
+            if rw_status:
                 transmuted_count += 1
 
-            response: PersonResponse = {"status": al_status, "person": transmuted}
+            response: PersonResponse = {"status": rw_status, "person": transmuted}
             person_response_ta.validate_python(response)
 
-            # Send message when transmutation finished
+            # Send message when gemway finished
             await ws_manager.message(websocket, {person["uid"]: response})
     except WebSocketDisconnect:
         log.info(f"Websocket disconnected: {websocket}")

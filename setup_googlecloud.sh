@@ -3,8 +3,8 @@
 # Help set-up the whole API keys
 
 # you could modify this
-APP_NAME="transmutation"
-SERVICE_ACCOUNT="transmutation-vision"
+APP_NAME="gemway"
+SERVICE_ACCOUNT="gemway-vision"
 
 # fetch credential key path from .env
 eval "$(grep GOOGLE_VISION_CREDENTIALS .env)"

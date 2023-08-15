@@ -7,7 +7,7 @@ import secrets
 from fastapi import Security, status, WebSocket, Request
 from fastapi.exceptions import HTTPException
 from fastapi.security.api_key import APIKeyHeader, APIKeyQuery
-from transmutation.api.config import settings
+from gemway.api.config import settings
 
 
 # logging modules

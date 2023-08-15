@@ -46,7 +46,7 @@ def get_public_email_providers(public_email_providers_url=PUBLIC_EMAIL_PROVIDERS
 
 
 class Settings(BaseSettings):
-    app_name: str = "Transmutation API"
+    app_name: str = "Gemway API"
     google_api_key: str
     google_cx: str
     google_vision_credentials: str

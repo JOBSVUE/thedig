@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "temporary"
+name = "gemway"
 dynamic = ["version"]
 description = 'enrich informations about a person using OSINT techniques in a privacy-friendly way'
 readme = "README.md"
@@ -14,21 +14,23 @@ authors = [
   { name = "Badreddine", email = "badreddine@ankaboot.fr" },
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
+  "Framework :: FastAPI",
 ]
 dependencies = []
 
 [project.urls]
-Documentation = "https://github.com/ankaboot-source/transmutation/temporary#readme"
-Issues = "https://github.com/ankaboot-source/transmutation/temporary/issues"
-Source = "https://github.com/ankaboot-source/transmutation"
+Documentation = "https://github.com/ankaboot-source/gemway/"
+Issues = "https://github.com/ankaboot-source/gemway/issues"
+Source = "https://github.com/ankaboot-source/gemway/"
 
 [tool.hatch.version]
-path = "src/temporary/__about__.py"
+path = "src/gemway/__about__.py"
 
 [tool.hatch.envs.default]
 dependencies = [
@@ -58,7 +60,7 @@ dependencies = [
   "ruff>=0.0.243",
 ]
 [tool.hatch.envs.lint.scripts]
-typing = "mypy --install-types --non-interactive {args:src/temporary tests}"
+typing = "mypy --install-types --non-interactive {args:src/gemway tests}"
 style = [
   "ruff {args:.}",
   "black --check --diff {args:.}",
@@ -124,7 +126,7 @@ unfixable = [
 ]
 
 [tool.ruff.isort]
-known-first-party = ["temporary"]
+known-first-party = ["gemway"]
 
 [tool.ruff.flake8-tidy-imports]
 ban-relative-imports = "all"
@@ -134,16 +136,16 @@ ban-relative-imports = "all"
 "tests/**/*" = ["PLR2004", "S101", "TID252"]
 
 [tool.coverage.run]
-source_pkgs = ["temporary", "tests"]
+source_pkgs = ["gemway", "tests"]
 branch = true
 parallel = true
 omit = [
-  "src/temporary/__about__.py",
+  "src/gemway/__about__.py",
 ]
 
 [tool.coverage.paths]
-temporary = ["src/temporary", "*/temporary/src/temporary"]
-tests = ["tests", "*/temporary/tests"]
+gemway = ["src/gemway", "*/gemway/src/gemway"]
+tests = ["tests", "*/gemway/tests"]
 
 [tool.coverage.report]
 exclude_lines = [

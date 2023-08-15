@@ -1,4 +1,4 @@
-"""Alchemist"""
+"""Railway"""
 
 from loguru import logger as log
 from inspect import signature
@@ -103,7 +103,7 @@ class MinerField:
         return modified
 
 
-class Alchemist:
+class Railway:
     """Enrich iteratively persons using miners"""
 
     _ordered_elements: list = [

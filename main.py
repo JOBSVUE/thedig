@@ -13,13 +13,13 @@ from fastapi import FastAPI, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_limiter import FastAPILimiter
 
-from transmutation.api.config import settings, setup_cache
+from gemway.api.config import settings, setup_cache
 
-from transmutation.api.logsetup import setup_logger_from_settings
+from gemway.api.logsetup import setup_logger_from_settings
 
 # import other apis
-from transmutation.api import transmuter_router
-from transmutation.security import get_api_key
+from gemway.api import transmuter_router
+from gemway.security import get_api_key
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
 
 # routing composition
 app = FastAPI(
-    title="Transmutation API",
+    title="Gemway API",
     description=__doc__,
     version=__version__,
     contact={"name": __copyright__, "email": __author__.split("<")[1][:-1]},

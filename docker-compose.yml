@@ -1,9 +1,9 @@
 version: '3'
 
 services:
-  transmutation:
-    container_name: transmutation
-    image: transmutation_image
+  gemway:
+    container_name: gemway
+    image: gemway_image
     env_file:
       - .env
     build:
@@ -14,12 +14,12 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - transmutation_redis
+      - gemway_redis
 
-  transmutation_redis:
+  gemway_redis:
     image: redis:alpine
     hostname: redis
-    container_name: transmutation_redis
+    container_name: gemway_redis
     restart: always
     command:
       - 'redis-server'

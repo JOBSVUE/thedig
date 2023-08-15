@@ -30,7 +30,7 @@ Issues = "https://github.com/ankaboot-source/gemway/issues"
 Source = "https://github.com/ankaboot-source/gemway/"
 
 [tool.hatch.version]
-path = "gemway/__init__.py"
+path = "gemway/__about__.py"
 
 [tool.hatch.envs.default]
 dependencies = [

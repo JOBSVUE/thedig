@@ -4,7 +4,7 @@
 
 # you could modify this
 APP_NAME="gemway"
-SERVICE_ACCOUNT="gemway-vision"
+SERVICE_ACCOUNT="${APP_NAME}-vision"
 
 # fetch credential key path from .env
 eval "$(grep GOOGLE_VISION_CREDENTIALS .env)"

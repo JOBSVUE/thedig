@@ -3,5 +3,5 @@
 
 __author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
 __copyright__ = "Ankaboot"
-__license__ = "AGPL"
+__license__ = "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)"
 __version__ = "0.1"

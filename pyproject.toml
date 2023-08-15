@@ -4,11 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gemway"
-dynamic = ["version"]
+dynamic = ["version", "license"]
 description = 'enrich informations about a person using OSINT techniques in a privacy-friendly way'
 readme = "README.md"
 requires-python = ">=3.11"
-license = "AGPL"
 keywords = []
 authors = [
   { name = "Badreddine", email = "badreddine@ankaboot.fr" },

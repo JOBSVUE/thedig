@@ -13,7 +13,7 @@ services:
       - ./:/app
       - ${GOOGLE_VISION_CREDENTIALS}:/app/google-vision-gemway.json:ro
     ports:
-      - "8000:8000"
+      - "8080:8080"
     depends_on:
       - gemway_redis
 

@@ -28,7 +28,7 @@ COPY .env ./
 
 COPY . $APP_HOME/
 
-EXPOSE 80
+EXPOSE 8080
 
 # Run the web service on container startup. Here we use uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--proxy-headers", "--use-colors", "--port", "80"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--proxy-headers", "--use-colors", "--port", "8080"]

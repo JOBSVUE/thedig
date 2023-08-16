@@ -1,7 +1,4 @@
 #!/bin/python3
-"""
-Microservices for data enrichment using determinist, IA and legit OSINT techniques on your contacts
-"""
 
 # fast api
 from contextlib import asynccontextmanager
@@ -16,6 +13,16 @@ from gemway.api.logsetup import setup_logger_from_settings
 # import other apis
 from gemway.api import transmuter_router
 from gemway.security import get_api_key
+from gemway.__about__ import (
+    __version__,
+    __summary__, 
+    __copyright__,
+    __author__,
+    __email__,
+    __license__,
+    __version__
+)
+    
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -26,9 +33,9 @@ async def lifespan(app: FastAPI):
 # routing composition
 app = FastAPI(
     title="Gemway API",
-    description=__doc__,
+    description=__summary__,
     version=__version__,
-    contact={"name": __copyright__, "email": __author__.split("<")[1][:-1]},
+    contact={"name": f"{__author__} - {__copyright__}", "email": __email__},
     license_info={"name": __license__},
     dependencies=[Security(get_api_key)],
     lifespan=lifespan,

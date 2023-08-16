@@ -11,7 +11,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./:/app
-      - ${GOOGLE_VISION_CREDENTIALS}:./google-vision-gemway.json:ro
+      - ${GOOGLE_VISION_CREDENTIALS}:/app/google-vision-gemway.json:ro
     ports:
       - "8000:8000"
     depends_on:

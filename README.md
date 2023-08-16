@@ -21,7 +21,7 @@ Business-related data fetched from an email address and full name:
 
 This program intend to be actively GDPR compliant and respectful of person's privacy. Our main goal is to help user's enrich data on existing contacts. We implemented proactively a few GDPR principles in the code itself:
 - Right to Opt-Out: if the person mined use the tag #OptOut in its social profile, the enrichment will be stopped, the person's graph won't be enriched and the API's user will be noticed that the person OptOut.
-- Lawfulness, fairness and transparency: our sources of data are only public data the person already consent to share publicly. We do not mine databreached data for example. 
+- Lawfulness, fairness and transparency: our sources of data are only public data the person already consent to share publicly. We do not mine databreached data nor doxing for examples. 
 - Purpose and data limitation: This program intend to limit extracted personal data to only relevant to business purposes by selecting fields related to business targeting. Sensitive data are not mined.
 - Accuracy: we rather prefer not to enrich with dubious information than take the risk of false positives, for examples the social profiles found are checked to be the ones about the person itself.
 - Storage limitation: the data enriched are not stored except for cache purpose for a limited duration (default 24 hours)

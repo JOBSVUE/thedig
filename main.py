@@ -2,10 +2,6 @@
 """
 Microservices for data enrichment using determinist, IA and legit OSINT techniques on your contacts
 """
-__author__ = "Badreddine LEJMI <badreddine@ankaboot.fr>"
-__copyright__ = "Ankaboot"
-__license__ = "AGPL"
-__version__ = "0.1"
 
 # fast api
 from contextlib import asynccontextmanager

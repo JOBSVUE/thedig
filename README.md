@@ -32,7 +32,7 @@ By using this application, you must abid to local, international and ethical pri
 
 ## 🏗️ How to use
 
-You'll need python 3.11, redis for cache and a [few bunch of libraries](requirements.txt).
+You'll need python 3.11, redis for cache, `gcloud` if you want an automatic set-up, and a [few bunch of libraries](requirements.txt).
 
 ### Configure
 To run this project, you'll need a few environement variables which includes some API keys. Please edit [default.env](default.env) and rename it as `.env`.

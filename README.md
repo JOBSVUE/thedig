@@ -2,19 +2,33 @@
 
 # 🪨➜💎 Gemway API
 
-Enrich data about someone (e.g employee name, title, profile pictures etc.) using OSINT (Opensource Intelligence) methods i.e only public data this person consent to share.
+Enrich data about someone (e.g employee name, title, profile pictures etc.) using determinist, OSINT (Opensource Intelligence) and IA in a privacy-friendly way i.e only public data this person consent to share (no databreach) with the possibility to #OptOut.
 
 ## ✨ Features
 
-Data fetched:
-- First name, last name, title, profile picture, company name from LinkedIn using Google/Bing Search by email address and full name
-- Company's name from an email address using whois on its domain
-- Company's logo either favicon or open graph image (used for social networks)
+Business-related data fetched from an email address and full name:
+- Given name, Family name
+- Job title
+- Social Network's URL and LinkedIn's URL
+- Profile pictures
+- Company's name
+- Work's location
+- Home's location
+- Nationality
+- Language spoken
 
+## 🛡️ Privacy-by-design
+
+This program intend to be actively GDPR compliant and respectful of person's privacy. Our main goal is to help user's enrich data on existing contacts. We implemented proactively a few GDPR principles in the code itself:
+- Right to Opt-Out: if the person mined use the tag #OptOut in its social profile, the enrichment will be stopped, the person's graph won't be enriched and the API's user will be noticed that the person OptOut.
+- Lawfulness, fairness and transparency: our sources of data are only public data the person already consent to share publicly. We do not mine databreached data for example. 
+- Purpose and data limitation: This program intend to limit extracted personal data to only relevant to business purposes by selecting fields related to business targeting. Sensitive data are not mined.
+- Accuracy: we rather prefer not to enrich with dubious information than take the risk of false positives, for examples the social profiles found are checked to be the ones about the person itself.
+- Storage limitation: the data enriched are not stored except for cache purpose for a limited duration (default 24 hours)
 
 ## 🏗️ How to use
 
-You'll need python 3.10 and a [few bunch of libraries](requirements.txt).
+You'll need python 3.11, redis for cache and a [few bunch of libraries](requirements.txt).
 
 ### Configure
 To run this project, you'll need a few environement variables which includes some API keys. Please edit [default.env](default.env) and rename it as `.env`.
@@ -27,16 +41,11 @@ You'll need a few API keys, at least Google Custom Search API and Google Vision.
   3. Visit https://console.developers.google.com/apis/credentials and generate API key credentials for your project.
 
 
-### Install
-
-```bash
-  pip install gemway
-```
-
 ### Launch
+Download it and:
 ```bash
-  python -m gemway.app
-``` 
+  docker-compose up -d
+```
 
 ## ⚠️ Support
 

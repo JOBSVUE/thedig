@@ -321,7 +321,7 @@ class LinkedInSearch:
                     f"The name mined doesn't match the name given: {person_d['name']}, {name}"
                 )
                 continue
-            print(person_d['name'], name, fuzz.token_set_ratio(person_d["name"], name))
+
             # check homonymous
             if name in persons_d:
                 return None

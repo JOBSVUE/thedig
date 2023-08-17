@@ -8,6 +8,7 @@ from loguru import logger as log
 
 from redis.asyncio import Redis
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import FilePath
 
 NITTER_INSTANCES = "https://status.d420.de/api/v1/instances"
 NITTER_BACKUP_INSTANCE = "https://nitter.net"
@@ -49,7 +50,7 @@ class Settings(BaseSettings):
     app_name: str = "Gemway API"
     google_api_key: str
     google_cx: str
-    google_vision_credentials: str
+    google_vision_credentials: FilePath
     query_type: str = "q"
     bing_api_key: Optional[str] = None
     bing_customconfig: Optional[str] = None
@@ -64,7 +65,6 @@ class Settings(BaseSettings):
     server_port: int
     api_keys: list[str]
     api_key_name: str
-    google_vision_credentials: str
     public_email_providers: Optional[set[str]] = get_public_email_providers()
     jobtitles_list_file: str = JOBTITLES_FILE
     nitter_instance_server: str = pick_nitter_instance()

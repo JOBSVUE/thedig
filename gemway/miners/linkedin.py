@@ -313,12 +313,15 @@ class LinkedInSearch:
             # the full name from the result must be the same that the name itself
             # 96 seems a good ratio for difference between ascii and latin characters
             # should do fine tuning here trained on a huge international dataset
-            if fuzz.token_set_ratio(person_d["name"], name) < 96:
+            # thefuzz is buggy and sometimes answer 100 when the strings ARE different
+            # TBD: replace thefuzz with another package or wait for it to be taken over by a new maintainer
+            name_similarity = fuzz.token_set_ratio(person_d["name"], name)
+            if name_similarity < 96 or (name_similarity == 100 and person_d["name"].lower() != name.lower()):
                 log.debug(
                     f"The name mined doesn't match the name given: {person_d['name']}, {name}"
                 )
                 continue
-
+            print(person_d['name'], name, fuzz.token_set_ratio(person_d["name"], name))
             # check homonymous
             if name in persons_d:
                 return None

@@ -578,9 +578,8 @@ class SocialNetworkMiner:
         idr = {idr_email, idr_email.replace('.', '')}
         # useful only if really different from name
         # otherwise, it gives too much false positive
-        if any(fuzz.partial_token_sort_ratio(i, self._person["name"]) > 81
-               for i in idr):
-            return set()
+        idr = set() if any(fuzz.partial_token_sort_ratio(i, self._person["name"]) > 81
+               for i in idr) else idr
         return idr
 
 

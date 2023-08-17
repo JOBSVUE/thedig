@@ -71,25 +71,40 @@ def person_set_field(person: Person, field: str, value: str | set) -> Person:
     return person
 
 
-def dict_to_person(person_dict: dict, setdefault=False) -> Person:
+def dict_to_person(person_dict: dict, setdefault=False, unsetvoid=False) -> Person:
     if setdefault:
-        for k, t in Person.__annotations__.items():
-            if k not in person_dict:
-                person_dict[k] = t()
-                continue
+        for k in Person.__annotations__.keys():
             is_k_set = RE_SET.match(str(Person.__annotations__[k]))
-            if is_k_set and not is_pure_iterable(person_dict[k]):
+            if not is_k_set:
+                continue
+            elif k not in person_dict:
+                person_dict[k] = set()
+            elif not is_pure_iterable(person_dict[k]):
                 person_dict[k] = {person_dict[k], }
     else:
         for k, v in person_dict.items():
             is_k_set = RE_SET.match(str(Person.__annotations__[k]))
             if is_k_set and not is_pure_iterable(v):
                 person_dict[k] = {v, }
+
+    # unefficient but clearer
+    if unsetvoid:
+        person_dict = person_unset_void(person_dict)
+
     return person_dict
+
+
+def person_unset_void(person: Person):
+    return {k: v for k, v in person.items() if v}
 
 
 def is_pure_iterable(obj) -> bool:
     return hasattr(obj, "__iter__") and type(obj) is not str
+
+
+async def miner_to_person(miner_func, *args, **kwargs) -> Person | None:
+    result = await miner_func(*args, **kwargs)
+    return dict_to_person(result, unsetvoid=True) if result else None
 
 
 person_ta = TypeAdapter(Person)

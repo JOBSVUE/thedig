@@ -74,12 +74,12 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-async def setup_cache(settings: Settings, db: int) -> Redis:
+async def setup_cache(settings: Settings, db: int = None) -> Redis:
     """setup cache based on Redis
 
     Args:
         settings (Settings):settings including redis_*
-        db (int): database
+        db (int): database - Optional
 
     Returns:
         redis: redis database instance
@@ -90,9 +90,9 @@ async def setup_cache(settings: Settings, db: int) -> Redis:
         for setting_k, setting_v in settings.model_dump().items()
         if setting_k.startswith("redis")
     }
-    redis_parameters["db"] = db
+    if db:
+        redis_parameters["db"] = db
     redis_parameters["decode_responses"] = True
     redis_parameters["encoding"] = "utf-8"
     cache = await Redis(**redis_parameters)
-    log.info(f"Set-up redis cache for {db}")
     return cache

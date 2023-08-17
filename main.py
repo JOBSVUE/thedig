@@ -27,7 +27,7 @@ from gemway.__about__ import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logger_from_settings(log_level=settings.log_level)
-    await FastAPILimiter.init(await setup_cache(settings, 8))
+    await FastAPILimiter.init(await setup_cache(settings))
     yield
 
 # routing composition

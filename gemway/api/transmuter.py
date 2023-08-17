@@ -1,8 +1,6 @@
 """Transmuter API"""
 
 # config
-import asyncio
-
 from .config import settings
 
 # fast api
@@ -16,7 +14,7 @@ from .websocketmanager import manager as ws_manager
 # types
 from pydantic import EmailStr, HttpUrl
 from .person import Person, PersonRequest, PersonResponse
-from .person import person_request_ta, person_response_ta, ValidationError
+from .person import person_request_ta, person_response_ta, ValidationError, dict_to_person
 
 # logger
 from loguru import logger as log
@@ -79,13 +77,15 @@ async def miner_from_linkedin_url(name: str, url: HttpUrl) -> Person:
 async def miner_gravatar(email) -> Person:
     avatar = await gravatar(email)
     return (
-        {'image': avatar} if avatar
+        {'image': {avatar, }} if avatar
         else {}
     )
 
 
 @rw.register(field="email")
 async def mine_social(p: dict) -> Person:
+    if "name" not in p:
+        return None
     snm = SocialNetworkMiner(p)
 
     # if there is an image, let's vision mine it

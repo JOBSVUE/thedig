@@ -330,6 +330,11 @@ class SocialNetworkMiner:
     }
 
     def __init__(self, person: dict, socialnetworks: Optional[list] = None):
+        # specific for this miner, name is mandatory
+        # TBD: find a better way to require for name
+        if "name" not in person:
+            raise ValueError("Name is mandatory")
+        
         # person init
         self._original_person = person
         self._person: Person = dict_to_person(person.copy(), setdefault=True)

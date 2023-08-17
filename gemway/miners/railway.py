@@ -1,5 +1,6 @@
 """Railway"""
 
+from functools import partial, update_wrapper
 from loguru import logger as log
 from inspect import signature
 import re
@@ -7,7 +8,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
-from ..api.person import Person, person_ta, person_set_field, dict_to_person
+from ..api.person import Person, miner_to_person, person_ta, person_set_field, dict_to_person
 
 
 RE_SET = re.compile(r"(\s|^)set\W")
@@ -178,7 +179,7 @@ class Railway:
                 operation="enrich",
                 field=miner_param['field'],
                 func_name=miner_func.__name__,),
-            'endpoint': miner_func,
+            'endpoint': update_wrapper(partial(miner_to_person, miner_func), miner_func),
             'response_model': (
                 miner_func.__annotations__['return']
                 | None

@@ -71,11 +71,20 @@ def person_set_field(person: Person, field: str, value: str | set) -> Person:
     return person
 
 
-def dict_to_person(person_dict: dict) -> Person:
-    for k, v in person_dict.items():
-        is_k_set = RE_SET.match(str(Person.__annotations__[k]))
-        if is_k_set and not is_pure_iterable(v):
-            person_dict[k] = {v, }
+def dict_to_person(person_dict: dict, setdefault=False) -> Person:
+    if setdefault:
+        for k, t in Person.__annotations__.items():
+            if k not in person_dict:
+                person_dict[k] = t()
+                continue
+            is_k_set = RE_SET.match(str(Person.__annotations__[k]))
+            if is_k_set and not is_pure_iterable(person_dict[k]):
+                person_dict[k] = {person_dict[k], }
+    else:
+        for k, v in person_dict.items():
+            is_k_set = RE_SET.match(str(Person.__annotations__[k]))
+            if is_k_set and not is_pure_iterable(v):
+                person_dict[k] = {v, }
     return person_dict
 
 

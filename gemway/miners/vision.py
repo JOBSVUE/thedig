@@ -13,6 +13,7 @@ from typing import Optional
 from json import loads
 
 from ..api.config import settings
+from ..api.person import Person, dict_to_person
 
 from bs4 import BeautifulSoup
 from google.cloud import vision
@@ -331,26 +332,7 @@ class SocialNetworkMiner:
     def __init__(self, person: dict, socialnetworks: Optional[list] = None):
         # person init
         self._original_person = person
-        self._person = person.copy()
-
-        if "identifier" not in self._person:
-            self._person["identifier"] = set()
-        elif type(self._person["identifier"]) == str:
-            self._person["identifier"] = {self._person["identifier"]}
-        elif type(self._person["identifier"]) == list:
-            self._person["identifier"] = set(self._person["identifier"])
-        if "sameAs" not in self._person:
-            self._person["sameAs"] = set()
-        if "nationality" not in self._person:
-            self._person["nationality"] = set()
-        if "knowsLanguage" not in self._person:
-            self._person["knowsLanguage"] = set()
-        if "homeLocation" not in self._person:
-            self._person["homeLocation"] = set()
-        elif type(self._person["homeLocation"]) is not set:
-            self._person["homeLocation"] = {
-                self._person["homeLocation"],
-            }
+        self._person: Person = dict_to_person(person.copy(), setdefault=True)
 
         # ok let's pretend is always void
         self._person["description"] = set()

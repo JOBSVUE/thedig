@@ -556,7 +556,8 @@ class SocialNetworkMiner:
     def _generate_identifiers(self) -> set[str]:
         idr: set = (
             self._generate_identifier_from_email()
-            | self._generate_identifier_from_name()
+            # | self._generate_identifier_from_name()
+            # disabled temporary because give too much false positive
         )
         return idr
     

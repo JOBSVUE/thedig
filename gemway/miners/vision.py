@@ -193,7 +193,7 @@ def get_socialprofile(
             f"Social Network profile not found. URL: {url}, Error: {r.status_code}"
         )
         return False, sn
-        
+
     soup = BeautifulSoup(r.text, "html.parser")
 
     # the title from the profile must contains the person's name itself
@@ -580,7 +580,7 @@ class SocialNetworkMiner:
         # useful only if really different from name
         # otherwise, it gives too much false positive
         idr = set() if any(fuzz.partial_token_sort_ratio(i, self._person["name"]) > 81
-               for i in idr) else idr
+                           for i in idr) else idr
         return idr
 
 

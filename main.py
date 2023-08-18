@@ -15,14 +15,15 @@ from gemway.api import transmuter_router
 from gemway.security import get_api_key
 from gemway.__about__ import (
     __version__,
-    __summary__, 
+    __title__,
+    __summary__,
     __copyright__,
     __author__,
     __email__,
     __license__,
     __version__
 )
-    
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,8 +33,9 @@ async def lifespan(app: FastAPI):
 
 # routing composition
 app = FastAPI(
-    title="Gemway API",
-    description=__summary__,
+    debug=bool(settings.log_level == "DEBUG"),
+    title=__title__,
+    summary=__summary__,
     version=__version__,
     contact={"name": f"{__author__} - {__copyright__}", "email": __email__},
     license_info={"name": __license__},

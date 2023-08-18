@@ -51,16 +51,25 @@ You could also generate manually all Google API Keys for text search and JSON se
 
 
 ### Launch
+
 Download it and:
 ```bash
   docker-compose up -d
 ```
 
+## 🤝 How to contribute
+You're welcome! First, have a look on issues open and closed. If nothing is related to your needs, either open an issue or [fork, create a branch and submit your PR](https://docs.github.com/en/get-started/quickstart/contributing-to-projects).
+### Launch in developer mode
+- Set the `LOG_LEVEL` to `DEBUG` in `.env`
+- Enter the ``gemway`` folder and run it this way : ``uvicorn main:app --reload``
+### Contributor Copyright Agreement
+By contributing to this product, you got the right to use, modify and distribute the product with your contribution and you give to the editor of this product (ankaboot) an unlimited and perpetual license to use, modify and publish, including commercially, your contribution.
+
 ## ⚠️ Support
 
-For support, email contact@ankaboot.fr or join our Matrix channel.
+For support, contact by email contact@ankaboot.io for commercial support or open an issue for community support (no-SLA, no-Warranty).
 
 
 ## 📃 License
 
-This software is a free software (open source) [dual-licensed](DUAL-LICENSE) under the [AGPL](LICENSE) and a [commercial license](DUAL-LICENSE).
+This software is a free software (open source) [dual-licensed](DUAL-LICENSE) under the [AGPL](LICENSE) (No SLA, No Warranty) and a [commercial license](DUAL-LICENSE). Basically, that means that you could use, modify and distribute this software freely if the derivative work is OpenSource itself (OSI-approved). For axemple, if your software is a Software-as-a-Service, your SaaS must be OpenSource itself. If you wish to use this software in a non-OSI approved license, aka proprietary software, you must buy a commercial license from the editor of this product (aka ankaboot.io - contact@ankaboot.io).

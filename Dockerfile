@@ -19,7 +19,7 @@ ENV APP_HOME /app
 WORKDIR $APP_HOME
 
 COPY ./requirements.txt $APP_HOME/requirements.txt
-# Install production dependencies.
+# Install dependencies.
 RUN pip install --no-cache-dir --upgrade -r $APP_HOME/requirements.txt
 
 #COPY tests/ tests/

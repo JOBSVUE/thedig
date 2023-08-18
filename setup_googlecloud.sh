@@ -27,7 +27,7 @@ gcloud iam service-accounts create $SERVICE_ACCOUNT \
 sleep 5
 
 # create the key as JSON file
-echo iam service-accounts keys create "${GOOGLE_VISION_CREDENTIALS}" \
+iam service-accounts keys create "${GOOGLE_VISION_CREDENTIALS}" \
   --iam-account "${SERVICE_ACCOUNT}@${APP_NAME}.iam.gserviceaccount.com"
 
 # Set up Application Default Credentials in your local environment with your user credentials

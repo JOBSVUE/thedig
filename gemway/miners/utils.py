@@ -2,7 +2,7 @@
 Various utilities
 """
 
-from thefuzz import fuzz
+from rapidfuzz import fuzz
 from fake_useragent import UserAgent
 
 TOKEN_RATIO = 82

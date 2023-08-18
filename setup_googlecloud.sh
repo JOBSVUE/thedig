@@ -24,8 +24,6 @@ gcloud services enable customsearch.googleapis.com
 gcloud iam service-accounts create $SERVICE_ACCOUNT \
   --display-name "${APP_NAME} vision"
 
-sleep 5
-
 # create the key as JSON file
 iam service-accounts keys create "${GOOGLE_VISION_CREDENTIALS}" \
   --iam-account "${SERVICE_ACCOUNT}@${APP_NAME}.iam.gserviceaccount.com"

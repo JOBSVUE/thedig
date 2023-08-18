@@ -51,14 +51,3 @@ app.add_middleware(
 )
 
 app.include_router(transmuter_router)
-
-# launching this app as a module is for dev purpose
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "main:app",
-        port=settings.server_port,
-        host="0.0.0.0",
-        reload=True,
-    )

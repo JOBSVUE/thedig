@@ -18,7 +18,7 @@ from ..api.person import Person, dict_to_person
 from bs4 import BeautifulSoup
 from google.cloud import vision
 from loguru import logger as log
-from thefuzz import fuzz
+from rapidfuzz import fuzz
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 

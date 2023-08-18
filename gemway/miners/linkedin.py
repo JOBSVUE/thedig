@@ -23,7 +23,7 @@ from urllib.parse import quote
 from loguru import logger as log
 
 # Fuzzy string match for person name identification
-from thefuzz import fuzz
+from rapidfuzz import fuzz
 
 # linkedin profile url with an ISO3166 country code regular expression
 RE_LINKEDIN_URL = re.compile(

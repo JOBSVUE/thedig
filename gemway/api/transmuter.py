@@ -116,7 +116,7 @@ async def mine_worksfor(email: EmailStr) -> Person:
     if domain not in settings.public_email_providers:
         company = get_company(domain)
         if company:
-            works_for['worksFor'] = company
+            works_for['worksFor'] = company['name']
     return works_for
 
 

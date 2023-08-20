@@ -3,6 +3,10 @@
 Return company name based on domain's email address whois
 """
 import logging
+from datetime import date
+from typing import Required
+from typing_extensions import TypedDict
+from pydantic import EmailStr, HttpUrl
 import whoisdomain as whois
 
 
@@ -32,6 +36,21 @@ COMPANY_TYPE_ABBR = {
 log = logging.getLogger(__name__)
 
 
+class Organization(TypedDict, total=False):
+    name: Required[str]
+    founder: set[str]
+    logo: set[HttpUrl]
+    legalName: str
+    location: set[str]
+    numberOfEmployees: str #often a range
+    image: set[HttpUrl]
+    sameAs: set[HttpUrl]
+    url: HttpUrl
+    email: EmailStr
+    telephone: str
+    foundingDate: date
+    
+
 def get_domain(email: str) -> str:
     return email.split("@")[1]
 
@@ -48,7 +67,7 @@ def remove_company_type_abbrv(company: str) -> str:
             )
 
 
-def get_company(domain: str) -> str | None:
+def get_company(domain: str) -> Organization | None:
     try:
         result = whois.query(domain, ignore_returncode=True)
     except whois.WhoisPrivateRegistry as e:
@@ -58,22 +77,26 @@ def get_company(domain: str) -> str | None:
         log.error(f"Whois failed: {e}")
         return None
 
-    # if the whois request does answer a proper string
     if not result:
         return None
 
     # the company name is the registrant in *this* whois implementation
     company = result.registrant
 
+    if not company:
+        return None
+        
     # there is some domains who hide their real registrant name
     if company in TO_IGNORE:
         log.debug(f"Registrant in ignore list: {company}")
         return None
 
-    return remove_company_type_abbrv(company) if company else company
+    org: Organization = Organization(name=remove_company_type_abbrv(company), legalName=company)
+    
+    return org
 
 
-def get_company_from_email(email: str) -> str:
+def get_company_from_email(email: str) -> Organization:
     """return company name from an email address
 
     Args:
@@ -84,42 +107,3 @@ def get_company_from_email(email: str) -> str:
     """
     domain = get_domain(email)
     return get_company(domain)
-
-
-def get_company_from_person(person: dict) -> dict:
-    domain = get_domain(person["email"])
-    company = get_company(domain)
-    person["worksFor"] = {"legalName": company, "name": company}
-    return person
-
-
-def bulk_companies_from_domains(domains: list) -> dict:
-    return {domain: get_company(domain) for domain in domains}
-
-
-def bulk_companies_from_emails(emails: list) -> dict:
-    domains = {}
-
-    # build directory of domains
-    for email in emails:
-        domain = get_domain(email)
-        if domain not in domains:
-            domains[domain] = [email]
-        else:
-            domains[domain].append(email)
-
-    # map emails to companies based on their domain
-    companies = {}
-    for domain in domains:
-        company = get_company(domain)
-        for email in domains[domain]:
-            companies[email] = company
-
-    return companies
-
-
-if __name__ == "__main__":
-    import sys
-
-    # print({domain:get_company(domain) for domain in sys.argv[1:]})
-    print(bulk_companies_from_emails(sys.argv[1:]))

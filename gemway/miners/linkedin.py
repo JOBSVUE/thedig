@@ -162,7 +162,6 @@ class LinkedInSearch:
             except requests.RequestsError as e:
             # except req.RequestException as e:
                 log.error(f"{search_url_complete}: {e}")
-                return None
             if not r.ok:
                 log.error(f"{r.status_code} : {r.reason}")
 

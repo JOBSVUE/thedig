@@ -34,7 +34,7 @@ By using this application, you must abid to local, international and ethical pri
 
 ## 🏗️ How to use
 
-You'll need python 3.11, redis for cache, `gcloud` if you want an automatic set-up, and a [few bunch of libraries](requirements.txt).
+You'll need python 3.11, redis for cache, `gcloud` if you want an semi-automatic set-up, and a [few bunch of libraries](requirements.txt).
 
 ### Configure
 To run this project, you'll need a few environement variables which includes some API keys from Google. Please edit [default.env](default.env) and rename it as `.env`.
@@ -49,7 +49,7 @@ You could also generate manually all Google API Keys for text search and JSON se
   3. Visit https://console.developers.google.com/apis/credentials and generate API key credentials for your project.
   4. Visit https://cloud.google.com/vision/product-search/docs/auth and generate the JSON credential for your project.
 
-
+Please remember that Google's API provides a limited free tier. For instance, the [Custom Search Site Restricted JSON API provides 100 search queries per day for free](https://developers.google.com/custom-search/v1/site_restricted_api) and this program uses usually at least one search query per request. 
 ### Launch
 
 Download it and:

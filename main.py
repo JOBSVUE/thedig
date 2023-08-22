@@ -11,10 +11,9 @@ from gemway.api.config import settings, setup_cache
 from gemway.api.logsetup import setup_logger_from_settings
 
 # import other apis
-from gemway.api import transmuter_router
+from gemway.api import gem_router
 from gemway.security import get_api_key
 from gemway.__about__ import (
-    __version__,
     __title__,
     __summary__,
     __copyright__,
@@ -41,6 +40,21 @@ app = FastAPI(
     license_info={"name": __license__},
     dependencies=[Security(get_api_key)],
     lifespan=lifespan,
+    terms_of_service="https://github.com/ankaboot-source/gemway/#%EF%B8%8F-support",
+    openapi_tags=[
+        {
+            "name": "railway",
+            "description": "🪨➜💎 enrich __iteratively__ data, every enriched data could be potentially used to mine more data",    
+        },
+        {
+            "name": "person",
+            "description": "Enrich **person**",
+        },
+        {
+            "name": "company",
+            "description": "Extract **company** related info.",
+        },
+    ],
 )
 
 
@@ -50,4 +64,4 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-app.include_router(transmuter_router)
+app.include_router(gem_router)

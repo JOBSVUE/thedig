@@ -14,7 +14,7 @@ from .websocketmanager import manager as ws_manager
 # types
 from pydantic import EmailStr, HttpUrl
 from .person import Person, PersonRequest, PersonResponse
-from .person import person_request_ta, person_response_ta, ValidationError, dict_to_person
+from .person import person_request_ta, person_response_ta, ValidationError
 
 # logger
 from loguru import logger as log
@@ -24,11 +24,11 @@ import json
 
 # service
 from ..miners.linkedin import LinkedInSearch
-from ..miners.whoiscompany import get_company
-from ..miners.domainlogo import guess_country
-from ..miners.gravatar import gravatar
+from ..miners.company import Domain, Company, company_by_domain, company_from_whois
+from ..miners.domainlogo import guess_country, find_favicon
+from ..miners.gravatar import gravatar as miner_gravatar
 from ..miners.vision import SocialNetworkMiner
-from ..miners.railway import Railway
+from ..miners.railway import Railway, JSONorNoneResponse
 from ..miners.splitfullname import split_fullname
 from ..miners.bio import find_jobtitle
 
@@ -48,7 +48,7 @@ rw = Railway(router)
 
 
 @rw.register(field="name")
-async def miner_linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
+async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
     miner = LinkedInSearch(search_api_params)
     person = await miner.search(
         name=name, email=email, company=worksFor
@@ -65,7 +65,7 @@ async def miner_linkedin(name: str, email: EmailStr = None, worksFor: str = None
     ),
     insert=("givenName", "familyName"),
 )
-async def miner_from_linkedin_url(name: str, url: HttpUrl) -> Person:
+async def from_linkedin_url(name: str, url: HttpUrl) -> Person:
     person: Person = {}
     if "linkedin" in url:
         miner = LinkedInSearch(search_api_params)
@@ -74,8 +74,8 @@ async def miner_from_linkedin_url(name: str, url: HttpUrl) -> Person:
 
 
 @rw.register(field="email", update=("image",))
-async def miner_gravatar(email) -> Person:
-    avatar = await gravatar(email)
+async def gravatar(email) -> Person:
+    avatar = await miner_gravatar(email)
     return (
         {'image': {avatar, }} if avatar
         else {}
@@ -83,7 +83,7 @@ async def miner_gravatar(email) -> Person:
 
 
 @rw.register(field="email")
-async def mine_social(p: dict) -> Person:
+async def social(p: dict) -> Person:
     if "name" not in p:
         return None
     snm = SocialNetworkMiner(p)
@@ -108,20 +108,20 @@ async def mine_social(p: dict) -> Person:
 
 
 @rw.register(field="email", update=("worksFor",))
-async def mine_worksfor(email: EmailStr) -> Person:
+async def worksfor(email: EmailStr) -> Person:
     # otherwise, the domain will give us the @org
     # except for public email providers
     domain = email.split("@")[1]
     works_for = {}
     if domain not in settings.public_email_providers:
-        company = get_company(domain)
+        company = await company_from_whois(domain)
         if company:
             works_for['worksFor'] = company['name']
     return works_for
 
 
 @rw.register(field="description", update=("jobTitle",))
-async def mine_bio(description: str = None) -> Person:
+async def bio(description: str = None) -> Person:
     desc: set[str] = {description, } if type(description) is str else description
     job_title = {}
     jt = set()
@@ -137,38 +137,38 @@ async def mine_bio(description: str = None) -> Person:
 
 
 @rw.register(field="name", update=("givenName", "familyName"))
-async def mine_name(name: str, email: EmailStr) -> Person:
+async def name(name: str, email: EmailStr) -> Person:
     splitted: Person = split_fullname(name, email.split("@")[1])
     return splitted
 
 
 @rw.register(field="email", insert=("workLocation",))
-async def mine_country(email: EmailStr) -> Person:
+async def country(email: EmailStr) -> Person:
     country = guess_country(email.split("@")[-1])
     return {"workLocation": country} if country else {}
 
 
-@router.get("/transmute/{email}", dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
-async def transmute_email(email: EmailStr, name: str) -> Person:
-    rw_status, transmuted = await rw.person({"email": email, "name": name})
+@router.get("/person/email/{email}", tags=("person", "railway"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+async def person_email(email: EmailStr, name: str) -> Person:
+    rw_status, persond = await rw.person({"email": email, "name": name})
     if not rw_status:
         raise HTTPException(status_code=204)
-    return transmuted
+    return persond
 
 
-@router.post("/transmute/", dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
-async def transmute_person(person: Person) -> Person:
-    rw_status, transmuted = await rw.person({"email": person['email'], "name": person['name']})
+@router.post("/person/", tags=("person", "railway"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+async def person_post(person: Person) -> Person:
+    rw_status, persond = await rw.person({"email": person['email'], "name": person['name']})
     if not rw_status:
         raise HTTPException(status_code=204)
-    return transmuted
+    return persond
 
 
-@router.websocket("/transmute/{user_id}/websocket")
+@router.websocket("/person/{user_id}/websocket")
 async def websocket_endpoint(websocket: WebSocket, user_id: int):
     await ws_manager.connect(websocket)
     ratelimit = WebSocketRateLimiter(**MAX_REQUESTS_PER_SEC)
-    transmuted_count = 0
+    persond_count = 0
     log.info(f"Websocket connected: {websocket} - {user_id}")
 
     try:
@@ -188,12 +188,12 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
 
             rw_status = None
 
-            rw_status, transmuted = await rw.person(person["person"])
+            rw_status, persond = await rw.person(person["person"])
 
             if rw_status:
-                transmuted_count += 1
+                persond_count += 1
 
-            response: PersonResponse = {"status": rw_status, "person": transmuted}
+            response: PersonResponse = {"status": rw_status, "person": persond}
             person_response_ta.validate_python(response)
 
             # Send message when gemway finished
@@ -201,3 +201,27 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
     except WebSocketDisconnect:
         log.info(f"Websocket disconnected: {websocket}")
         ws_manager.disconnect(websocket)
+
+
+@router.get("/company/domain/{domain}", tags=("company", "railway"), response_class=JSONorNoneResponse)
+async def company_get(domain: Domain) -> Company | None:
+    """Search for public data on a company based on its domain
+
+    Args:
+        domain (Domain)
+
+    Returns:
+        Company | None
+    """
+    cmp = await company_by_domain(domain)
+    if not cmp or 'name' not in cmp:
+        return None
+    favicon = find_favicon(domain)
+    if favicon:
+        if 'logo' not in cmp:
+            cmp['logo'] = favicon
+        if 'image' in cmp:
+            cmp['image'].add(favicon)
+        else:
+            cmp['image'] = {favicon, }
+    return cmp

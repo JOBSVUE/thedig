@@ -27,5 +27,5 @@ def match_name(name: str, text: str) -> bool:
     return fuzz.partial_token_sort_ratio(name, text) >= TOKEN_RATIO
 
 
-def normalize(name: str) -> str:
-    return name.encode("ASCII", "ignore").strip().lower().decode().replace(" ", "")
+def normalize(name: str, whitespace: str="") -> str:
+    return name.encode("ASCII", "ignore").strip().lower().decode().replace(" ", whitespace)

@@ -8,6 +8,8 @@ from collections import defaultdict
 
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
+
+from .utils import normalize
 from ..api.person import Person, miner_to_person, person_ta, person_set_field, dict_to_person
 
 
@@ -174,9 +176,11 @@ class Railway:
     def add_route(self, miner_func, miner_param: dict, is_person_param: bool, route_kwargs: dict):
         route_param = {}
         route_param.update(route_kwargs)
+        miner_response_type_name = miner_func.__annotations__['return'].__name__.lower()
         route_param.update({
             'path': self.default_path.format(
-                operation="enrich",
+                # only works if the function has one and only one return type
+                operation=miner_response_type_name,
                 field=miner_param['field'],
                 func_name=miner_func.__name__,),
             'endpoint': update_wrapper(partial(miner_to_person, miner_func), miner_func),
@@ -192,6 +196,7 @@ class Railway:
                     }
                  }),
             'methods': ['POST' if is_person_param else 'GET', ],
+            'tags': (miner_response_type_name, )
         })
         self.router.add_api_route(**route_param)
     

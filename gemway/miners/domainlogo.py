@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/bin/env python3
 """
 Enrichment related to a domain
 - favicon
@@ -80,30 +80,40 @@ def domain_to_urls(domain: str) -> list[str]:
     ]
 
 
-def get_favicon(url: str) -> bool:
+def get_favicon(url: str):
     """check for favicon at a specific URL
 
     Args:
         favicon_url (str): favicon url to check
 
     Returns:
-        True if found
+        URL if found
         False if not found but host answer
         None if the host does answer with a HTTP or Network error
     """
     favicon_url = f"{url}/favicon.ico"
     try:
         r = requests.get(favicon_url)
-    except requests.RequestException:
+    except requests.RequestsError:
         log.debug("No reachable host for this url: %s" % favicon_url)
         return None
 
     if r.ok and r.headers["Content-Type"] == "image/x-icon":
         log.debug("favicon found at this URL %s" % favicon_url)
-        return True
+        return favicon_url
     else:  # yet, this is probably the right website to scan
         log.debug("No favicon at this URL: %s" % favicon_url)
         return False
+
+
+def get_ogimage(html) -> str | None:
+    og_image_url = None
+    og_image_tag = html.find("meta", attrs={"property": "og:image"})
+    if og_image_tag:
+        og_image = og_image_tag.get("content")
+        og_image_url = urllib.parse.urljoin(url, og_image)
+
+    return og_image_url
 
 
 def scrap_favicon(url: str) -> str:
@@ -131,14 +141,7 @@ def scrap_favicon(url: str) -> str:
             favicon_href = favicon_link.get("href")
             favicon_url = urllib.parse.urljoin(url, favicon_href)
         else:
-            og_image_tag = soup.find("meta", attrs={"property": "og:image"})
-            if og_image_tag:
-                log.debug("og:image found for this url: %s" % url)
-                og_image = og_image_tag.get("content")
-                favicon_url = urllib.parse.urljoin(url, og_image)
-            else:
-                log.debug("Nothing found sorry for this url: %s" % url)
-                return None
+            favicon_url = get_ogimage(soup)
 
     return favicon_url
 

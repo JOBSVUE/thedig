@@ -7,8 +7,11 @@ from json import load
 import importlib.resources as pkg_resources
 from . import data
 
-RE_WORDS = re.compile(r"\w{3,}|of|to")
-JOBTITLES = set(load(open(pkg_resources.files(data) / "jobtitles.json"))["job-titles"])
+RE_WORDS = re.compile(r"\w{2,}|of|to")
+JOBTITLES = set(
+    load(open(pkg_resources.files(data) / "jobtitles-en.json")) +
+    load(open(pkg_resources.files(data) / "jobtitles-fr.json"))
+    )
 
 
 def normalize(text: str) -> str:

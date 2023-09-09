@@ -15,7 +15,7 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 RE_WHITESPACE = re.compile(r"\s+")
-RE_ALPHA = re.compile(r"\s?'?\w+")
+RE_ALPHA = re.compile(r"\w+\-?'?")
 
 FAMILYNAME_SEPARATOR = {
     "إبن",
@@ -148,16 +148,16 @@ BUSINESS_SEPARATOR = {
 }
 
 
-def order(givenName: str, familyname: str) -> dict:
+def order(givenname: str, familyname: str) -> dict:
     # FAMILY NAME First Name (reversed)
-    if givenName.isupper() and not familyname.isupper():
+    if givenname.isupper() and not familyname.isupper():
         return {
-            "familyName": givenName,
+            "familyName": givenname,
             "givenName": familyname,
         }
     return {
         "familyName": familyname,
-        "givenName": givenName,
+        "givenName": givenname,
     }
 
 
@@ -177,17 +177,16 @@ def _split_fullname(fullname: str) -> dict:
     matched = re.match(RE_ALPHA, fullname)
     if not matched:
         return None
-    fullname = matched.group(0)
+    #fullname = matched.group(0)
 
     # minimum to guess length is 4
     # needs a space somewhere in between
     if len(fullname) < 4 or " " not in fullname.strip():
         return {
             "givenName": fullname,
-            "familyName": None,
         }
 
-    # e.g Family Name, First Name
+    # e.g Familyname, First Name
     comma_format = fullname.split(",")
     if len(comma_format) == 2 and comma_format[0][0].isupper():
         return {
@@ -209,39 +208,45 @@ def _split_fullname(fullname: str) -> dict:
             words.pop(0)
 
     # e.g givenName FamilyName
+    # too much fake positive about FamilyName
     if len(words) == 2:
-        return {**order(words[0], words[1]), **{"jobTitle": jobtitle}}
+        result = {
+            "givenName": order(words[0], words[1])["givenName"],
+            }
+        if jobtitle:
+            result["jobTitle"] = jobtitle
+        return result
 
     # eg. First name FAMILY NAME (or the opposite)
-    givenName = words[0]
+    givenname = words[0]
     familyname = None
 
     last_word_upper = words[-1].isupper()
     first_word_upper = words[0].isupper()
 
     if first_word_upper ^ last_word_upper:
-        # trick to reverse test
+        # trick to reverse FAMILY NAME Given Name
         isfamily = str.isupper if last_word_upper else lambda f: not str.isupper(f)
         for i in range(len(words)):
             if isfamily(words[i]):
                 break
-        givenName = " ".join(words[:i])
+        givenname = " ".join(words[:i])
         familyname = " ".join(words[i:])
         if first_word_upper:
-            givenName, familyname = familyname, givenName
+            givenname, familyname = familyname, givenname
     else:
         # eg. First Name Van Family Name
         for i in range(1, len(words) - 1):
             if words[i].lower() in FAMILYNAME_SEPARATOR:
-                givenName = " ".join(words[:i])
+                givenname = " ".join(words[:i])
                 familyname = " ".join(words[i:])
                 break
 
-    if givenName:
+    if givenname:
         return {
-            "givenName": givenName,
+            "givenName": givenname,
             "familyName": familyname,
-            "jobtitle": jobtitle,
+            "jobTitle": jobtitle,
         }
 
 
@@ -273,7 +278,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         prog="Fullname Splitter",
-        description="Split a fullname in a givenName and familyname",
+        description="Split a fullname in a givenname and familyname",
     )
     parser.add_argument("-f", "--file")
     parser.add_argument("-n", "--name")

@@ -24,7 +24,6 @@ class JSONorNoneResponse(JSONResponse):
         return super(JSONorNoneResponse, self).render(content)
 
 
-
 class MinerField:
 
     def __init__(self, miner: dict, field: str, person: Person):
@@ -44,17 +43,21 @@ class MinerField:
 
         log.debug(f"miner {self.miner['endpoint']} on {self.field} gave {p_mined}")
 
-        p_mined.update(dict_to_person(p_mined))
-        person_ta.validate_python(p_mined)
+        if p_mined:
+            p_mined.update(dict_to_person(p_mined))
+            person_ta.validate_python(p_mined)
 
         return p_mined
 
-    async def mine(self):
+    async def mine(self) -> dict:
         upgraded = set()
 
         log.debug(f"mining {self.field} with miner {self.miner}")
         p_mined: Person = await self.run()
 
+        if not p_mined:
+            return {}
+        
         if "OptOut" in p_mined:
             upgraded.add("Optout")
             log.warning(f"{self.miner['endpoint']} gave OptOut for {self.person}")
@@ -157,7 +160,7 @@ class Railway:
                 if (field, person[field]) in mined[miner["endpoint"]]:
                     log.error(f"{miner['endpoint']} already mined {field} with value {person[field]}")
                     continue
-                
+ 
                 mined[miner["endpoint"]].append((field, person[field]))
 
                 miner_f = MinerField(miner, field, person)                

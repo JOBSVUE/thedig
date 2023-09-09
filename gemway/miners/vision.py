@@ -51,7 +51,9 @@ DESCRIPTION_DEFAULTS = {
     "See Instagram photos and videos from",
     "I use about.me to show people what matters most to me.",
     "Follow their code on GitHub",
-    "on TikTok | Watch the latest video from",
+    "See the complete profile on LinkedIn and discover",
+    "GitHub is where",
+    " on TikTok | ",
 }
 
 SOCIALNETWORKS = {
@@ -78,7 +80,6 @@ SOCIALNETWORKS = {
 REQUESTS_PARAM = {
     "headers": ua_headers(),
     "timeout": 10,
-    "impersonate": IMPERSONATE_BROWSER,
 }
 
 

@@ -22,16 +22,7 @@ from rapidfuzz import fuzz
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-try:
-    from curl_cffi import requests
-
-    CURL_REQUESTS = True
-    IMPERSONATE_BROWSER = "chrome110"
-except ImportError:
-    log.warning("Using native requests instead of curl_cffi: no impersonate")
-    import requests
-
-    CURL_REQUESTS = False
+from curl_cffi import requests
 
 from .utils import TOKEN_RATIO, match_name, ua_headers
 
@@ -80,6 +71,7 @@ SOCIALNETWORKS = {
     # that's why we're using nitter as a proxy
     "twitter#alt": "%s/{identifier}" % settings.nitter_instance_server,
     "youtube": "https://youtube.com/{identifier}",
+    "dribble": "https://dribble.com/{identifier}",
 }
 
 # a private life is a happy life
@@ -167,26 +159,14 @@ def get_socialprofile(
     #    params['proxies'] = {'http' : "https://localhost:8080"}
     #    log.info(f"Retry with proxy. Proxy: {params['proxies']}, URL: {url}")
 
-    if CURL_REQUESTS:
-        # if not session:
-        #    session = requests.AsyncSession()
-        try:
-            # r = await session.get(url, **params)
-            r = requests.get(url, **params)
-        except requests.RequestsError as e:
-            log.error(f"Failed trying to reach Social Network. URL {url}, Error {e}")
-            return None, sn
-    else:
-        try:
-            r = requests.get(url, **params)
-        # except requests.exceptions.ProxyError as e:
-        #     log.error(f"Proxy error. Params: {params}. Error {e}")
-        # except requests.exceptions.ConnectTimeout:
-        #     log.error(f"Timeout error. Params: {params}")
-        #     return None, sn
-        except requests.RequestException as e:
-            log.error(f"Failed trying to reach Social Network. URL: {url}, Error: {e}")
-            return None, sn
+    # if not session:
+    #    session = requests.AsyncSession()
+    try:
+        # r = await session.get(url, **params)
+        r = requests.get(url, **params)
+    except requests.RequestsError as e:
+        log.error(f"Failed trying to reach Social Network. URL {url}, Error {e}")
+        return None, sn
 
     if not r.ok:
         log.debug(

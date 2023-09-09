@@ -107,14 +107,14 @@ async def social(p: dict) -> Person:
     return snm.person
 
 
-@rw.register(field="email", update=("worksFor",))
+#@rw.register(field="email", update=("worksFor",))
 async def worksfor(email: EmailStr) -> Person:
     # otherwise, the domain will give us the @org
     # except for public email providers
     domain = email.split("@")[1]
     works_for = {}
     if domain not in settings.public_email_providers:
-        company = await company_from_whois(domain)
+        company = company_from_whois(domain)
         if company:
             works_for['worksFor'] = company['name']
     return works_for

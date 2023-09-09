@@ -116,7 +116,7 @@ def get_ogimage(html) -> str | None:
     return og_image_url
 
 
-def scrap_favicon(url: str) -> str:
+def scrap_favicon(url: str) -> str | None:
     """Scrap for favicon on a website
     fallback to og:image if found
 
@@ -131,17 +131,19 @@ def scrap_favicon(url: str) -> str:
     except requests.RequestException:
         return None
 
-    if r.status_code == 200:
-        soup = BeautifulSoup(r.text, features="lxml")
-        log.debug("That page's url seems Ok: %s " % url)
+    if not r.ok:
+        return None
 
-        favicon_link = soup.find("link", attrs={"rel": FAVICON_RE})
-        if favicon_link:
-            log.debug("We did find the favicon link in the HTML: %s" % favicon_link)
-            favicon_href = favicon_link.get("href")
-            favicon_url = urllib.parse.urljoin(url, favicon_href)
-        else:
-            favicon_url = get_ogimage(soup)
+    soup = BeautifulSoup(r.text, features="lxml")
+    log.debug("That page's url seems Ok: %s " % url)
+
+    favicon_link = soup.find("link", attrs={"rel": FAVICON_RE})
+    if favicon_link:
+        log.debug("We did find the favicon link in the HTML: %s" % favicon_link)
+        favicon_href = favicon_link.get("href")
+        favicon_url = urllib.parse.urljoin(url, favicon_href)
+    else:
+        favicon_url = get_ogimage(soup)
 
     return favicon_url
 

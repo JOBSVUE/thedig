@@ -49,7 +49,7 @@ Domain = pydantic.constr(
 
 HTTP_PROXY = {
     'http': "http://mail.leadminer.io:8060",
-    'https':"http://mail.leadminer.io:8060",
+    'https': "http://mail.leadminer.io:8060",
     }
 
 
@@ -113,7 +113,7 @@ def company_from_whois(domain: Domain) -> Company | None:
     except whois.FailedParsingWhoisOutput as e:
         log.error(f"Whois failed: {e}")
         return None
-    
+
     if not result:
         return None
 
@@ -121,6 +121,7 @@ def company_from_whois(domain: Domain) -> Company | None:
     company = result.registrant
 
     if not company or company == result.registrar:
+        log.debug("No result or the registrat is the registrant")
         return None
 
     # there is some domains who hide their real registrant name
@@ -160,7 +161,7 @@ async def company_from_web(domain: Domain) -> Company | None:
     name = get_name(domain)
     if not name:
         return None
-    company = Company(name=name)
+    company = {}
     cmps = []
     cmps.append(await company_from_crunchbase(name))
     cmps.append(await company_from_indeed(name))
@@ -175,11 +176,10 @@ async def company_from_web(domain: Domain) -> Company | None:
                 company[k].update(v)
             else:
                 company[k] = v
-
     return company
 
 
-async def find_company_societecom(name: str) -> HttpUrl|None:
+async def find_company_societecom(name: str) -> HttpUrl | None:
     r = hrequests.get(
         f"https://www.societe.com/cgi-bin/liste?ori=avance&nom={quote(name)}&exa=on",
         timeout=QUERY_TIMEOUT
@@ -310,7 +310,6 @@ async def company_from_linkedin(name: str) -> Company | None:
             name=ld_json['name'],
             url=ld_json['sameAs'],
             sameAs={ld_json['url'], ld_json['sameAs']},
-            description={ld_json['slogan'], },
             logo=ld_json['logo']['contentUrl'],
             image={ld_json['logo']['contentUrl'], },
             numberOfEmployees=str(ld_json['numberOfEmployees']['value']),
@@ -318,6 +317,10 @@ async def company_from_linkedin(name: str) -> Company | None:
     except TypeError as e:
         log.warning(e)
         return None
+
+    slogan = ld_json.get('slogan')
+    if slogan:
+        cmp['description'] = {slogan, }
 
     if 'address' in ld_json:
         if 'addressRegion' in ld_json:
@@ -337,9 +340,12 @@ async def company_from_linkedin(name: str) -> Company | None:
                 cmp['address'] = {f"{ld_json['address']['streetAddress']}, {ld_json['address']['postalCode']} {ld_json['address']['addressLocality']}, {ld_json['address']['addressRegion']}, {ld_json['address']['addressCountry']}", },
 
     if 'description' in ld_json:
+        if 'description' not in cmp:
+            cmp['description'] = set()
         cmp['description'].add(ld_json['description'])
 
     return cmp
+
 
 async def company_from_crunchbase(name: str) -> Company | None:
     r = hrequests.get(
@@ -355,7 +361,7 @@ async def company_from_crunchbase(name: str) -> Company | None:
         return None
 
     name_found = r.html.find("h1.profile-name").text.lower()
-    if not name_found or name_found.text.lower() != name.lower():
+    if not name_found or name_found != name.lower():
         log.debug(f"Company name found {name_found} doesn't match name given {name}")
         return None
 
@@ -368,14 +374,23 @@ async def company_from_crunchbase(name: str) -> Company | None:
     cmp: Company = Company(
         name=name,
         description={r.html.find("span.description").text, },
-        image={r.html.find(".image-holder img").attrs['src'], },
-        location={els_one[0].text, },
-        numberOfEmployees=els_one[1].text,
-        url=els_one[-2].attrs['href'],
-        foundingDate=els_two[1].text,
-        legalName=els_two[4].text,
-        sameAs={r.url, els_one[-2].attrs['href']}
     )
+
+    if len(els_one) >= 2:
+        cmp['location'] = {els_one[0].text, }
+        cmp['numberOfEmployees'] = els_one[1].text
+        cmp['url'] = els_one[-2].attrs['href']
+
+    if len(els_two) >= 5:
+        cmp['foundingDate'] = els_two[1].text
+        cmp['legalName'] = els_two[4].text
+
+    cmp['sameAs'] = {r.url, els_one[-2].attrs['href']}
+
+
+    image = r.html.find(".image-holder img")
+    if image:
+        cmp['image'] = image.attrs['src']
 
     if sameAs:
         cmp['sameAs'] |= sameAs

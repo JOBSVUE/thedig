@@ -92,7 +92,7 @@ class LinkedInSearch:
 
     # either q or exactTerms (don't work for emails)
     QUERY_TYPE = "q"
-    GOOGLE_FIELDS = "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image)"
+    GOOGLE_FIELDS = "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image,pagemap/metatags/og:description)"
     GOOGLE_SEARCH_URL_BASE = "https://www.googleapis.com/customsearch/v1/siterestrict?key={google_api_key}&cx={google_cx}&num={num_results}&fields={google_fields}&{query_type}"
     BING_SEARCH_URL_BASE = "https://api.bing.microsoft.com/v7.0/custom/search?customconfig={bing_custom_config}&count={num_results}"
 
@@ -166,7 +166,6 @@ class LinkedInSearch:
                 log.error(f"{r.status_code} : {r.reason}")
 
             result_raw = r.json()
-
             # if a data is missing, that means probably that there is no results
             if "items" in result_raw and len(result_raw["items"]) > 0:
                 return result_raw["items"]
@@ -229,6 +228,10 @@ class LinkedInSearch:
             "profile:last_name"
         ]
 
+        self.person["description"] = {result["pagemap"]["metatags"][0][
+            "og:description"
+        ], }
+        
         # we do not use cse_thumbnail (Google's image)
         if len(result["pagemap"]["metatags"]) >= 1:
             self.person["image"] = result["pagemap"]["metatags"][0]["og:image"]
@@ -239,6 +242,7 @@ class LinkedInSearch:
         person_d = {
             "givenName": result["pagemap"]["metatags"][0]["profile:first_name"],
             "familyName": result["pagemap"]["metatags"][0]["profile:last_name"],
+            "description": {result["pagemap"]["metatags"][0]["og:description"], },
             "url": result["link"],
             "identifier": re.match(RE_LINKEDIN_URL, result["link"])["identifier"],
         }

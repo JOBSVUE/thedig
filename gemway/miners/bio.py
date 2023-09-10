@@ -8,6 +8,12 @@ import importlib.resources as pkg_resources
 from . import data
 
 RE_WORDS = re.compile(r"\w{2,}|of|to")
+
+# Job titles are extracted from :
+# - the ESCO classification of the European Commission
+# - SOC US
+# - SOC UK
+# - French Pole Emploi
 JOBTITLES = set(
     load(open(pkg_resources.files(data) / "jobtitles-en.json")) +
     load(open(pkg_resources.files(data) / "jobtitles-fr.json"))

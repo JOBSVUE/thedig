@@ -113,6 +113,9 @@ def company_from_whois(domain: Domain) -> Company | None:
     except whois.FailedParsingWhoisOutput as e:
         log.error(f"Whois failed: {e}")
         return None
+    except whois.UnknownTld as e:
+        log.error(f"Whois failed: {e}")
+        return None       
 
     if not result:
         return None
@@ -144,10 +147,13 @@ async def company_by_domain(domain: Domain) -> Company | None:
         Company: company object
     """
     cmp: Company = company_from_whois(domain) or {}
+    if not cmp:
+        return cmp
 
     # to be efficient web scrapping should gave no false positive
     # domain MUST BE [name of the company in whois].tld
-    if cmp and get_name(domain) not in cmp['name'].lower():
+    probable_name = get_name(domain)
+    if not probable_name or probable_name not in cmp['name'].lower():
         return cmp
 
     web_cmp: Company = await company_from_web(domain)
@@ -163,11 +169,11 @@ async def company_from_web(domain: Domain) -> Company | None:
         return None
     company = {}
     cmps = []
-    cmps.append(await company_from_crunchbase(name))
-    cmps.append(await company_from_indeed(name))
-    cmps.append(await company_from_linkedin(name))
+    cmps.append(await company_from_crunchbase(name, domain))
+    cmps.append(await company_from_indeed(name, domain))
+    cmps.append(await company_from_linkedin(name, domain))
     if domain[-3:] == ".fr":
-        cmps.append(company_from_societecom(name))
+        cmps.append(await company_from_societecom(name))
     for cmp in cmps:
         if not cmp or domain not in cmp.get('url', ''):
             continue
@@ -233,7 +239,7 @@ async def company_from_societecom(name: str) -> Company | None:
     return cmp
 
 
-async def company_from_indeed(name: str) -> Company | None:
+async def company_from_indeed(name: str, domain: str = "") -> Company | None:
     r = hrequests.get(
         f"https://www.indeed.com/cmp/{name}",
         timeout=QUERY_TIMEOUT,
@@ -244,7 +250,7 @@ async def company_from_indeed(name: str) -> Company | None:
         return None
 
     name_found = r.html.find("div[@itemprop='name']")
-    if not name_found or name_found.text.lower() != name.lower():
+    if not name_found or all([name_found.text.lower() != n.lower() for n in (name, domain)]):
         log.debug(f"Company name found {name_found} doesn't match name given {name}")
         return None
 
@@ -286,7 +292,7 @@ async def company_from_indeed(name: str) -> Company | None:
     return cmp
 
 
-async def company_from_linkedin(name: str) -> Company | None:
+async def company_from_linkedin(name: str, domain: str = "") -> Company | None:
     r = hrequests.get(
         f"https://www.linkedin.com/company/{name}",
         timeout=QUERY_TIMEOUT,
@@ -300,7 +306,7 @@ async def company_from_linkedin(name: str) -> Company | None:
         return None
 
     name_found = r.html.find("h1")
-    if not name_found or name_found.text.lower() != name.lower():
+    if not name_found or all([name_found.text.lower() != n.lower() for n in (name, domain)]):
         log.debug(f"Company name found {name_found} doesn't match name given {name}")
         return None
 
@@ -308,15 +314,21 @@ async def company_from_linkedin(name: str) -> Company | None:
     try:
         cmp: Company = Company(
             name=ld_json['name'],
-            url=ld_json['sameAs'],
-            sameAs={ld_json['url'], ld_json['sameAs']},
-            logo=ld_json['logo']['contentUrl'],
-            image={ld_json['logo']['contentUrl'], },
-            numberOfEmployees=str(ld_json['numberOfEmployees']['value']),
+            sameAs={ld_json['url'], },
         )
     except TypeError as e:
         log.warning(e)
         return None
+
+    if 'numberOfEmployees' in ld_json:
+        cmp['numberOfEmployees'] = str(ld_json['numberOfEmployees']['value'])
+
+    if 'logo' in ld_json:
+        cmp['logo'] = ld_json['logo']['contentUrl']
+        cmp['image'] = {ld_json['logo']['contentUrl'], }
+        
+    if 'sameAs' in ld_json:
+        cmp['url'] = ld_json['sameAs']
 
     slogan = ld_json.get('slogan')
     if slogan:
@@ -347,7 +359,7 @@ async def company_from_linkedin(name: str) -> Company | None:
     return cmp
 
 
-async def company_from_crunchbase(name: str) -> Company | None:
+async def company_from_crunchbase(name: str, domain: str = "") -> Company | None:
     r = hrequests.get(
         f"https://www.crunchbase.com/organization/{name}",
         timeout=QUERY_TIMEOUT,
@@ -361,7 +373,7 @@ async def company_from_crunchbase(name: str) -> Company | None:
         return None
 
     name_found = r.html.find("h1.profile-name").text.lower()
-    if not name_found or name_found != name.lower():
+    if not name_found or all([name_found != n.lower() for n in (name, domain)]):
         log.debug(f"Company name found {name_found} doesn't match name given {name}")
         return None
 
@@ -376,17 +388,17 @@ async def company_from_crunchbase(name: str) -> Company | None:
         description={r.html.find("span.description").text, },
     )
 
+    cmp['sameAs'] = {r.url, }
+
     if len(els_one) >= 2:
         cmp['location'] = {els_one[0].text, }
         cmp['numberOfEmployees'] = els_one[1].text
         cmp['url'] = els_one[-2].attrs['href']
+        cmp['sameAs'].add(els_one[-2].attrs['href'])
 
     if len(els_two) >= 5:
         cmp['foundingDate'] = els_two[1].text
         cmp['legalName'] = els_two[4].text
-
-    cmp['sameAs'] = {r.url, els_one[-2].attrs['href']}
-
 
     image = r.html.find(".image-holder img")
     if image:

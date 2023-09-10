@@ -6,24 +6,56 @@ import json
 import logging
 from typing import Required
 from typing_extensions import TypedDict
-from urllib.parse import quote
+import urllib.parse
 from pydantic import EmailStr, HttpUrl
 import hrequests
 import pydantic
 import whoisdomain as whois
+from .utils import normalize
 
 
 QUERY_TIMEOUT = 10
 
 TO_IGNORE = (
-    "Statutory Masking Enabled",
-    "Privacy service provided by Withheld for Privacy ehf",
-    "Data Protected",
-    "Whois Privacy Service",
-    "Redacted for Privacy Purposes",
-    "REDACTED FOR PRIVACY",
+    "<data not disclosed>",
     "Contact Privacy Inc. Customer",
+    "Data Protected",
+    "Domain Privacy Trustee SA",
     "Domains By Proxy, LLC",
+    'Data Privacy Protected',
+    'Domain Privacy Service FBO Registrant',
+    'Domain Privacy Service FBO Registrant.',
+    'Domain Privacy Trustee',
+    "Domain Protection Services",
+    "hidden",
+    "Identity Protect Limited",
+    "Identity Protection Service",
+    'Jewella Privacy LLC Privacy ID#',
+    'MyPrivacy.net',
+    "NameBrightPrivacy.com",
+    "NO FORMAT!",
+    "None",
+    "Not Disclosed",
+    "Not shown, please visit www.dnsbelgium.be for webbased whois.",
+    "[PRIVATE]",
+    'Privacy Protection',
+    'PrivacyGuardian.org llc',
+    "Privacy service provided by Withheld for Privacy ehf",
+    "REDACTED FOR PRIVACY",
+    'Redacted for GDPR privacy',
+    "Redacted for Privacy",
+    "Redacted for Privacy Purposes",
+    "Statutory Masking Enabled",
+    'See PrivacyGuardian.org',
+    'Super domains privacy',
+    'Whois Privacy',
+    'Whois Privacy Protection Foundation',
+    'Whois Privacy Protection Service',
+    'Whois Privacy Protection Service by VALUE-DOMAIN',
+    'Whois Privacy Protection Service by onamae.com',
+    "Whois Privacy Service",
+    "Whoisprotection.cc",
+    "Withheld for Privacy Purposes",
 )
 
 COMPANY_TYPE_ABBR = {
@@ -124,7 +156,7 @@ def company_from_whois(domain: Domain) -> Company | None:
     company = result.registrant
 
     if not company or company == result.registrar:
-        log.debug("No result or the registrat is the registrant")
+        log.debug("No result or the registrar is the registrant")
         return None
 
     # there is some domains who hide their real registrant name
@@ -169,9 +201,11 @@ async def company_from_web(domain: Domain) -> Company | None:
         return None
     company = {}
     cmps = []
-    cmps.append(await company_from_crunchbase(name, domain))
-    cmps.append(await company_from_indeed(name, domain))
-    cmps.append(await company_from_linkedin(name, domain))
+    cmps.extend((
+        await company_from_crunchbase(name, domain),
+        await company_from_indeed(name, domain),
+        await company_from_linkedin(name, domain),
+    ))
     if domain[-3:] == ".fr":
         cmps.append(await company_from_societecom(name))
     for cmp in cmps:
@@ -187,7 +221,7 @@ async def company_from_web(domain: Domain) -> Company | None:
 
 async def find_company_societecom(name: str) -> HttpUrl | None:
     r = hrequests.get(
-        f"https://www.societe.com/cgi-bin/liste?ori=avance&nom={quote(name)}&exa=on",
+        f"https://www.societe.com/cgi-bin/liste?ori=avance&nom={urllib.parse.quote(name)}&exa=on",
         timeout=QUERY_TIMEOUT
         )
     if not r.ok:
@@ -240,8 +274,9 @@ async def company_from_societecom(name: str) -> Company | None:
 
 
 async def company_from_indeed(name: str, domain: str = "") -> Company | None:
+    url = f"https://www.indeed.com/cmp/{name}" 
     r = hrequests.get(
-        f"https://www.indeed.com/cmp/{name}",
+        url,
         timeout=QUERY_TIMEOUT,
     )
 
@@ -256,8 +291,8 @@ async def company_from_indeed(name: str, domain: str = "") -> Company | None:
 
     cmp: Company = Company(name=name_found.text, sameAs={r.url, })
     logo = r.html.find("[@data-tn-component] img")
-    if logo:
-        cmp['logo'] = logo.attrs['src']
+    if logo and "placeholder" not in logo.attrs['src']:
+        cmp['logo'] = urllib.parse.urljoin(url, logo.attrs['src'])
         cmp['image'] = {cmp['logo'], }
 
     location = r.html.find("li[@data-testid='companyInfo-headquartersLocation'] span")
@@ -293,8 +328,9 @@ async def company_from_indeed(name: str, domain: str = "") -> Company | None:
 
 
 async def company_from_linkedin(name: str, domain: str = "") -> Company | None:
+    normalized = normalize(name)
     r = hrequests.get(
-        f"https://www.linkedin.com/company/{name}",
+        f"https://www.linkedin.com/company/{normalized}",
         timeout=QUERY_TIMEOUT,
         #verify=False,
         #proxies={'https': HTTP_PROXY,

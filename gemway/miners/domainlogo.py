@@ -93,7 +93,7 @@ def get_favicon(url: str):
     """
     favicon_url = f"{url}/favicon.ico"
     try:
-        r = requests.get(favicon_url)
+        r = requests.get(favicon_url, timeout=1)
     except requests.RequestsError:
         log.debug("No reachable host for this url: %s" % favicon_url)
         return None
@@ -106,7 +106,7 @@ def get_favicon(url: str):
         return False
 
 
-def get_ogimage(html) -> str | None:
+def get_ogimage(html, url) -> str | None:
     og_image_url = None
     og_image_tag = html.find("meta", attrs={"property": "og:image"})
     if og_image_tag:
@@ -128,7 +128,7 @@ def scrap_favicon(url: str) -> str | None:
     """
     try:
         r = requests.get(url)
-    except requests.RequestException:
+    except requests.RequestsError:
         return None
 
     if not r.ok:
@@ -143,7 +143,7 @@ def scrap_favicon(url: str) -> str | None:
         favicon_href = favicon_link.get("href")
         favicon_url = urllib.parse.urljoin(url, favicon_href)
     else:
-        favicon_url = get_ogimage(soup)
+        favicon_url = get_ogimage(soup, url)
 
     return favicon_url
 

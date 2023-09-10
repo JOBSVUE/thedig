@@ -224,4 +224,5 @@ async def company_get(domain: Domain) -> Company | None:
             cmp['image'].add(favicon)
         else:
             cmp['image'] = {favicon, }
+
     return cmp

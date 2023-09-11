@@ -32,8 +32,8 @@ def pick_nitter_instance(
             if instance["points"] > min_points and instance['ping_avg']
         }
         instance = instances[choice(sorted(instances.keys())[:first])]
-    except (requests.RequestException, IndexError, KeyError):
-        log.error(f"Failure to get nitter instances, fallback to {backup_instance}")
+    except (requests.RequestException, IndexError, KeyError) as e:
+        log.error(f"Failure to get nitter instances {e}, fallback to {backup_instance}")
         instance = backup_instance
     return instance
 

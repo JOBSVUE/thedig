@@ -12,7 +12,7 @@ import hrequests
 import pydantic
 import whoisdomain as whois
 from .utils import normalize
-
+import random
 
 QUERY_TIMEOUT = 10
 
@@ -81,8 +81,10 @@ Domain = pydantic.constr(
     )
 
 HTTP_PROXY = {
-    'http': "http://mail.leadminer.io:8060",
-    'https': "http://mail.leadminer.io:8060",
+    'http': "http://127.0.0.1:41255",
+    'https': "http://127.0.0.1:41255",
+#    'http': "socks5://mail.leadminer.io:8060",
+#    'https': "socks5://mail.leadminer.io:8060",
     }
 
 
@@ -202,11 +204,12 @@ async def company_by_domain(domain: Domain) -> Company | None:
         return cmp
 
     web_cmp: Company = await company_from_web(domain)
-    if 'description' in web_cmp and len(web_cmp['description']) > 1:
-        web_cmp['description'] = remove_shorter_duplicates(web_cmp['description'])
-    
     if web_cmp:
-        cmp.update(web_cmp)
+        for field, value in web_cmp.items():
+            if type(value) is set and len(value) > 1:
+                cmp[field] = remove_shorter_duplicates(value)
+            else:
+                cmp[field] = value
 
     return cmp
 
@@ -225,7 +228,7 @@ async def company_from_web(domain: Domain) -> Company | None:
     if domain[-3:] == ".fr":
         cmps.append(await company_from_societecom(name))
     for cmp in cmps:
-        if not cmp or domain not in cmp.get('url', ''):
+        if not cmp or all(name not in sameAs for sameAs in cmp.get('sameAs', [])):
             continue
         for k, v in cmp.items():
             if type(v) is set and k in company:
@@ -415,10 +418,10 @@ async def company_from_crunchbase(name: str, domain: str = "") -> Company | None
     r = hrequests.get(
         f"https://www.crunchbase.com/organization/{name}",
         timeout=QUERY_TIMEOUT,
-        #proxies={'https': HTTP_PROXY, 'http': HTTP_PROXY},
-        #browser="firefox",
-        #os="win",
-        )
+        #proxies=HTTP_PROXY,
+        browser=random.choice(("firefox", "chrome")),
+        os=random.choice(("win", "lin", "mac"))
+    )
 
     if not r.ok:
         log.error(f"Couldn't get results for {r.url}: {r.reason}")
@@ -429,11 +432,6 @@ async def company_from_crunchbase(name: str, domain: str = "") -> Company | None
         log.debug(f"Company name found {name_found} doesn't match name given {name}")
         return None
 
-    els_one = r.html.find_all("ul.icon-and-value > li.ng-star-inserted")
-    els_two = r.html.find_all("ul > li.ng-star-inserted > field-formatter")
-    # industries, founded date, founders, operating status, legal name
-    # company type, contact email, phone number
-    sameAs = {e.attrs['href'] for e in r.html.find_all('a[title^="View on"]')}
 
     cmp: Company = Company(
         name=name,
@@ -442,29 +440,57 @@ async def company_from_crunchbase(name: str, domain: str = "") -> Company | None
 
     cmp['sameAs'] = {r.url, }
 
-    if len(els_one) >= 2:
-        cmp['location'] = {els_one[0].text, }
-        cmp['numberOfEmployees'] = els_one[1].text
-        cmp['url'] = els_one[-2].attrs['href']
-        cmp['sameAs'].add(els_one[-2].attrs['href'])
+    summary = r.html.find_all("ul.icon_and_value > li.ng-star-inserted")
+    if len(summary) >= 2:
+        cmp['location'] = {summary[0].text, }
+        cmp['numberOfEmployees'] = summary[1].text
+        cmp['url'] = summary[-2].find('a').attrs['href']
+        cmp['sameAs'].add(summary[-2].find('a').attrs['href'])
 
-    if len(els_two) >= 5:
-        cmp['foundingDate'] = els_two[1].text
-        cmp['legalName'] = els_two[4].text
+    details_html = r.html.find_all("profile-section.ng-star-inserted li.ng-star-inserted")
+    details_fields = {
+        "Industries": {
+            'field' : 'industry',
+            'extract': lambda f: set(str.splitlines(f)),
+        },
+        "Founded Date": {
+            'field': 'foundingDate',
+            'extract': str,
+        },
+        "Founders": {
+            'field': 'founder',
+            'extract': lambda f: f.split(', '),
+        },
+        "Also Known As": {
+            'field': 'alternateName',
+            'extract': lambda f: {f, },
+        },
+        "Legal Name": {
+            'field': 'legalName',
+            'extract': str,
+        },
+        "Contact Email": {
+            'field': 'email',
+            'extract': str,
+        },
+        "Phone Number": {
+            'field': 'telephone',
+            'extract': str,
+        },
+    }
+    for detail in details_html:
+        if not detail.text:
+            break
+        field, value = detail.text.split('\n', 1)
+        if field in details_fields.keys():
+            cmp[details_fields[field]['field']] = details_fields[field]['extract'](value)
 
     image = r.html.find(".image-holder img")
     if image:
         cmp['image'] = image.attrs['src']
 
+    sameAs = {e.attrs['href'] for e in r.html.find_all('a[title^="View on"]')}
     if sameAs:
         cmp['sameAs'] |= sameAs
-    if len(els_two) >= 8:
-        cmp['email'] = els_two[6].text
-        cmp['telephone'] = els_two[7].text
-    elif len(els_two) >= 7:
-        if '@' in els_two[6].text:
-            cmp['email'] = els_two[6].text
-        else:
-            cmp['telephone'] = els_two[6].text
 
     return cmp

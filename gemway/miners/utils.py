@@ -4,10 +4,12 @@ Various utilities
 
 from rapidfuzz import fuzz
 from fake_useragent import UserAgent
+from .ISO3166 import ISO3166
+import re
 
 TOKEN_RATIO = 82
 
-
+    
 def ua_headers(random: bool = False) -> dict:
     """
     generate a random user-agent

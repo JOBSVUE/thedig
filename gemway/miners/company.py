@@ -61,6 +61,7 @@ TO_IGNORE = (
 COMPANY_TYPE_ABBR = {
     'Co',
     'Corp',
+    'Corporation',
     'EURL',
     'Inc',
     'LLC',
@@ -118,6 +119,18 @@ def get_name(domain: Domain) -> str | None:
     if len(d) > 2:
         return None
     return d[-2].replace('-', ' ').lower()
+
+
+def remove_shorter_duplicates(data: set):
+    for d in data.copy():
+        # it has been removed, so continue
+        if d not in data:
+            continue
+        data_c = data.copy() - {d, }
+        for d_c in data_c:
+            if d_c in d:
+                data.remove(d_c)
+    return data
 
 
 def remove_company_type_abbrv(company: str) -> str:
@@ -189,6 +202,9 @@ async def company_by_domain(domain: Domain) -> Company | None:
         return cmp
 
     web_cmp: Company = await company_from_web(domain)
+    if 'description' in web_cmp and len(web_cmp['description']) > 1:
+        web_cmp['description'] = remove_shorter_duplicates(web_cmp['description'])
+    
     if web_cmp:
         cmp.update(web_cmp)
 
@@ -320,9 +336,9 @@ async def company_from_indeed(name: str, domain: str = "") -> Company | None:
     if revenue:
         cmp['revenue'] = revenue.text
 
-    description = r.html.find("div.more-text p") or r.html.find("div[@data-testid='less-text'] p:first-child")
+    description = r.html.find("div[@data-testid='more-text'] p") or r.html.find("div[@data-testid='less-text'] p:first-child")
     if description:
-        cmp['description'] = {description.text, }
+        cmp['description'] = {description.text.removesuffix('...Show less'), }
 
     return cmp
 

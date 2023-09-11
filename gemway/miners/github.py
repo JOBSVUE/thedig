@@ -1,6 +1,6 @@
 import requests
 
-GITHUB_TOKEN = "XXXXXXXXXX"
+GITHUB_TOKEN = "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"
 GITHUB_GRAPHQL_ENDPOINT = "https://api.github.com/graphql" 
 GITHUB_GRAPHQL_USERS = """{
   users_by_name: search(type: USER, query: "${name}", first: 3) {

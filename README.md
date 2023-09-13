@@ -84,7 +84,7 @@ You're welcome! First, have a look on issues open and closed. If nothing is rela
 - Set the `LOG_LEVEL` to `DEBUG` in `.env`
 - Enter the ``gemway`` folder and run it this way : ``uvicorn main:app --reload``
 ### Contributor Copyright Agreement
-By contributing to this product, you got the right to use, modify and distribute the product with your contribution and you give to the editor of this product (ankaboot) an unlimited and perpetual license to use, modify and publish, including commercially, your contribution.
+In consideration of your contributions to this product, you shall be granted the right to utilize, modify, and disseminate the product in conjunction with your contributions. Simultaneously, you hereby grant the software editor (Ankaboot Company) an irrevocable, perpetual, and unrestricted license to employ, adapt, and publish, including for commercial purposes, your contributions, in their entirety.
 
 ## ⚠️ Support
 

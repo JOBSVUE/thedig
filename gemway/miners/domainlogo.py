@@ -11,6 +11,7 @@ import urllib.parse
 
 import logging
 from curl_cffi import requests
+from .utils import domain_to_urls, guess_country
 
 # make it work as a command line tool
 try:
@@ -21,63 +22,6 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 FAVICON_RE = re.compile("^(shortcut icon|icon)$", re.I)
-
-COUNTRY_TLD_EXCLUSION = {
-    "ai",
-    "am",
-    "at",
-    "bz",
-    "cc",
-    "co",
-    "fi",
-    "fm",
-    "im",
-    "in",
-    "io",
-    "is",
-    "it",
-    "ly",
-    "me",
-    "mu",
-    "nu",
-    "re",
-    "sk",
-    "sh",
-    "tk",
-    "to",
-    "tv",
-    "ws",
-}
-
-
-def get_tld(domain: str) -> str:
-    return domain.split(".")[-1]
-
-
-def guess_country(domain: str) -> str:
-    tld = get_tld(domain)
-    # tld used generically are irrelevant to guess country
-    if tld in COUNTRY_TLD_EXCLUSION:
-        return None
-    return ISO3166.get(tld.upper())
-
-
-def domain_to_urls(domain: str) -> list[str]:
-    """Build hypothetical websites URL from a domain
-    Gives priority to https then to www
-
-    Args:
-        domain (str): domain name
-
-    Returns:
-        list of urls
-    """
-    return [
-        f"https://www.{domain}",
-        f"https://{domain}",
-        f"http://www.{domain}",
-        f"http://{domain}",
-    ]
 
 
 def get_favicon(url: str):

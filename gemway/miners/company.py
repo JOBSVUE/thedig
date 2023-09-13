@@ -4,14 +4,17 @@ Grab informations about a company from its domain
 """
 import json
 import logging
+import re
 from typing import Required
 from typing_extensions import TypedDict
 import urllib.parse
+from bs4 import BeautifulSoup
 from pydantic import EmailStr, HttpUrl
 import hrequests
+from curl_cffi import requests
 import pydantic
 import whoisdomain as whois
-from .utils import normalize
+from .utils import normalize, domain_to_urls
 import random
 
 QUERY_TIMEOUT = 10
@@ -87,8 +90,7 @@ HTTP_PROXY = {
 #    'https': "socks5://mail.leadminer.io:8060",
     }
 
-
-class Company(TypedDict, total=False):
+class Organization(TypedDict, total=False):
     name: Required[str]
     description: set[str]
     address: set[str]
@@ -96,7 +98,6 @@ class Company(TypedDict, total=False):
     founder: set[str]
     logo: HttpUrl
     image: set[HttpUrl]
-    industry: set[str]
     legalName: str
     location: set[str]
     # often a range x-y
@@ -107,8 +108,9 @@ class Company(TypedDict, total=False):
     email: EmailStr
     telephone: str
     foundingDate: str
-    # not native to Organization schema.org
-    # unstructured
+    
+class Company(Organization, total=False):
+    industry: set[str]
     revenue: str
 
 
@@ -150,19 +152,13 @@ def remove_company_type_abbrv(company: str) -> str:
 
 def company_from_whois(domain: Domain) -> Company | None:
     try:
-        result = whois.query(domain, ignore_returncode=True)
+        result = whois.query(domain, ignore_returncode=True, timeout=4.0)
     except whois.WhoisPrivateRegistry as e:
         log.error(f"Whois failed: {e}")
         return None
-    except whois.WhoisCommandFailed as e:
+    except (whois.WhoisCommandFailed, whois.FailedParsingWhoisOutput, whois.UnknownTld, whois.WhoisCommandTimeout) as e:
         log.error(f"Whois failed: {e}")
         return None
-    except whois.FailedParsingWhoisOutput as e:
-        log.error(f"Whois failed: {e}")
-        return None
-    except whois.UnknownTld as e:
-        log.error(f"Whois failed: {e}")
-        return None       
 
     if not result:
         return None
@@ -185,7 +181,7 @@ def company_from_whois(domain: Domain) -> Company | None:
 
 
 async def company_by_domain(domain: Domain) -> Company | None:
-    """Will get company using its name
+    """Will get company using its domain whois
 
     Args:
         domain (str): domain of the company
@@ -194,14 +190,14 @@ async def company_by_domain(domain: Domain) -> Company | None:
         Company: company object
     """
     cmp: Company = company_from_whois(domain) or {}
-    if not cmp:
-        return cmp
+    #if not cmp:
+    #    return cmp
 
-    # to be efficient web scrapping should gave no false positive
+    # to be efficient web scrapping should give no false positive
     # domain MUST BE [name of the company in whois].tld
-    probable_name = get_name(domain)
-    if not probable_name or probable_name not in cmp['name'].lower():
-        return cmp
+    #probable_name = get_name(domain)
+    #if not probable_name or probable_name not in cmp['name'].lower():
+    #    return cmp
 
     web_cmp: Company = await company_from_web(domain)
     if web_cmp:
@@ -215,20 +211,24 @@ async def company_by_domain(domain: Domain) -> Company | None:
 
 
 async def company_from_web(domain: Domain) -> Company | None:
-    name = get_name(domain)
-    if not name:
-        return None
-    company = {}
+    company = await company_from_website(domain)
+    if "name" not in company:
+        name = get_name(domain)
+        # no name, no game
+        if not name:
+            return None
+        company['name'] = name
+
     cmps = []
     cmps.extend((
-        await company_from_crunchbase(name, domain),
-        await company_from_indeed(name, domain),
-        await company_from_linkedin(name, domain),
+        await company_from_crunchbase(company['name'], domain),
+        await company_from_indeed(company['name'], domain),
+        await company_from_linkedin(company['name'], domain),
     ))
     if domain[-3:] == ".fr":
-        cmps.append(await company_from_societecom(name))
+        cmps.append(await company_from_societecom(company['name']))
     for cmp in cmps:
-        if not cmp or all(name not in sameAs for sameAs in cmp.get('sameAs', [])):
+        if not cmp or domain not in cmp['url']:
             continue
         for k, v in cmp.items():
             if type(v) is set and k in company:
@@ -347,9 +347,9 @@ async def company_from_indeed(name: str, domain: str = "") -> Company | None:
 
 
 async def company_from_linkedin(name: str, domain: str = "") -> Company | None:
-    normalized = normalize(name)
+    url = f"https://www.linkedin.com/company/{normalize(name)}"
     r = hrequests.get(
-        f"https://www.linkedin.com/company/{normalized}",
+        url,
         timeout=QUERY_TIMEOUT,
         #verify=False,
         #proxies={'https': HTTP_PROXY,
@@ -361,15 +361,17 @@ async def company_from_linkedin(name: str, domain: str = "") -> Company | None:
         return None
 
     name_found = r.html.find("h1")
-    if not name_found or all([name_found.text.lower() != n.lower() for n in (name, domain)]):
+    if not name_found or all([name_found.text.casefold() != n.casefold() for n in (name, domain)]):
         log.debug(f"Company name found {name_found} doesn't match name given {name}")
         return None
 
     ld_json = json.loads(r.html.find("script[type='application/ld+json']").text)
+    
     try:
         cmp: Company = Company(
             name=ld_json['name'],
             sameAs={ld_json['url'], },
+            url=ld_json['url'],
         )
     except TypeError as e:
         log.warning(e)
@@ -390,21 +392,16 @@ async def company_from_linkedin(name: str, domain: str = "") -> Company | None:
         cmp['description'] = {slogan, }
 
     if 'address' in ld_json:
+        location = [
+                ld_json['address']['addressLocality'],
+                ld_json['address']['addressCountry']
+        ]
         if 'addressRegion' in ld_json:
-            location = (
-                ld_json['address'].get('addressLocality', ''),
-                ld_json['address'].get('addressRegion', ''),
-                ld_json['address'].get('addressCountry', '')
-                )
-        else:
-            location = (
-                ld_json['address'].get('addressLocality', ''),
-                ld_json['address'].get('addressCountry', '')
-                )
-        if location:
-            cmp['location'] = {', '.join(location), }
-            if ('streetAddress', 'postalCode', 'addressRegion') in ld_json['address']:
-                cmp['address'] = {f"{ld_json['address']['streetAddress']}, {ld_json['address']['postalCode']} {ld_json['address']['addressLocality']}, {ld_json['address']['addressRegion']}, {ld_json['address']['addressCountry']}", },
+            location.insert(1, ld_json['address']['addressRegion'])
+        cmp['location'] = {', '.join(location), }
+        
+        if ('streetAddress', 'postalCode', 'addressRegion') in ld_json['address']:
+            cmp['address'] = {f"{ld_json['address']['streetAddress']}, {ld_json['address']['postalCode']} {ld_json['address']['addressLocality']}, {ld_json['address']['addressRegion']}, {ld_json['address']['addressCountry']}", },
 
     if 'description' in ld_json:
         if 'description' not in cmp:
@@ -492,5 +489,75 @@ async def company_from_crunchbase(name: str, domain: str = "") -> Company | None
     sameAs = {e.attrs['href'] for e in r.html.find_all('a[title^="View on"]')}
     if sameAs:
         cmp['sameAs'] |= sameAs
+
+    return cmp
+
+
+async def company_from_website(domain: str):
+    cmp = {}
+    urls = domain_to_urls(domain)
+    for url in urls:
+        r = requests.get(url)
+        if r.ok:
+            break
+    if not r.ok:
+        return cmp
+    html = BeautifulSoup(r.text, "lxml")
+    org_html = html.find(attrs={'itemtype': "http://schema.org/Organization"})
+    if org_html:
+        for field in Company.__annotations__.keys():
+            f_html = org_html.find(attrs={'itemprop': f"{field}"})
+            # takes the first value only
+            if f_html and 'content' in f_html.attrs:
+                cmp[field] = f_html.attrs['content']
+
+    meta = html.find_all("meta")
+    og_html = [
+        m for m in meta
+        if 'property' in m.attrs and m.attrs['property'].startswith("og:")
+        ]
+    if og_html:
+        og_map = {
+            'og:site_name': [{
+                'field': 'name',
+                'extract': str,
+                }],
+            'og:title': [{
+                'field': 'name',
+                'extract': lambda x: min(
+                    re.split(":|-|\|", x),
+                    key=len
+                    ).strip(),
+                }],
+            'og:image': [{
+                'field': 'image',
+                'extract': lambda x: {x, },
+                },
+                {
+                'field': 'logo',
+                'extract': str,
+                }],
+            'og:description': [{
+                'field': 'description',
+                'extract': lambda x: {x, },
+                }],
+            'og:url': [{
+                'field': 'sameAs',
+                'extract': lambda x: {x, },
+                }]
+            }
+        for og_field in og_html:
+            if og_field.attrs['property'] not in og_map:
+                continue
+            og_dest = og_map[og_field.attrs['property']]
+            for dest in og_dest:
+                cmp[dest['field']] = dest['extract'](og_field.attrs['content'])
+
+    if cmp:
+        cmp['url'] = url
+        if 'sameAs' in cmp:
+            cmp['sameAs'].add(url)
+        else:
+            cmp['sameAs'] = {url, }
 
     return cmp

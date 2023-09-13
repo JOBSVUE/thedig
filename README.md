@@ -8,6 +8,7 @@ Enrich data about someone (e.g job title, company, profile pictures etc.) using 
 
 ## ✨ Features
 
+### Person
 Marketing-related data fetched from an email address and full name:
 - Given name, Family name
 - Job title
@@ -21,6 +22,21 @@ Marketing-related data fetched from an email address and full name:
 
 If a person add #OptOut to his social profile bio, he won't be mined.
 
+### Company
+Company informations based solely on the domain:
+- name
+- website's url
+- alternate name
+- industry
+- legal name
+- description
+- employees number
+- founding date
+- founders
+- email
+- telephone
+- social network's URL
+- 
 ## 🛡️ Privacy-by-design
 
 This program intend to be actively GDPR compliant and respectful of mined person's privacy. Our intent is to help user's enrich data on existing contacts not to spy nor gather data on someone with a malicious purpose. We implemented proactively a few GDPR principles in the code itself:
@@ -56,6 +72,11 @@ Download it and:
 ```bash
   docker-compose up -d
 ```
+
+## 🔜 Roadmap
+- More data enrichment for persons and company coming for as many safe sources as possible
+- IA to automatically summarize descriptions, identify face pictures, detect locations, normalize job titles or 
+- Safe and privacy-oriented integration with [GHunt](https://github.com/mxrch/GHunt) and [Holehe](https://github.com/megadose/holehe): requires to pick only relevant data and websites and transform it into safe data (eg. guess a location area of interest based on google maps reviews instead of tracking the person's location or detect an interest for marketing if hubspot.com account)
 
 ## 🤝 How to contribute
 You're welcome! First, have a look on issues open and closed. If nothing is related to your needs, either open an issue or [fork, create a branch and submit your PR](https://docs.github.com/en/get-started/quickstart/contributing-to-projects).

@@ -2,8 +2,10 @@
 Various utilities
 """
 
+from pydantic import HttpUrl
 from rapidfuzz import fuzz
 from fake_useragent import UserAgent
+import urllib
 from .ISO3166 import ISO3166
 
 TOKEN_RATIO = 82
@@ -34,6 +36,17 @@ COUNTRY_TLD_EXCLUSION = {
     "tv",
     "ws",
 }
+
+
+def absolutize(url: str, base_url: HttpUrl) -> HttpUrl:
+    if str(url).startswith("http"):
+        absolute_url = url
+    else:
+        absolute_url = urllib.parse.urljoin(base_url, str(url))
+    # if this didn't work, return empty string
+    if not str(absolute_url).startswith("http"):
+        absolute_url = ""
+    return absolute_url
 
 
 def get_tld(domain: str) -> str:
@@ -84,5 +97,10 @@ def match_name(name: str, text: str) -> bool:
     return fuzz.partial_token_sort_ratio(name, text) >= TOKEN_RATIO
 
 
-def normalize(name: str, whitespace: str="") -> str:
-    return name.encode("ASCII", "ignore").strip().lower().decode().replace(" ", whitespace)
+def normalize(name: str, replace: dict = {' ': ''}) -> str:
+    name = str(
+        name.encode("ASCII", "ignore").strip().decode()
+        ).casefold()
+    for k, v in replace.items():
+        name = name.replace(k, v)
+    return name

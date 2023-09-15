@@ -9,17 +9,11 @@ import re
 from bs4 import BeautifulSoup
 import urllib.parse
 
-import logging
+from loguru import logger as log
 from curl_cffi import requests
 from .utils import domain_to_urls, guess_country
+from .ISO3166 import ISO3166
 
-# make it work as a command line tool
-try:
-    from .ISO3166 import ISO3166
-except ImportError:
-    from ISO3166 import ISO3166
-
-log = logging.getLogger(__name__)
 
 FAVICON_RE = re.compile("^(shortcut icon|icon)$", re.I)
 

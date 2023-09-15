@@ -5,16 +5,17 @@ Grab informations about a company from its domain
 import json
 import logging
 import re
+import string
 from typing import Required
 from typing_extensions import TypedDict
 import urllib.parse
 from bs4 import BeautifulSoup
-from pydantic import EmailStr, HttpUrl
+from pydantic import EmailStr, HttpUrl, TypeAdapter
 import hrequests
 from curl_cffi import requests
 import pydantic
 import whoisdomain as whois
-from .utils import normalize, domain_to_urls
+from .utils import absolutize, normalize, domain_to_urls
 import random
 
 QUERY_TIMEOUT = 10
@@ -90,6 +91,7 @@ HTTP_PROXY = {
 #    'https': "socks5://mail.leadminer.io:8060",
     }
 
+
 class Organization(TypedDict, total=False):
     name: Required[str]
     description: set[str]
@@ -108,8 +110,13 @@ class Organization(TypedDict, total=False):
     email: EmailStr
     telephone: str
     foundingDate: str
-    
-class Company(Organization, total=False):
+
+
+class Corporation(Organization, total=False):
+    tickerSymbol: str
+
+
+class Company(Corporation, total=False):
     industry: set[str]
     revenue: str
 
@@ -132,7 +139,7 @@ def remove_shorter_duplicates(data: set):
             continue
         data_c = data.copy() - {d, }
         for d_c in data_c:
-            if d_c in d:
+            if str(d_c).strip(string.whitespace+'.') in str(d).strip(string.whitespace+'.'):
                 data.remove(d_c)
     return data
 
@@ -212,23 +219,22 @@ async def company_by_domain(domain: Domain) -> Company | None:
 
 async def company_from_web(domain: Domain) -> Company | None:
     company = await company_from_website(domain)
-    if "name" not in company:
-        name = get_name(domain)
-        # no name, no game
-        if not name:
-            return None
-        company['name'] = name
+    name = company.get('name', get_name(domain))
+    if not name:
+        return None
+    print(name)
 
     cmps = []
     cmps.extend((
-        await company_from_crunchbase(company['name'], domain),
-        await company_from_indeed(company['name'], domain),
-        await company_from_linkedin(company['name'], domain),
+        await company_from_crunchbase(name, domain),
+        await company_from_indeed(name, domain),
+        await company_from_linkedin(name, domain),
     ))
     if domain[-3:] == ".fr":
-        cmps.append(await company_from_societecom(company['name']))
+        cmps.append(await company_from_societecom(name))
+
     for cmp in cmps:
-        if not cmp or domain not in cmp['url']:
+        if not cmp or (not name and domain not in cmp['url']) or (name and name != cmp['name']):
             continue
         for k, v in cmp.items():
             if type(v) is set and k in company:
@@ -293,7 +299,7 @@ async def company_from_societecom(name: str) -> Company | None:
 
 
 async def company_from_indeed(name: str, domain: str = "") -> Company | None:
-    url = f"https://www.indeed.com/cmp/{name}" 
+    url = f"https://www.indeed.com/cmp/{name}"
     r = hrequests.get(
         url,
         timeout=QUERY_TIMEOUT,
@@ -309,6 +315,18 @@ async def company_from_indeed(name: str, domain: str = "") -> Company | None:
         return None
 
     cmp: Company = Company(name=name_found.text, sameAs={r.url, })
+    
+    link = r.html.find("a[@data-tn-element='companyLink[]']")
+    if not link:
+        return {}
+    cmp['url'] = link.attrs['href']
+
+    # that's not the right company
+    if domain not in cmp['url'] and cmp['url'] != url:
+        return {}
+
+    cmp['sameAs'].add(cmp['url'])
+
     logo = r.html.find("[@data-tn-component] img")
     if logo and "placeholder" not in logo.attrs['src']:
         cmp['logo'] = urllib.parse.urljoin(url, logo.attrs['src'])
@@ -316,7 +334,7 @@ async def company_from_indeed(name: str, domain: str = "") -> Company | None:
 
     location = r.html.find("li[@data-testid='companyInfo-headquartersLocation'] span")
     if location:
-        cmp['location'] = {location.text, }
+        cmp['location'] = {location.text.removesuffix(' ...'), }
 
     numberOfEmployees = r.html.find("li[@data-testid='companyInfo-employee'] div:last-child")
     if numberOfEmployees:
@@ -325,11 +343,6 @@ async def company_from_indeed(name: str, domain: str = "") -> Company | None:
     industry = r.html.find("a[@data-tn-element='industryInterLink']")
     if industry:
         cmp['industry'] = {industry.text, }
-
-    url = r.html.find("a[@data-tn-element='companyLink[]']")
-    if url:
-        cmp['url'] = url.attrs['href']
-        cmp['sameAs'].add(cmp['url'])
 
     foundingDate = r.html.find("li[data-testid='companyInfo-founded'] div:last-child")
     if foundingDate:
@@ -347,14 +360,30 @@ async def company_from_indeed(name: str, domain: str = "") -> Company | None:
 
 
 async def company_from_linkedin(name: str, domain: str = "") -> Company | None:
-    url = f"https://www.linkedin.com/company/{normalize(name)}"
-    r = hrequests.get(
-        url,
-        timeout=QUERY_TIMEOUT,
-        #verify=False,
-        #proxies={'https': HTTP_PROXY,
-        #         'http': HTTP_PROXY},
-    )
+    cmp = (
+        await _company_from_linkedin(name, domain)
+        or await _company_from_linkedin(name, domain, use_domain=True)
+        )
+    return cmp
+
+
+async def _company_from_linkedin(name: str, domain: str = "", use_domain: bool=False) -> Company | None:
+    normalized_name = normalize(
+        domain if use_domain else name,
+        replace={' ': '', '.': '-'}
+        )
+    url = f"https://www.linkedin.com/company/{normalized_name}"
+    try:
+        r = hrequests.get(
+            url,
+            timeout=QUERY_TIMEOUT,
+            #verify=False,
+            #proxies={'https': HTTP_PROXY,
+            #         'http': HTTP_PROXY},
+        )
+    except Exception:
+        log.error(f"Couldn't get results for {r.url}: {r.reason}")
+        return None        
 
     if not r.ok:
         log.error(f"Couldn't get results for {r.url}: {r.reason}")
@@ -371,11 +400,21 @@ async def company_from_linkedin(name: str, domain: str = "") -> Company | None:
         cmp: Company = Company(
             name=ld_json['name'],
             sameAs={ld_json['url'], },
-            url=ld_json['url'],
         )
     except TypeError as e:
         log.warning(e)
         return None
+    
+    # if we don't have the Website's company, we can't be sure
+    if 'sameAs' not in ld_json:
+        return {}
+    
+    cmp['url'] = ld_json['sameAs']
+
+    # that's not the right company
+    if domain not in cmp['url'] and cmp['url'] != url:
+        return {}
+
 
     if 'numberOfEmployees' in ld_json:
         cmp['numberOfEmployees'] = str(ld_json['numberOfEmployees']['value'])
@@ -384,25 +423,24 @@ async def company_from_linkedin(name: str, domain: str = "") -> Company | None:
         cmp['logo'] = ld_json['logo']['contentUrl']
         cmp['image'] = {ld_json['logo']['contentUrl'], }
         
-    if 'sameAs' in ld_json:
-        cmp['url'] = ld_json['sameAs']
 
     slogan = ld_json.get('slogan')
     if slogan:
         cmp['description'] = {slogan, }
 
     if 'address' in ld_json:
-        location = [
-                ld_json['address']['addressLocality'],
-                ld_json['address']['addressCountry']
-        ]
-        if 'addressRegion' in ld_json:
-            location.insert(1, ld_json['address']['addressRegion'])
-        cmp['location'] = {', '.join(location), }
-        
-        if ('streetAddress', 'postalCode', 'addressRegion') in ld_json['address']:
-            cmp['address'] = {f"{ld_json['address']['streetAddress']}, {ld_json['address']['postalCode']} {ld_json['address']['addressLocality']}, {ld_json['address']['addressRegion']}, {ld_json['address']['addressCountry']}", },
-
+        location = (
+            ld_json['address'].get('addressLocality', None),
+            ld_json['address'].get('addressRegion', None),
+            ld_json['address'].get('addressCountry', None),
+        )
+        location = {', '.join(loc for loc in location if loc)}
+        if location:
+            cmp['location'] = location
+        address_l = list(ld_json['address'].values())
+        address_l.remove('PostalAddress')
+        cmp['address'] = {', '.join(address_l), }
+                          
     if 'description' in ld_json:
         if 'description' not in cmp:
             cmp['description'] = set()
@@ -412,8 +450,9 @@ async def company_from_linkedin(name: str, domain: str = "") -> Company | None:
 
 
 async def company_from_crunchbase(name: str, domain: str = "") -> Company | None:
+    url = f"https://www.crunchbase.com/organization/{normalize(name)}"
     r = hrequests.get(
-        f"https://www.crunchbase.com/organization/{name}",
+        url,
         timeout=QUERY_TIMEOUT,
         #proxies=HTTP_PROXY,
         browser=random.choice(("firefox", "chrome")),
@@ -439,9 +478,14 @@ async def company_from_crunchbase(name: str, domain: str = "") -> Company | None
 
     summary = r.html.find_all("ul.icon_and_value > li.ng-star-inserted")
     if len(summary) >= 2:
+        cmp['url'] = summary[-2].find('a').attrs['href']
+        
+        # that's not the right company
+        if domain not in cmp['url'] and cmp['url'] != url:
+            return {}
+        
         cmp['location'] = {summary[0].text, }
         cmp['numberOfEmployees'] = summary[1].text
-        cmp['url'] = summary[-2].find('a').attrs['href']
         cmp['sameAs'].add(summary[-2].find('a').attrs['href'])
 
     details_html = r.html.find_all("profile-section.ng-star-inserted li.ng-star-inserted")
@@ -497,19 +541,68 @@ async def company_from_website(domain: str):
     cmp = {}
     urls = domain_to_urls(domain)
     for url in urls:
-        r = requests.get(url)
-        if r.ok:
-            break
-    if not r.ok:
+        try:
+            r = requests.get(url, timeout=1)
+            if r.ok:
+                break
+        except requests.RequestsError:
+            r = None
+            continue
+    if not r or not r.ok:
         return cmp
+
     html = BeautifulSoup(r.text, "lxml")
-    org_html = html.find(attrs={'itemtype': "http://schema.org/Organization"})
-    if org_html:
-        for field in Company.__annotations__.keys():
-            f_html = org_html.find(attrs={'itemprop': f"{field}"})
-            # takes the first value only
-            if f_html and 'content' in f_html.attrs:
-                cmp[field] = f_html.attrs['content']
+
+    # schema.org organization has the priority
+
+    # first, let's try with JSON
+    org_js = html.find("script", attrs={'type': 'application/ld+json'})
+    if org_js:
+        # <script content="" attribute or inside <script></script> element
+        org_json_ = json.loads(
+            org_js.attrs['content'] if 'content' in org_js.attrs else org_js.text,
+            strict=False
+            )
+        org_json = None
+        eligible_json = lambda x: x.get("@type", "").title() in ("Organization", "Corporation", "Website")
+        # select only first eligible JSON
+        if type(org_json_) is list:
+            org_json = next(
+                filter(
+                    eligible_json,
+                    org_json_
+                ),
+                None
+                )
+        elif eligible_json(org_json_):
+            org_json = org_json_
+            
+        if org_json:
+            fields = Company.__annotations__.keys() & org_json.keys()
+            for field in fields:
+                # weirdly, sometimes fields are just empty
+                if not org_json[field]:
+                    continue
+                if 'set[' in str(Company.__annotations__[field]) and type(org_json[field]) is str:
+                    org_json[field] = {org_json[field], }
+                try:
+                    cmp[field] = TypeAdapter(Company.__annotations__[field], config=dict(arbitrary_types_allowed=True)).validate_python(org_json[field])
+                except pydantic.ValidationError:
+                    log.debug(f"{org_json[field]} not type valid for field: {field}")
+                    continue
+                
+    # then with HTML
+    if not cmp:
+        org_html = (
+            html.find(attrs={'itemtype': "http://schema.org/Organization"})
+            or html.find(attrs={'itemtype': "http://schema.org/Corporation"})
+            )
+        if org_html:
+            for field in Company.__annotations__.keys():
+                f_html = org_html.find(attrs={'itemprop': f"{field}"})
+                # takes the first value only when not empty
+                if f_html and f_html.attrs.get('content', None):
+                    cmp[field] = f_html.attrs['content']
 
     meta = html.find_all("meta")
     og_html = [
@@ -518,16 +611,17 @@ async def company_from_website(domain: str):
         ]
     if og_html:
         og_map = {
+# in some edgecases, website's title is "Home/Welcome/Accueil/... | Company's Name" :(
+#            'og:title': [{
+#                'field': 'name',
+#                'extract': lambda x: min(
+#                    re.split(" : | - | \| ", x),
+#                    key=len
+#                    ).strip(),
+#                }],
             'og:site_name': [{
                 'field': 'name',
                 'extract': str,
-                }],
-            'og:title': [{
-                'field': 'name',
-                'extract': lambda x: min(
-                    re.split(":|-|\|", x),
-                    key=len
-                    ).strip(),
                 }],
             'og:image': [{
                 'field': 'image',
@@ -551,13 +645,28 @@ async def company_from_website(domain: str):
                 continue
             og_dest = og_map[og_field.attrs['property']]
             for dest in og_dest:
+                # only add data if isn't already found through JSON Schema.org
+                if dest['field'] in cmp.keys():
+                    continue
+                if 'content' not in og_field.attrs:
+                    continue
                 cmp[dest['field']] = dest['extract'](og_field.attrs['content'])
 
-    if cmp:
-        cmp['url'] = url
-        if 'sameAs' in cmp:
-            cmp['sameAs'].add(url)
-        else:
-            cmp['sameAs'] = {url, }
+    # no need to continue
+    if not cmp:
+        return cmp
+
+    cmp['url'] = url
+    if 'sameAs' in cmp:
+        cmp['sameAs'] = {absolutize(sameAs, url) for sameAs in cmp['sameAs']}
+        cmp['sameAs'].add(url)
+    else:
+        cmp['sameAs'] = {url, }
+
+    # sometimes URLs are relative URLs
+    if 'image' in cmp:
+        cmp['image'] = {absolutize(image, url) for image in cmp['image']}
+    if 'logo' in cmp:
+        cmp['logo'] = absolutize(cmp['logo'], url)
 
     return cmp

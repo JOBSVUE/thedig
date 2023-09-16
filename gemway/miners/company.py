@@ -2,6 +2,7 @@
 """
 Grab informations about a company from its domain
 """
+from functools import partial
 import json
 import logging
 import re
@@ -14,8 +15,9 @@ from pydantic import EmailStr, HttpUrl, TypeAdapter
 import hrequests
 from curl_cffi import requests
 import pydantic
+import rapidfuzz
 import whoisdomain as whois
-from .utils import absolutize, normalize, domain_to_urls
+from .utils import absolutize, match_name, normalize, domain_to_urls
 import random
 
 QUERY_TIMEOUT = 10
@@ -24,6 +26,7 @@ TO_IGNORE = (
     "<data not disclosed>",
     "Contact Privacy Inc. Customer",
     "Data Protected",
+    "DATA REDACTED",
     "Domain Privacy Trustee SA",
     "Domains By Proxy, LLC",
     'Data Privacy Protected',
@@ -63,6 +66,7 @@ TO_IGNORE = (
 )
 
 COMPANY_TYPE_ABBR = {
+    'AG',
     'Co',
     'Corp',
     'Corporation',
@@ -130,6 +134,14 @@ def get_name(domain: Domain) -> str | None:
     if len(d) > 2:
         return None
     return d[-2].replace('-', ' ').lower()
+
+
+def extract_name(text: str, domain: Domain) -> str:
+    return rapidfuzz.process.extractOne(
+        domain,
+        map(str.strip, re.split(":|-|\|", text)),
+        scorer=rapidfuzz.fuzz.QRatio,
+        )[0]
 
 
 def remove_shorter_duplicates(data: set):
@@ -210,7 +222,9 @@ async def company_by_domain(domain: Domain) -> Company | None:
     if web_cmp:
         for field, value in web_cmp.items():
             if type(value) is set and len(value) > 1:
-                cmp[field] = remove_shorter_duplicates(value)
+                cmp[field] = cmp.get(field, set()) | remove_shorter_duplicates(value)
+            elif field in cmp:
+                continue
             else:
                 cmp[field] = value
 
@@ -222,7 +236,6 @@ async def company_from_web(domain: Domain) -> Company | None:
     name = company.get('name', get_name(domain))
     if not name:
         return None
-    print(name)
 
     cmps = []
     cmps.extend((
@@ -332,7 +345,7 @@ async def company_from_indeed(name: str, domain: str = "") -> Company | None:
         cmp['logo'] = urllib.parse.urljoin(url, logo.attrs['src'])
         cmp['image'] = {cmp['logo'], }
 
-    location = r.html.find("li[@data-testid='companyInfo-headquartersLocation'] span")
+    location = r.html.find("a[data-tn-element='cmp-LocationsSectionlocation'] span")
     if location:
         cmp['location'] = {location.text.removesuffix(' ...'), }
 
@@ -390,7 +403,10 @@ async def _company_from_linkedin(name: str, domain: str = "", use_domain: bool=F
         return None
 
     name_found = r.html.find("h1")
-    if not name_found or all([name_found.text.casefold() != n.casefold() for n in (name, domain)]):
+    if not name_found or (
+        not match_name(name, name_found.text, strict=True, acronym=True)
+        and not match_name(domain, name_found.text, strict=True, acronym=True)
+    ):
         log.debug(f"Company name found {name_found} doesn't match name given {name}")
         return None
 
@@ -451,13 +467,16 @@ async def _company_from_linkedin(name: str, domain: str = "", use_domain: bool=F
 
 async def company_from_crunchbase(name: str, domain: str = "") -> Company | None:
     url = f"https://www.crunchbase.com/organization/{normalize(name)}"
-    r = hrequests.get(
-        url,
-        timeout=QUERY_TIMEOUT,
-        #proxies=HTTP_PROXY,
-        browser=random.choice(("firefox", "chrome")),
-        os=random.choice(("win", "lin", "mac"))
-    )
+    try:
+        r = hrequests.get(
+            url,
+            timeout=QUERY_TIMEOUT,
+            #proxies=HTTP_PROXY,
+            browser=random.choice(("firefox", "chrome")),
+            os=random.choice(("win", "lin", "mac"))
+        )
+    except Exception as e:
+        log.error(f"Crunchbase: {e}")
 
     if not r.ok:
         log.error(f"Couldn't get results for {r.url}: {r.reason}")
@@ -586,7 +605,10 @@ async def company_from_website(domain: str):
                 if 'set[' in str(Company.__annotations__[field]) and type(org_json[field]) is str:
                     org_json[field] = {org_json[field], }
                 try:
-                    cmp[field] = TypeAdapter(Company.__annotations__[field], config=dict(arbitrary_types_allowed=True)).validate_python(org_json[field])
+                    cmp[field] = TypeAdapter(
+                        Company.__annotations__[field],
+                        config=dict(arbitrary_types_allowed=True)
+                        ).validate_python(org_json[field])
                 except pydantic.ValidationError:
                     log.debug(f"{org_json[field]} not type valid for field: {field}")
                     continue
@@ -611,18 +633,15 @@ async def company_from_website(domain: str):
         ]
     if og_html:
         og_map = {
-# in some edgecases, website's title is "Home/Welcome/Accueil/... | Company's Name" :(
-#            'og:title': [{
-#                'field': 'name',
-#                'extract': lambda x: min(
-#                    re.split(" : | - | \| ", x),
-#                    key=len
-#                    ).strip(),
-#                }],
             'og:site_name': [{
                 'field': 'name',
                 'extract': str,
                 }],
+            # too many websites put "Home - Brand Name"
+            #'og:title': [{
+            #    'field': 'name',
+            #    'extract': str,
+            #    }],
             'og:image': [{
                 'field': 'image',
                 'extract': lambda x: {x, },
@@ -662,6 +681,13 @@ async def company_from_website(domain: str):
         cmp['sameAs'].add(url)
     else:
         cmp['sameAs'] = {url, }
+
+    # name cleaning
+    if 'name' in cmp:
+        cmp['name'] = extract_name(cmp['name'], domain)
+        print(cmp['name'])
+    else:
+        print(cmp)
 
     # sometimes URLs are relative URLs
     if 'image' in cmp:

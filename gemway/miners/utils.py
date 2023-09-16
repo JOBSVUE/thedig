@@ -77,7 +77,8 @@ def domain_to_urls(domain: str) -> list[str]:
     #    f"http://www.{domain}",
     #    f"http://{domain}",
     ]
-    
+
+
 def ua_headers(random: bool = False) -> dict:
     """
     generate a random user-agent
@@ -91,10 +92,17 @@ def ua_headers(random: bool = False) -> dict:
     return {"user-agent": user_agent}
 
 
-def match_name(name: str, text: str) -> bool:
+def match_name(name: str, text: str, strict: bool = False, acronym: bool = False) -> bool:
+    match = True
     if not name:
-        return True
-    return fuzz.partial_token_sort_ratio(name, text) >= TOKEN_RATIO
+        return match
+    elif strict:
+        match = (name.casefold() == text.casefold())
+        if not match and acronym:
+            match = (name.casefold() == filter(str.isupper, text))
+    else:
+        match = fuzz.partial_token_sort_ratio(name, text) >= TOKEN_RATIO
+    return match
 
 
 def normalize(name: str, replace: dict = {' ': ''}) -> str:

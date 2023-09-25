@@ -6,11 +6,11 @@ from functools import partial
 import json
 import re
 import string
-from typing import Required
+from typing import Annotated, Required
 from typing_extensions import TypedDict
 import urllib.parse
 from bs4 import BeautifulSoup
-from pydantic import EmailStr, HttpUrl, TypeAdapter
+from pydantic import EmailStr, HttpUrl, StringConstraints, TypeAdapter
 import hrequests
 from curl_cffi import requests
 import pydantic
@@ -82,10 +82,11 @@ COMPANY_TYPE_ABBR = {
 }
 
 
-Domain = pydantic.constr(
+DomainName = Annotated[str, StringConstraints(
     pattern=r"^([\w-]+\.)*(\w[\w-]{0,66})\.(?P<tld>[a-z]{2,18})$",
     strict=True
-    )
+    )]
+
 
 PROXY = {
     'https': settings.proxy if hasattr(settings, "proxy") else "",
@@ -126,14 +127,14 @@ def get_domain(email: EmailStr) -> str:
     return email.split("@")[1]
 
 
-def get_name(domain: Domain) -> str | None:
+def get_name(domain: DomainName) -> str | None:
     d = domain.split(".")
     if len(d) > 2:
         return None
     return d[-2].replace('-', ' ').lower()
 
 
-def extract_name(text: str, domain: Domain) -> str:
+def extract_name(text: str, domain: DomainName) -> str:
     return rapidfuzz.process.extractOne(
         domain,
         map(str.strip, re.split(":|-|\|", text)),
@@ -166,7 +167,7 @@ def remove_company_type_abbrv(company: str) -> str:
     return company
 
 
-def company_from_whois(domain: Domain) -> Company | None:
+def company_from_whois(domain: DomainName) -> Company | None:
     try:
         result = whois.query(domain, ignore_returncode=True, timeout=4.0)
     except whois.WhoisPrivateRegistry as e:
@@ -196,7 +197,7 @@ def company_from_whois(domain: Domain) -> Company | None:
     return cmp
 
 
-async def company_by_domain(domain: Domain) -> Company | None:
+async def company_by_domain(domain: DomainName) -> Company | None:
     """Will get company using its domain whois
 
     Args:
@@ -228,7 +229,7 @@ async def company_by_domain(domain: Domain) -> Company | None:
     return cmp
 
 
-async def company_from_web(domain: Domain) -> Company | None:
+async def company_from_web(domain: DomainName) -> Company | None:
     company = await company_from_website(domain)
     name = company.get('name', get_name(domain))
     if not name:
@@ -308,7 +309,7 @@ async def company_from_societecom(name: str) -> Company | None:
     return cmp
 
 
-async def company_from_indeed(name: str, domain: str = "") -> Company | None:
+async def company_from_indeed(name: str, domain: DomainName = "") -> Company | None:
     url = f"https://www.indeed.com/cmp/{name}"
     r = hrequests.get(
         url,
@@ -369,7 +370,7 @@ async def company_from_indeed(name: str, domain: str = "") -> Company | None:
     return cmp
 
 
-async def company_from_linkedin(name: str, domain: str = "") -> Company | None:
+async def company_from_linkedin(name: str, domain: DomainName = "") -> Company | None:
     cmp = (
         await _company_from_linkedin(name, domain)
         or await _company_from_linkedin(name, domain, use_domain=True)
@@ -377,7 +378,7 @@ async def company_from_linkedin(name: str, domain: str = "") -> Company | None:
     return cmp
 
 
-async def _company_from_linkedin(name: str, domain: str = "", use_domain: bool=False) -> Company | None:
+async def _company_from_linkedin(name: str, domain: DomainName = "", use_domain: bool=False) -> Company | None:
     normalized_name = normalize(
         domain if use_domain else name,
         replace={' ': '', '.': '-'}
@@ -461,7 +462,7 @@ async def _company_from_linkedin(name: str, domain: str = "", use_domain: bool=F
     return cmp
 
 
-async def company_from_crunchbase(name: str, domain: Domain = "") -> Company | None:
+async def company_from_crunchbase(name: str, domain: DomainName = "") -> Company | None:
     url = f"https://www.crunchbase.com/organization/{normalize(name)}"
     try:
         r = hrequests.get(
@@ -553,7 +554,7 @@ async def company_from_crunchbase(name: str, domain: Domain = "") -> Company | N
     return cmp
 
 
-async def company_from_website(domain: str):
+async def company_from_website(domain: DomainName):
     cmp = {}
     urls = domain_to_urls(domain)
     for url in urls:

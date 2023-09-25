@@ -1,10 +1,11 @@
 """Transmuter API"""
 
 # config
+from typing import Annotated
 from .config import settings
 
 # fast api
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, Path, status, Depends
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
 from fastapi_limiter.depends import WebSocketRateLimiter, RateLimiter
 
@@ -24,7 +25,7 @@ import json
 
 # service
 from ..miners.linkedin import LinkedInSearch
-from ..miners.company import Domain, Company, company_by_domain, company_from_whois
+from ..miners.company import DomainName, Company, company_by_domain, company_from_whois
 from ..miners.domainlogo import guess_country, find_favicon
 from ..miners.gravatar import gravatar as miner_gravatar
 from ..miners.vision import SocialNetworkMiner
@@ -204,11 +205,11 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
 
 
 @router.get("/company/domain/{domain}", tags=("company", "railway"), response_class=JSONorNoneResponse)
-async def company_get(domain: Domain) -> Company | None:
+async def company_get(domain: Annotated[DomainName, Path(description="domain name")]) -> Company | None:
     """Search for public data on a company based on its domain
 
     Args:
-        domain (Domain)
+        domain (DomainName)
 
     Returns:
         Company | None

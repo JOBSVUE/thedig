@@ -4,7 +4,6 @@ Grab informations about a company from its domain
 """
 from functools import partial
 import json
-import logging
 import re
 import string
 from typing import Required
@@ -19,6 +18,8 @@ import rapidfuzz
 import whoisdomain as whois
 from .utils import absolutize, match_name, normalize, domain_to_urls
 import random
+from ..api.config import settings
+from loguru import logger as log
 
 QUERY_TIMEOUT = 10
 
@@ -81,18 +82,14 @@ COMPANY_TYPE_ABBR = {
 }
 
 
-log = logging.getLogger(__name__)
-
 Domain = pydantic.constr(
     pattern=r"^([\w-]+\.)*(\w[\w-]{0,66})\.(?P<tld>[a-z]{2,18})$",
     strict=True
     )
 
-HTTP_PROXY = {
-    'http': "http://127.0.0.1:41255",
-    'https': "http://127.0.0.1:41255",
-#    'http': "socks5://mail.leadminer.io:8060",
-#    'https': "socks5://mail.leadminer.io:8060",
+PROXY = {
+    'https': settings.proxy if hasattr(settings, "proxy") else "",
+    'http': settings.proxy if hasattr(settings, "proxy") else "",
     }
 
 
@@ -391,11 +388,10 @@ async def _company_from_linkedin(name: str, domain: str = "", use_domain: bool=F
             url,
             timeout=QUERY_TIMEOUT,
             #verify=False,
-            #proxies={'https': HTTP_PROXY,
-            #         'http': HTTP_PROXY},
+            proxies=PROXY
         )
-    except Exception:
-        log.error(f"Couldn't get results for {r.url}: {r.reason}")
+    except Exception as e:
+        log.error(f"{e}")
         return None        
 
     if not r.ok:
@@ -465,21 +461,22 @@ async def _company_from_linkedin(name: str, domain: str = "", use_domain: bool=F
     return cmp
 
 
-async def company_from_crunchbase(name: str, domain: str = "") -> Company | None:
+async def company_from_crunchbase(name: str, domain: Domain = "") -> Company | None:
     url = f"https://www.crunchbase.com/organization/{normalize(name)}"
     try:
         r = hrequests.get(
             url,
             timeout=QUERY_TIMEOUT,
-            #proxies=HTTP_PROXY,
+            proxies=PROXY,
             browser=random.choice(("firefox", "chrome")),
             os=random.choice(("win", "lin", "mac"))
         )
     except Exception as e:
         log.error(f"Crunchbase: {e}")
+        return None
 
     if not r.ok:
-        log.error(f"Couldn't get results for {r.url}: {r.reason}")
+        log.error(f"Couldn't get results for {r.url}: {r.status_code} - {r.reason}")
         return None
 
     name_found = r.html.find("h1.profile-name").text.lower()
@@ -510,7 +507,7 @@ async def company_from_crunchbase(name: str, domain: str = "") -> Company | None
     details_html = r.html.find_all("profile-section.ng-star-inserted li.ng-star-inserted")
     details_fields = {
         "Industries": {
-            'field' : 'industry',
+            'field': 'industry',
             'extract': lambda f: set(str.splitlines(f)),
         },
         "Founded Date": {
@@ -685,10 +682,7 @@ async def company_from_website(domain: str):
     # name cleaning
     if 'name' in cmp:
         cmp['name'] = extract_name(cmp['name'], domain)
-        print(cmp['name'])
-    else:
-        print(cmp)
-
+    
     # sometimes URLs are relative URLs
     if 'image' in cmp:
         cmp['image'] = {absolutize(image, url) for image in cmp['image']}

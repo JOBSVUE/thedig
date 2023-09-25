@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     public_email_providers: Optional[set[str]] = get_public_email_providers()
     jobtitles_list_file: str = JOBTITLES_FILE
     nitter_instance_server: str = pick_nitter_instance()
-    http_proxy: Optional[str] = "http://mail.leadminer.io:8060"
+    proxy: Optional[str] = "http://ufjhhzpz-rotate:qx4z7hjklubw@p.webshare.io:80/"
 
     model_config = SettingsConfigDict(env_file=".env")
 

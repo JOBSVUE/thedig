@@ -111,9 +111,4 @@ def find_favicon(domain: str) -> str:
 if __name__ == "__main__":
     import sys
 
-    logging.basicConfig(
-        format="%(asctime)-15s [%(levelname)s] %(funcName)s: %(message)s",
-        level=logging.DEBUG,
-    )
-
     log.info(find_favicon(domain=sys.argv[1]))

@@ -51,9 +51,7 @@ rw = Railway(router)
 @rw.register(field="name")
 async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
     miner = LinkedInSearch(search_api_params)
-    person = await miner.search(
-        name=name, email=email, company=worksFor
-    )
+    person = await miner.search(name=name, email=email, company=worksFor)
     return person
 
 
@@ -78,7 +76,12 @@ async def from_linkedin_url(name: str, url: HttpUrl) -> Person:
 async def gravatar(email) -> Person:
     avatar = await miner_gravatar(email)
     return (
-        {'image': {avatar, }} if avatar
+        {
+            'image': {
+                avatar,
+            }
+        }
+        if avatar
         else {}
     )
 
@@ -108,7 +111,7 @@ async def social(p: dict) -> Person:
     return snm.person
 
 
-#@rw.register(field="email", update=("worksFor",))
+# @rw.register(field="email", update=("worksFor",))
 async def worksfor(email: EmailStr) -> Person:
     # otherwise, the domain will give us the @org
     # except for public email providers
@@ -123,7 +126,13 @@ async def worksfor(email: EmailStr) -> Person:
 
 @rw.register(field="description", update=("jobTitle",))
 async def bio(description: str = None) -> Person:
-    desc: set[str] = {description, } if type(description) is str else description
+    desc: set[str] = (
+        {
+            description,
+        }
+        if type(description) is str
+        else description
+    )
     job_title = {}
     jt = set()
     for d in desc:
@@ -149,7 +158,9 @@ async def country(email: EmailStr) -> Person:
     return {"workLocation": country} if country else {}
 
 
-@router.get("/person/email/{email}", tags=("person", "railway"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+@router.get(
+    "/person/email/{email}", tags=("person", "railway"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))]
+)
 async def person_email(email: EmailStr, name: str) -> Person:
     rw_status, persond = await rw.person({"email": email, "name": name})
     if not rw_status:
@@ -224,6 +235,8 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
         if 'image' in cmp:
             cmp['image'].add(favicon)
         else:
-            cmp['image'] = {favicon, }
+            cmp['image'] = {
+                favicon,
+            }
 
     return cmp

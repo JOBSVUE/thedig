@@ -36,7 +36,7 @@ async def github_query(query: str, params: dict, token=GITHUB_TOKEN, endpoint=GI
     return r.json()
 
 async def users_by_name(name: str) -> list[dict]:
-    data_json = 
+    data_json = None
     try:
         data = data_json.json()["data"]["location_users"]
     except TypeError:

@@ -2,7 +2,6 @@
 """
 Grab informations about a company from its domain
 """
-from functools import partial
 import json
 import re
 import string
@@ -378,7 +377,7 @@ async def company_from_linkedin(name: str, domain: DomainName = "") -> Company |
     return cmp
 
 
-async def _company_from_linkedin(name: str, domain: DomainName = "", use_domain: bool=False) -> Company | None:
+async def _company_from_linkedin(name: str, domain: DomainName = "", use_domain: bool = False) -> Company | None:
     normalized_name = normalize(
         domain if use_domain else name,
         replace={' ': '', '.': '-'}

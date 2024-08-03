@@ -15,4 +15,4 @@ requests[socks]>=2.29.0
 typing_extensions>=4.7.1
 uvicorn>=0.22
 whoisdomain>=1.20230720.2
-hrequests>=0.8
+hrequests[all]>=0.8

@@ -44,7 +44,7 @@ app = FastAPI(
     openapi_tags=[
         {
             "name": "railway",
-            "description": "🪨➜💎 enrich __iteratively__ data, every enriched data could be potentially used to mine more data",    
+            "description": "🪨➜💎 enrich __iteratively__ data, every enriched data could be potentially used to mine more data",
         },
         {
             "name": "person",

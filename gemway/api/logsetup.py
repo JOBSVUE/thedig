@@ -50,7 +50,7 @@ class LoggingSettings(BaseSettings):
     rotation: str = "1 days"
     retention: str = "1 months"
     serialize: bool = False
-    model_config = SettingsConfigDict(env_prefix="log_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="log_", env_file=".env", extra="ignore")
 
 
 class InterceptHandler(logging.Handler):

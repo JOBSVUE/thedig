@@ -34,6 +34,7 @@ TO_IGNORE = (
     'Domain Privacy Service FBO Registrant.',
     'Domain Privacy Trustee',
     "Domain Protection Services",
+    "GDPR Masked",
     "hidden",
     "Identity Protect Limited",
     "Identity Protection Service",
@@ -136,7 +137,7 @@ def get_name(domain: DomainName) -> str | None:
 def extract_name(text: str, domain: DomainName) -> str:
     return rapidfuzz.process.extractOne(
         domain,
-        map(str.strip, re.split(":|-|\|", text)),
+        map(str.strip, re.split(":|-|\\|", text)),
         scorer=rapidfuzz.fuzz.QRatio,
         )[0]
 
@@ -240,11 +241,15 @@ async def company_from_web(domain: DomainName) -> Company | None:
         await company_from_indeed(name, domain),
         await company_from_linkedin(name, domain),
     ))
-    if domain[-3:] == ".fr":
+    if domain[-3:].lower() == ".fr":
         cmps.append(await company_from_societecom(name))
 
     for cmp in cmps:
-        if not cmp or (not name and domain not in cmp['url']) or (name and name != cmp['name']):
+        if not cmp:
+            continue
+        if not name and domain not in cmp['url']:
+            continue
+        if not match_name(name, cmp['name'], acronym=True):
             continue
         for k, v in cmp.items():
             if type(v) is set and k in company:
@@ -310,34 +315,47 @@ async def company_from_societecom(name: str) -> Company | None:
 
 async def company_from_indeed(name: str, domain: DomainName = "") -> Company | None:
     url = f"https://www.indeed.com/cmp/{name}"
-    r = hrequests.get(
-        url,
-        timeout=QUERY_TIMEOUT,
-    )
+    
+    try:
+        r = hrequests.get(
+            url,
+            timeout=QUERY_TIMEOUT,
+        )
+    except Exception as e:
+        log.error(e)
+        return
 
     if not r.ok:
         log.error(f"Couldn't get results for {r.url}: {r.reason}")
         return None
+    try:
+        name_found = r.html.find("div[itemprop=name]")
+    except Exception as e:
+        log.error(e)
+        return
+    if not name_found:
+        log.debug("No company name found")
+        return
 
-    name_found = r.html.find("div[@itemprop='name']")
-    if not name_found or all([name_found.text.lower() != n.lower() for n in (name, domain)]):
-        log.debug(f"Company name found {name_found} doesn't match name given {name}")
+    if name_found.text.lower() != name.lower() and name_found.text.lower() != domain.lower():
+        log.debug(f"Company name found {name_found.text} doesn't match name given {name}")
         return None
 
     cmp: Company = Company(name=name_found.text, sameAs={r.url, })
-    
-    link = r.html.find("a[@data-tn-element='companyLink[]']")
+
+    link = r.html.find("a[data-testid='companyLink[]']")
     if not link:
         return {}
     cmp['url'] = link.attrs['href']
 
     # that's not the right company
     if domain not in cmp['url'] and cmp['url'] != url:
+        log.debug("No URL found for {cmp}")
         return {}
 
     cmp['sameAs'].add(cmp['url'])
 
-    logo = r.html.find("[@data-tn-component] img")
+    logo = r.html.find("img[itemprop=image]")
     if logo and "placeholder" not in logo.attrs['src']:
         cmp['logo'] = urllib.parse.urljoin(url, logo.attrs['src'])
         cmp['image'] = {cmp['logo'], }
@@ -346,11 +364,11 @@ async def company_from_indeed(name: str, domain: DomainName = "") -> Company | N
     if location:
         cmp['location'] = {location.text.removesuffix(' ...'), }
 
-    numberOfEmployees = r.html.find("li[@data-testid='companyInfo-employee'] div:last-child")
+    numberOfEmployees = r.html.find("li[data-testid='companyInfo-employee'] div:last-child")
     if numberOfEmployees:
-        cmp['numberOfEmployees'] = '-'.join(numberOfEmployees.text.split(" to ")).replace(',', '')
+        cmp['numberOfEmployees'] = '-'.join(numberOfEmployees.text.split(" to ")).replace(',', '').replace('\n', '')
 
-    industry = r.html.find("a[@data-tn-element='industryInterLink']")
+    industry = r.html.find("a[data-testid='industryInterLink']")
     if industry:
         cmp['industry'] = {industry.text, }
 
@@ -358,11 +376,11 @@ async def company_from_indeed(name: str, domain: DomainName = "") -> Company | N
     if foundingDate:
         cmp['foundingDate'] = foundingDate.text
 
-    revenue = r.html.find("li[@data-testid='companyInfo-revenue'] span")
+    revenue = r.html.find("li[data-testid='companyInfo-revenue'] span")
     if revenue:
-        cmp['revenue'] = revenue.text
+        cmp['revenue'] = revenue.text.replace('\n', '')
 
-    description = r.html.find("div[@data-testid='more-text'] p") or r.html.find("div[@data-testid='less-text'] p:first-child")
+    description = r.html.find("div[data-testid='more-text'] p") or r.html.find("div[data-testid='less-text'] p:first-child")
     if description:
         cmp['description'] = {description.text.removesuffix('...Show less'), }
 
@@ -398,16 +416,21 @@ async def _company_from_linkedin(name: str, domain: DomainName = "", use_domain:
         log.error(f"Couldn't get results for {r.url}: {r.reason}")
         return None
 
-    name_found = r.html.find("h1")
-    if not name_found or (
-        not match_name(name, name_found.text, strict=True, acronym=True)
-        and not match_name(domain, name_found.text, strict=True, acronym=True)
+    name_found_ = r.html.find("h1")
+    if not name_found_:
+        log.error(f"No name found at {r.url}")
+        return
+    name_found = name_found_.text.strip()
+
+    if (
+        not match_name(name, name_found, fuzzy=False, acronym=True)
+        and not match_name(domain, name_found, acronym=True)
     ):
         log.debug(f"Company name found {name_found} doesn't match name given {name}")
         return None
 
     ld_json = json.loads(r.html.find("script[type='application/ld+json']").text)
-    
+
     try:
         cmp: Company = Company(
             name=ld_json['name'],
@@ -416,15 +439,17 @@ async def _company_from_linkedin(name: str, domain: DomainName = "", use_domain:
     except TypeError as e:
         log.warning(e)
         return None
-    
+
     # if we don't have the Website's company, we can't be sure
     if 'sameAs' not in ld_json:
+        log.debug(f"No company's website for {cmp['name']}")
         return {}
-    
+
     cmp['url'] = ld_json['sameAs']
 
     # that's not the right company
     if domain not in cmp['url'] and cmp['url'] != url:
+        log.debug(f"domain {domain} not found in the URL {cmp['url']}")
         return {}
 
 
@@ -434,7 +459,6 @@ async def _company_from_linkedin(name: str, domain: DomainName = "", use_domain:
     if 'logo' in ld_json:
         cmp['logo'] = ld_json['logo']['contentUrl']
         cmp['image'] = {ld_json['logo']['contentUrl'], }
-        
 
     slogan = ld_json.get('slogan')
     if slogan:

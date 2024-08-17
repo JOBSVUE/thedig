@@ -1,22 +1,21 @@
-#!/bin/python3
+#!/bin/env python
 """
 Mine public data from LinkedIn with an email address using Google Search API
 Return format is JSON-LD simplified
 """
 
-# make it work as a command line tool
-try:
-    from .ISO3166 import ISO3166
-except ImportError:
-    from ISO3166 import ISO3166
-
+from abc import ABC, abstractmethod
+from typing import Literal, Optional
 import re
+import time
+import jwt
 
 # needed for memory sharing between threads
+from ..api.person import Person, dict_to_person
+from pydantic import HttpUrl, BaseModel, model_validator, Field
 
-from pydantic import HttpUrl
-
-from curl_cffi import requests
+# from curl_cffi import requests
+import requests
 from urllib.parse import quote
 
 # log
@@ -25,9 +24,17 @@ from loguru import logger as log
 # Fuzzy string match for person name identification
 from rapidfuzz import fuzz
 
+from .ISO3166 import ISO3166
+from .utils import match_name
+
+from html import unescape
+
+
+HttpMethod = Literal["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "TRACE", "PATCH"]
+
 # linkedin profile url with an ISO3166 country code regular expression
 RE_LINKEDIN_URL = re.compile(
-    r"^https?:\/\/((?P<countrycode>\w{2})|(:?www))\.linkedin\.com\/(?:public\-profile\/in|in|people)\/(?P<identifier>\w+(?:(?:\.|\-)\w+)?(?:(?:\-)\w+)?)/?$"
+    r"^https?:\/\/((?P<countrycode>\w{2})|(:?www))\.linkedin\.com\/(?:public\-profile\/in|in|people)\/(?P<identifier>([\w-]+))/?"
 )
 
 
@@ -47,23 +54,33 @@ def country_from_url(linkedin_url: str) -> str:
         return ISO3166[match["countrycode"].upper()]
 
 
-def parse_linkedin_title(title, name: str = None):
+def parse_linkedin_title(title, name: str = None) -> dict:
     """parse LinkedIn Title that has this form
         Full Name - Title - Company | LinkedIn
         and sometimes (Google only):
         Full Name - Title - Company... | LinkedIn
+        or even:
+        Full Name - Company | LinkedIn
+        Full Name - Title | LinkedIn
+        it should always ends with '| LinkedIn'
     Args:
         title (str): title from LinkedIn page
     """
-    full_title = title.split("|")[0].split(" - ")
+    title_ = title.split(" | ")
+    if title_[-1] != "LinkedIn" and title[-3:] != "...":
+        raise ValueError("This is not a LinkedIn profile title")
 
-    if name and full_title[0] != name:
-        return None
+    full_title = title_[0].split(" - ")
+    if len(full_title) < 2:
+        raise ValueError("This is not a LinkedIn profile title")
+
+    if name and full_title[0].casefold() != name.casefold():
+        raise ValueError("This may not its LinkedIn profile")
 
     result = {"name": full_title[0]}
 
     # when it's long, LinkedIn add a '...' suffix
-    if len(full_title) > 2:
+    if len(full_title) == 3:
         secondpart = full_title[2].removesuffix("...").strip()
         firstpart = full_title[1].removesuffix("...").strip()
         # if last word got LinkedIn in it, it's not his company
@@ -74,304 +91,373 @@ def parse_linkedin_title(title, name: str = None):
             result["worksFor"] = secondpart
         else:
             result["worksFor"] = firstpart
-    elif len(full_title) > 1:
-        result["jobTitle"] = full_title[1].removesuffix("...").strip()
-    else:
-        return None
 
     return result
 
 
-class LinkedInSearch:
-    """
-    Mine public data from LinkedIn with an email address
-    using Google Search API and/or Microsoft Bing API
-    """
+class LinkedInProfile(BaseModel):
+    url: HttpUrl
+    title: str
+    name: str
 
-    NUM_RESULTS = 10
+    # not every search engine got them correctly
+    description: Optional[str] = None
+    image: Optional[HttpUrl] = None
+    givenName: Optional[str] = None
+    familyName: Optional[str] = None
+    workLocation: Optional[str] = None
 
-    # either q or exactTerms (don't work for emails)
-    QUERY_TYPE = "q"
-    GOOGLE_FIELDS = "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image,pagemap/metatags/og:description)"
-    GOOGLE_SEARCH_URL_BASE = "https://www.googleapis.com/customsearch/v1/siterestrict?key={google_api_key}&cx={google_cx}&num={num_results}&fields={google_fields}&{query_type}"
-    BING_SEARCH_URL_BASE = "https://api.bing.microsoft.com/v7.0/custom/search?customconfig={bing_custom_config}&count={num_results}"
+    # usually computed from the URL
+    jobTitle: Optional[str] = None
+    worksFor: Optional[str] = None
+    country: Optional[str] = None
+    identifier: Optional[str] = None
+
+    # private attribute for regexp purposes
+    match: Optional[dict] = Field(default=None, exclude=True)
+
+    @model_validator(mode="after")
+    def parse(self):
+        self.match_url()
+        self.parse_title()
+        self.parse_url()
+
+    def match_url(self):
+        self.match = RE_LINKEDIN_URL.match(str(self.url))
+        if not self.match:
+            raise ValueError("Not a valid LinkedIn profile URL")
+
+    def parse_url(self):
+        if not self.country and self.match["countrycode"]:
+            self.country = ISO3166[self.match["countrycode"].upper()]
+        self.identifier = self.match["identifier"]
+
+    def parse_title(self):
+        r = parse_linkedin_title(self.title, self.name)
+        if not r:
+            raise ValueError("Not a valid LinkedIn Profile title")
+        if not match_name(self.name, r['name'], fuzzy=False, condensed=False):
+            raise ValueError("This LinkedIn profile name doesn't match")
+        if "worksFor" in r:
+            self.worksFor = r["worksFor"]
+        if "jobTitle" in r:
+            self.jobTitle = r["jobTitle"]
+
+    
+class Search(ABC):
+    RICH_FIELDS = ['worksFor', 'jobTitle']
+    RESULTS_COUNT = 10
 
     def __init__(
         self,
-        search_api_params: dict,
-        google: bool = True,
-        bing: bool = False,
-        bulk: bool = False,
+        endpoint: HttpUrl,
+        method: HttpMethod,
+        headers: dict = {},
+        query_params: dict = {},
+        body: dict = None
     ):
-        """LinkedInSearch constructor
+        self.endpoint = endpoint
+        self.headers = headers
+        self.query_params = query_params
+        self.body = body
+        self.method = method
+        self.session = requests.Session()
+        self.authenticate()
 
-        Args:
-            search_api_params (dict): parameters for the search API including credentials
-            google (bool, optional): search with Google. Defaults to True.
-            bing (bool, optional): search with Bing. Defaults to False.
+    @abstractmethod
+    def search_query(self, query: str = None) -> dict:
+        pass
 
-        Raises:
-            ValueError: at least bing or google search engine must be True
-        """
+    @abstractmethod
+    def extract(self):
+        pass
+    
+    @abstractmethod
+    def authenticate(self):
+        pass
 
-        self.google = False
-        self.bing = False
+    def raw_search(self, name: str):
+        self.authenticate()
+        search_q = self.search_query(name)
+        if self.method == "GET":
+            self.query_params.update(search_q)
+        elif self.method == "POST":
+            self.body.update(search_q)
+        else:
+            raise ValueError(f"Not a supported HTTP method: {self.method}")
 
-        # there is default values for this params, the others are mandatory
-        if "query_type" not in search_api_params:
-            search_api_params["query_type"] = LinkedInSearch.QUERY_TYPE
-        if "num_result" not in search_api_params:
-            search_api_params["num_results"] = LinkedInSearch.NUM_RESULTS
-        if "google_fields" not in search_api_params:
-            search_api_params["google_fields"] = LinkedInSearch.GOOGLE_FIELDS
+        prepped_req = requests.Request(
+            method=self.method,
+            url=self.endpoint,
+            params=self.query_params,
+            headers=self.headers,
+            json=self.body
+        ).prepare()
+            
+        r = self.session.send(prepped_req)
+        r.raise_for_status()
 
-        if google:
-            self.google = True
-            self.google_search_url = self.GOOGLE_SEARCH_URL_BASE.format(
-                **search_api_params
-            )
-            log.debug("Build Google search URL : " + self.google_search_url)
+        self.raw_results = r.json()
 
-        if bing:
-            self.bing = True
-            self.bing_search_url = self.BING_SEARCH_URL_BASE.format(**search_api_params)
-            log.debug("Build Bing search URL : " + self.bing_search_url)
-
-        if not bing and not google:
-            raise ValueError("Must choose at least one search engine: bing or google")
-
-        if bulk:
-            self.persons = []
-        self.person = {}
-
-    async def _search_google(self, query: str):
-        """Search a query on Google and return the first result
-
-        Args:
-            query (string): query string
-
-        Returns:
-            dict: first result
-        """
-        search_url_complete = f"{self.google_search_url}={query}"
-        async with requests.AsyncSession() as s:
-            try:
-                r = await s.get(search_url_complete)
-                # import requests as req
-                # r = req.get(search_url_complete)
-            except requests.RequestsError as e:
-            # except req.RequestException as e:
-                log.error(f"{search_url_complete}: {e}")
-            if not r.ok:
-                log.error(f"{r.status_code} : {r.reason}")
-
-            result_raw = r.json()
-            # if a data is missing, that means probably that there is no results
-            if "items" in result_raw and len(result_raw["items"]) > 0:
-                return result_raw["items"]
-
-        log.debug(f"No results found for query: {query}")
-
-    def _search_bing(self, query: str):
-        """Search a query on Bing and return the first result
-
-        Args:
-            query (str): query string
-
-        Returns:
-            dict: first result
-        """
-        search_url_complete = self.bing_search_url + "&q=" + query
-        r = requests.get(
-            search_url_complete,
-            headers={"Ocp-Apim-Subscription-Key": self.bing_api_key},
-        )
-        if not r.ok:
-            r.raise_for_status()
-
-        result_raw = r.json()
-
-        log.info("bing result %s" % result_raw)
-        # if a data is missing, that means probably that there is no results
-        if (
-            "webPages" in result_raw
-            and "value" in result_raw["webPages"]
-            and len(result_raw["webPages"]["value"]) > 0
-        ):
-            return result_raw["webPages"]["value"][0]
-
-        log.debug("No results found for query %s " % query)
-
-    def _add_country(self):
-        """add country name to the dict JSON-LD based on the linkedin profile url"""
-        if "url" in self.person:
-            country = country_from_url(self.person["url"])
-            if country:
-                self.person["workLocation"] = country
-
-    def _extract_bing_specific(self, result):
-        # sometimes it's an useless thumbnail : 404 Error
-        self.person["image"] = result["openGraphImage"]["contentUrl"]
-        self.person["url"] = result["url"]
-
-        # Bing also gives you sometimes location
-        address = result["richFacts"][0]["items"][0]["text"].split(", ")
-        # however sometimes the address isn't correctly identified by Bing
-        if len(address) >= 3:
-            self.person["workLocation"] = ", ".join(address)
-
-    def _extract_google_specific(self, result):
-        self.person["givenName"] = result["pagemap"]["metatags"][0][
-            "profile:first_name"
-        ]
-        self.person["familyName"] = result["pagemap"]["metatags"][0][
-            "profile:last_name"
-        ]
-
-        self.person["description"] = {result["pagemap"]["metatags"][0][
-            "og:description"
-        ], }
+    def search(self, name: str):
+        self.raw_search(name)
+        self.extract()
         
-        # we do not use cse_thumbnail (Google's image)
-        if len(result["pagemap"]["metatags"]) >= 1:
-            self.person["image"] = result["pagemap"]["metatags"][0]["og:image"]
-        self.person["url"] = result["link"]
+        # returns the first or the most complete
+        self.profiles = []
+        for r in self.results:
+            try:
+                self.profiles.append(LinkedInProfile(**r, **{"name": name}))
+                #if all(getattr(profiles[-1], field) for field in self.RICH_FIELDS):
+                #    return profiles[-1]
+            except ValueError as e:
+                log.debug(f"Not a valid {name} {r} LinkedInprofile: {e}")
 
-    def _result_to_dict(self, result) -> dict:
-        # build initial dict
-        person_d = {
-            "givenName": result["pagemap"]["metatags"][0]["profile:first_name"],
-            "familyName": result["pagemap"]["metatags"][0]["profile:last_name"],
-            "description": {result["pagemap"]["metatags"][0]["og:description"], },
-            "url": result["link"],
-            "identifier": re.match(RE_LINKEDIN_URL, result["link"])["identifier"],
+        return self.profiles
+
+    def persons(self):
+        self.persons = []
+        for profile in self.profiles:
+            self.persons.append(dict_to_person(dict(
+                name=profile.name,
+                url=profile.url,
+                sameAs={profile.url},
+                description=profile.description,
+                workLocation={profile.workLocation or profile.country},
+                givenName=profile.givenName,
+                familyName=profile.familyName,
+                identifier={profile.identifier},
+                image=profile.image,
+                jobTitle=profile.jobTitle,
+                worksFor=profile.worksFor
+            ), unsetvoid=True))
+
+
+class GoogleVertexAI(Search):
+    TOKEN_URI = "https://oauth2.googleapis.com/token"
+    TOKEN_LIFEDURATION = 3600
+    SCOPE = "https://www.googleapis.com/auth/cloud-platform"    
+    ENDPOINT = "https://discoveryengine.googleapis.com/v1alpha/projects/{project_id}/locations/{region}/collections/default_collection/engines/{datastore_id}/servingConfigs/default_search:search"
+
+    def __init__(
+        self,
+        service_account_info: dict,
+        project_id: str,
+        datastore_id: str,
+        region: str = "global",
+    ):
+        self.service_account_info = service_account_info
+        self.access_token = None
+        self.token_expiry = 0  # Timestamp when the token will expire
+
+        super().__init__(
+                endpoint=self.ENDPOINT.format(
+                    project_id=project_id,
+                    region=region,
+                    datastore_id=datastore_id
+                    ),
+                method="POST",
+                body={
+                    "pageSize": self.RESULTS_COUNT,
+                    "contentSearchSpec": {"snippetSpec": {"returnSnippet": False}}
+                },
+                headers={
+                    "Content-Type": "application/json",
+                }
+            )
+
+    def authenticate(self):
+        # Check if the token is still valid and not about to expire
+        if self.access_token and time.time() < self.token_expiry - 60 * 5:
+            return
+        
+        # Generate a JWT for the service account
+        now = int(time.time())
+        payload = {
+            "iss": self.service_account_info["client_email"],
+            "sub": self.service_account_info["client_email"],
+            "aud": self.TOKEN_URI,
+            "iat": now,
+            "exp": now + 3600,  # Token valid for 1 hour
+            "scope": self.SCOPE,
         }
 
-        person_d["name"] = f"{person_d['givenName']} {person_d['familyName']}"
-        # enrich with parsed from linkedin title
-        full_title = parse_linkedin_title(result["title"], person_d["name"])
-        # the parsing worked only if name parsed is the same
-        if full_title:
-            person_d.update(full_title)
+        # Sign the JWT with the service account's private key
+        signed_jwt = jwt.encode(payload, self.service_account_info["private_key"], algorithm="RS256")
 
-        # add the image, yet
-        # we do not use cse_thumbnail (Google's image)
-        if len(result["pagemap"]["metatags"]) >= 1:
-            person_d["image"] = result["pagemap"]["metatags"][0]["og:image"]
+        # Request an access token
+        token_response = requests.post(self.TOKEN_URI, data={
+            "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            "assertion": signed_jwt,
+        })
 
-        return person_d
+        token_response.raise_for_status()
+        token_json = token_response.json()
+        self.access_token = token_json["access_token"]
+        self.token_expiry = now + token_json.get("expires_in", self.TOKEN_LIFEDURATION)
 
-    async def extract(
-        self,
-        name: str,
-        email: str = None,
-        company: str = None,
-        linkedin_url: HttpUrl = None,
-        google: bool = True,
-    ) -> dict:
-        """
-        Search engine then update and return the personal data accordingly
-        Google gives you the givenName/familyName but not the location
-        Bings gives you the location sometimes but not the givenName/familyName
-        Args:
-            name (str): name
-            email (str): email
-            company (str): company's name
-            url (HttpUrl): URL's of LinkedIn
-            google (bool): extract with Google, if false Bing
+        # Update headers with the new access token
+        self.headers["Authorization"] = f"Bearer {self.access_token}"
+   
+    def raw_search(self, name: str):
+        self.authenticate()
+        return super().raw_search(name)
 
-        Returns:
-            person (str) : person JSON-LD filled with the infos mined
-        """
-        query_string = quote(
-            email or linkedin_url or (f"{name} {company}" if company else name)
-        )
-        if not query_string:
-            log.error("No query string could be built")
-            raise ValueError
+    def search_query(self, query: str) -> dict:
+        return {**self.body, "query": query}
 
-        results = (
-            await self._search_google(query_string)
-            if google
-            else self._search_bing(query_string)
-        )
-
-        if not results:
-            log.debug("LinkedIn: No result found")
-            # self.person = None
-            return None
-
-        # if there are homonymous, KO
-        # if the name found isn't the one given, KO
-        # else that's good!
-        persons_d = {}
-        for r in results:
-            # must be a valid profile link
-            if not re.match(RE_LINKEDIN_URL, r["link"]):
-                log.debug(f"This url isn't a valid Linkedin Profile {r['link']}")
-                continue
-
-            person_d = self._result_to_dict(r)
-
-            # the full name from the result must be the same that the name itself
-            # 96 seems a good ratio for difference between ascii and latin characters
-            # should do fine tuning here trained on a huge international dataset
-            # thefuzz is buggy and sometimes answer 100 when the strings ARE different
-            # TBD: replace thefuzz with another package or wait for it to be taken over by a new maintainer
-            name_similarity = fuzz.token_set_ratio(person_d["name"], name)
-            if name_similarity < 96 or (name_similarity == 100 and person_d["name"].lower() != name.lower()):
-                log.debug(
-                    f"The name mined doesn't match the name given: {person_d['name']}, {name}"
-                )
-                continue
-
-            # check homonymous
-            if name in persons_d:
-                return None
-
-            persons_d[name] = person_d
-            break
-
-        # not found, bye
-        if name not in persons_d:
-            return None
-
-        persons_d[name].update(self.person)
-        self.person = persons_d[name]
-
-        return self.person
-
-    async def search(
-        self, name, email: str = None, company: str = None, linkedin_url: HttpUrl = None
-    ) -> dict:
-        """
-        search and return the public data for an email and/or company
-        """
-        await self.extract(name, email, company, linkedin_url)
-
-        # answer only if we found something
-        if "url" in self.person:
-            self._add_country()
-        
-        return self.person
+    def extract(self):
+        self.results = [
+            {
+                "title": p.get('og:title'),
+                "url": p.get('og:url'),
+                "description": unescape(p.get('og:description')).replace("<br>", "\n"),
+                "givenName": p.get('profile:first_name'),
+                "familyName": p.get('profile:last_name'),
+                "image": p.get('og:image'),
+                "country": ISO3166.get(p.get('locale').split('_')[-1]),
+                }
+            for p in map(
+                lambda r: r.get('document', {}).get('derivedStructData', {}).get('pagemap', {}).get('metatags', [{}])[0],
+                self.raw_results.get("results", [])
+            )
+        ]
 
 
-if __name__ == "__main__":
-    import os
-    import sys
-
-    log.level("DEBUG")
-
-    search_api_params = {
-        "google_api_key": os.getenv("GOOGLE_API_KEY"),
-        "google_cx": os.getenv("GOOGLE_CX"),
-        "bing_api_key": os.getenv("BING_API_KEY"),
-        "query_type": "exactTerms",
-        "bing_customconfig": os.getenv("BING_CUSTOMCONFIG"),
+class Brave(Search):
+    ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
+    HEADERS = {
+        "X-Subscription-Token": None,
+        "Accept": "application/json",
+        "Accept-Encoding": "gzip",
     }
-    miner = LinkedInSearch(search_api_params)
-    print(
-        miner.search(
-            name=" ".join(sys.argv[3:]), email=sys.argv[1], company=sys.argv[2]
+    QUERY_PARAMS = {
+        "resultfilter": "web",
+        #"goggles_id": "https://raw.githubusercontent.com/carlopezzuto/google-linkedin/main/googgleLI",
+        "count": Search.RESULTS_COUNT,
+        "country": "us",
+        "search_lang": "en",
+    }
+
+    def __init__(
+        self,
+        token: str,
+    ):
+        self.token = token
+        super().__init__(
+                endpoint=self.ENDPOINT,
+                method="GET",
+                headers=self.HEADERS,
+                query_params=self.QUERY_PARAMS
         )
-    )
+        
+    def authenticate(self):
+        self.headers['X-Subscription-Token'] = self.token
+
+    def search_query(self, query: str):
+        return {"q": f"site:linkedin.com/in {query}"}
+
+    def extract(self):
+        self.results = [
+            {"title": p['title'], "url": p['url'], "description": p['description']}
+            for p in self.raw_results.get("web", {}).get("results", {}) if p
+        ]
+
+
+class Bing(Search):
+    ENDPOINT = "https://api.bing.microsoft.com/v7.0/custom/search"
+    QUERY_PARAMS = {
+        "count": Search.RESULTS_COUNT,
+    }
+
+    def __init__(
+        self,
+        token: str,
+        customconfig: str,
+    ):
+        self.token = token
+        super().__init__(
+                endpoint=self.ENDPOINT,
+                method="GET",
+                query_params=self.QUERY_PARAMS,
+        )
+        self.query_params["customconfig"] = customconfig
+
+    def authenticate(self):
+        self.headers['Ocp-Apim-Subscription-Key'] = self.token
+
+    def search_query(self, query: str) -> dict:
+        return {"q": query}
+
+    def extract(self):
+        self.results = []
+        if (
+            "webPages" not in self.raw_results
+            or not self.raw_results["webPages"].get("value")
+        ):
+            return   
+
+        for result in self.raw_results["webPages"]["value"]:
+            self.results.append({
+                "title": result["name"],
+                "description": result["snippet"],
+                "url": result["url"],
+                "image": result.get('openGraphImage', {}).get("contentUrl"),
+            })
+
+            # Bing also gives you sometimes location
+            for item in result.get("richFacts", ()):
+                if item['hint']['text'] != "ADDRESS:LOCATIONGENERAL":
+                    continue
+                address = item["items"][0]["text"].split(", ")
+                # however sometimes the address isn't correctly identified by Bing
+                if len(address) >= 3:
+                    self.results[-1]["workLocation"] = ", ".join(address)
+
+
+class GoogleCustom(Search):
+    ENDPOINT = "https://www.googleapis.com/customsearch/v1/siterestrict"
+    QUERY_PARAMS = {
+        "fields": "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image,pagemap/metatags/og:description)",
+        "num": Search.RESULTS_COUNT,
+        "query_type": 'q',
+    }
+
+    def __init__(
+        self,
+        token: str,
+        cx: str,
+    ):
+        self.token = token
+        self.cx = cx
+        super().__init__(
+                endpoint=self.ENDPOINT,
+                method="GET",
+                query_params=self.QUERY_PARAMS
+        )
+        
+    def authenticate(self):
+        self.headers.update({
+            "key": self.token,
+            "cx": self.cx,
+        })
+
+    def search_query(self, query: str):
+        return {"q": query}
+
+    def extract(self):
+        self.results = []
+
+        if not self.raw_results.get("items"):
+            return
+
+        self.results = [
+            {
+                "givenName": r["pagemap"]["metatags"][0]["profile:first_name"],
+                "familyName": r["pagemap"]["metatags"][0]["profile:last_name"],
+                "description": r["pagemap"]["metatags"][0]["og:description"],
+                "url": r["link"],
+                "image": r["pagemap"]["metatags"][0]["og:image"]
+            }
+            for r in self.raw_results["items"] if r.get("pagemap", {}).get("metatags", {})
+        ]

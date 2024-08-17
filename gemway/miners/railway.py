@@ -10,7 +10,7 @@ from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 
 from .utils import normalize
-from ..api.person import Person, miner_to_person, person_ta, person_set_field, dict_to_person
+from ..api.person import Person, miner_to_person, person_deduplicate, person_ta, person_set_field, dict_to_person
 
 
 RE_SET = re.compile(r"(\s|^)set\W")
@@ -163,7 +163,7 @@ class Railway:
  
                 mined[miner["endpoint"]].append((field, person[field]))
 
-                miner_f = MinerField(miner, field, person)                
+                miner_f = MinerField(miner, field, person)             
                 upgraded.update(await miner_f.mine())
 
             modified = True if upgraded else modified
@@ -217,7 +217,7 @@ class Railway:
         """
 
         def decorator(miner_func):
-            if not kw['field'] in self._ordered_elements:
+            if kw['field'] not in self._ordered_elements:
                 raise ValueError("This field can't be mined")
 
             # Check if this is dict/person

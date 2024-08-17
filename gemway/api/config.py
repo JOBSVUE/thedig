@@ -12,7 +12,7 @@ from pydantic import FilePath, HttpUrl
 from pydantic import Extra
 
 NITTER_INSTANCES = "https://status.d420.de/api/v1/instances"
-NITTER_BACKUP_INSTANCE = "https://nitter.net"
+NITTER_BACKUP_INSTANCE = "https://nitter.poast.org"
 PUBLIC_EMAIL_PROVIDERS_URL = "https://raw.githubusercontent.com/ankaboot-source/email-open-data/main/public-email-providers.json"
 PROXY_GETTER_URL = "https://faas-fra1-afec6ce7.doserverless.co/api/v1/web/fn-17051245-6c4e-4bdf-aa67-50f8d3c33580/openweb_proxy/get_proxy"
 JOBTITLES_FILE = "miners/jobtitles.json"

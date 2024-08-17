@@ -94,9 +94,19 @@ def dict_to_person(person_dict: dict, setdefault=False, unsetvoid=False) -> Pers
     return person_dict
 
 
-def person_unset_void(person: Person):
-    return {k: v for k, v in person.items() if v}
+def person_unset_void(person: Person) -> Person:
+    return {k: v for k, v in person.items() if v is not None and v != {None, }}
 
+
+def person_deduplicate(person: Person) -> Person:
+    similar_fields = {
+        "sameAs": "url",
+        "alternateName": "name",
+        }
+    for field, original in similar_fields.items():
+        if person.get(original) in person.get(field, ()):
+            person[field].remove(person[original])
+    return person
 
 def is_pure_iterable(obj) -> bool:
     return hasattr(obj, "__iter__") and type(obj) is not str

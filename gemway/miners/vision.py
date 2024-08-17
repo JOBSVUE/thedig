@@ -135,7 +135,7 @@ async def find_pages_with_matching_images(
 
 
 def is_socialprofile(url):
-    m = re.match(RE_SOCIALPROFILE, url)
+    m = re.match(RE_SOCIALPROFILE, str(url))
     if not m or m["socialnetwork"] not in SOCIALNETWORKS:
         return None
     sp = m.groupdict()
@@ -215,12 +215,13 @@ def extract_socialprofile(soup, url, name):
 
     og_image = soup.find("meta", attrs={"property": "og:image"})
     # snapchat gives by default a fake avatar called square.jpeg
-    if og_image and not og_image["content"].endswith("square.jpeg"):
+    # pinterest gives by default this URL: https://s.pinimg.com/images/default_open_graph_1200.png
+    if og_image:
         person["image"] = og_image["content"]
         log.debug(
             f"og:image found. Name: {name}, URL: {url}, Image URL: {og_image['content']}"
         )
-    else:  # twitter
+    else:  # twitter or pinterest
         twitter_image = soup.find("meta", attrs={"property": "twitter:image"})
         twitter_image_src = soup.find("meta", attrs={"property": "twitter:image:src"})
         twitter_image = twitter_image or twitter_image_src
@@ -229,6 +230,9 @@ def extract_socialprofile(soup, url, name):
             log.debug(
                 f"twitter:image found. Name: {name}, URL: {url} , Image URL: {twitter_image['content']}"
             )
+
+    if any(person["image"].endswith(f) for f in ("square.jpeg", "default_open_graph_1200.png")):
+        del person["image"]
 
     # OpenGraph protocol
     og_description = soup.find("meta", attrs={"property": "og:description"})
@@ -253,12 +257,14 @@ def extract_socialprofile(soup, url, name):
         jsonld = loads(jsonld.text)
         try:
             jsonld = jsonld.get("author") or jsonld
-            if jsonld.get("name"):
+            if jsonld.get("name") and jsonld["name"].casefold() != name.casefold():
                 person["alternateName"] = jsonld["name"]
             if jsonld.get('nationality'):
                 person["nationality"] = jsonld["nationality"]
             if jsonld.get('knowsLanguage'):
                 person["knowsLanguage"] = jsonld["knowsLanguage"]
+            if jsonld.get("image", {}).get("contentUrl"):
+                person["image"] = jsonld["image"]["contentUrl"]
             log.debug(f"JSON-LD found: {jsonld}")
         except KeyError:
             log.warning(f"Unknown JSON-LD format: {jsonld}")
@@ -366,7 +372,7 @@ class SocialNetworkMiner:
 
         pages = []
         for img in self._person["image"]:
-            pages.extend(await find_pages_with_matching_images(img))
+            pages.extend(await find_pages_with_matching_images(str(img)))
 
         for page in pages:
             m = is_socialprofile(page.url)

@@ -24,7 +24,7 @@ from loguru import logger as log
 import json
 
 # service
-from ..miners.linkedin import LinkedInSearch
+from ..miners.linkedin import Bing
 from ..miners.company import DomainName, Company, company_by_domain, company_from_whois
 from ..miners.domainlogo import guess_country, find_favicon
 from ..miners.gravatar import gravatar as miner_gravatar
@@ -40,6 +40,8 @@ search_api_params = {
     "google_api_key": settings.google_api_key,
     "google_cx": settings.google_cx,
     "query_type": settings.query_type,
+    "bing_custom_config": settings.bing_customconfig,
+    "bing_api_key": settings.bing_api_key,
 }
 
 MAX_REQUESTS_PER_SEC = {"times": 3, "seconds": 10}
@@ -50,11 +52,14 @@ rw = Railway(router)
 
 @rw.register(field="name")
 async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
-    miner = LinkedInSearch(search_api_params)
-    person = await miner.search(name=name, email=email, company=worksFor)
-    return person
+    #miner = GoogleCustom(cx=settings.google_cx, token=settings.google_api_key)
+    miner = Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key)
+    miner.search(name=name)
+    miner.persons()
+    return miner.persons[0] if miner.persons else None
 
 
+"""
 @rw.register(
     field="url",
     update=(
@@ -67,10 +72,10 @@ async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> P
 async def from_linkedin_url(name: str, url: HttpUrl) -> Person:
     person: Person = {}
     if "linkedin" in url:
-        miner = LinkedInSearch(search_api_params)
-        person.update(await miner.search(name=name, linkedin_url=url))
+        miner = GoogleCustomSearch(search_api_params)
+        person.update(miner.search(name=name))
     return person
-
+"""
 
 @rw.register(field="email", update=("image",))
 async def gravatar(email) -> Person:
@@ -86,6 +91,22 @@ async def gravatar(email) -> Person:
     )
 
 
+@rw.register(field="image")
+async def image(p: dict) -> Person:
+    if "name" not in p:
+        return
+
+    snm = SocialNetworkMiner(p)
+    await snm.image()
+
+    snm.sameAs()
+
+    if "OptOut" in snm.person:
+        return {'OptOut': True}
+    
+    return snm.person
+
+
 @rw.register(field="email")
 async def social(p: dict) -> Person:
     if "name" not in p:
@@ -94,9 +115,9 @@ async def social(p: dict) -> Person:
 
     # if there is an image, let's vision mine it
     # it will ads other social network URLs
-    if "image" in p:
-        await snm.image()
-        pass
+    # if "image" in p:
+    #    await snm.image()
+    #    pass
 
     # fuzzy identifier miner
     # it's not an independent miner since identifier can't be mined

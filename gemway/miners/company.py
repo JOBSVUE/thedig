@@ -169,7 +169,7 @@ def remove_company_type_abbrv(company: str) -> str:
 
 def company_from_whois(domain: DomainName) -> Company | None:
     try:
-        result = whois.query(domain, ignore_returncode=True, timeout=4.0)
+        result = whois.query(domain, ignore_returncode=True, timeout=float(QUERY_TIMEOUT))
     except whois.WhoisPrivateRegistry as e:
         log.error(f"Whois failed: {e}")
         return None

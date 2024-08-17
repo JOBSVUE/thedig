@@ -34,7 +34,8 @@ HttpMethod = Literal["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "TRACE",
 
 # linkedin profile url with an ISO3166 country code regular expression
 RE_LINKEDIN_URL = re.compile(
-    r"^https?:\/\/((?P<countrycode>\w{2})|(:?www))\.linkedin\.com\/(?:public\-profile\/in|in|people)\/(?P<identifier>([\w-]+))/?"
+    r"^https?:\/\/((?P<countrycode>\w{2})|(:?www))\.linkedin\.com\/(?:public\-profile\/in|in|people)\/(?P<identifier>([%\w-]+))/?",
+    re.U
 )
 
 
@@ -54,7 +55,7 @@ def country_from_url(linkedin_url: str) -> str:
         return ISO3166[match["countrycode"].upper()]
 
 
-def parse_linkedin_title(title, name: str = None) -> dict:
+def parse_linkedin_title(title: str, name: str = None) -> dict:
     """parse LinkedIn Title that has this form
         Full Name - Title - Company | LinkedIn
         and sometimes (Google only):
@@ -66,10 +67,10 @@ def parse_linkedin_title(title, name: str = None) -> dict:
     Args:
         title (str): title from LinkedIn page
     """
-    title_ = title.split(" | ")
-    if title_[-1] != "LinkedIn" and title[-3:] != "...":
+    if not title.endswith("LinkedIn") and not title.endswith("..."):
         raise ValueError("This is not a LinkedIn profile title")
 
+    title_ = title.split(" | ")
     full_title = title_[0].split(" - ")
     if len(full_title) < 2:
         raise ValueError("This is not a LinkedIn profile title")
@@ -176,9 +177,9 @@ class Search(ABC):
     def authenticate(self):
         pass
 
-    def raw_search(self, name: str):
+    def raw_search(self, query: str):
         self.authenticate()
-        search_q = self.search_query(name)
+        search_q = self.search_query(query)
         if self.method == "GET":
             self.query_params.update(search_q)
         elif self.method == "POST":
@@ -199,8 +200,8 @@ class Search(ABC):
 
         self.raw_results = r.json()
 
-    def search(self, name: str):
-        self.raw_search(name)
+    def search(self, query: str, name: str):
+        self.raw_search(query)
         self.extract()
         
         # returns the first or the most complete

@@ -9,7 +9,6 @@ from loguru import logger as log
 from redis.asyncio import Redis
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import FilePath, HttpUrl
-from pydantic import Extra
 
 NITTER_INSTANCES = "https://status.d420.de/api/v1/instances"
 NITTER_BACKUP_INSTANCE = "https://nitter.poast.org"

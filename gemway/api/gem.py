@@ -52,14 +52,12 @@ rw = Railway(router)
 
 @rw.register(field="name")
 async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
-    #miner = GoogleCustom(cx=settings.google_cx, token=settings.google_api_key)
+   #miner = GoogleCustom(cx=settings.google_cx, token=settings.google_api_key)
     miner = Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key)
-    miner.search(name=name)
+    miner.search(query=name, name=name)
     miner.persons()
     return miner.persons[0] if miner.persons else None
 
-
-"""
 @rw.register(
     field="url",
     update=(
@@ -70,12 +68,11 @@ async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> P
     insert=("givenName", "familyName"),
 )
 async def from_linkedin_url(name: str, url: HttpUrl) -> Person:
-    person: Person = {}
-    if "linkedin" in url:
-        miner = GoogleCustomSearch(search_api_params)
-        person.update(miner.search(name=name))
-    return person
-"""
+    if "linkedin" in url.host:
+        miner = Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key)
+        miner.search(query=str(url), name=name)
+        miner.persons()
+    return miner.persons[0] if miner.persons else None
 
 @rw.register(field="email", update=("image",))
 async def gravatar(email) -> Person:
@@ -132,7 +129,7 @@ async def social(p: dict) -> Person:
     return snm.person
 
 
-# @rw.register(field="email", update=("worksFor",))
+@rw.register(field="email", update=("worksFor",))
 async def worksfor(email: EmailStr) -> Person:
     # otherwise, the domain will give us the @org
     # except for public email providers
@@ -195,6 +192,12 @@ async def person_post(person: Person) -> Person:
     if not rw_status:
         raise HTTPException(status_code=204)
     return persond
+
+
+@router.post("/person/", tags=("person", "railway"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+async def person_post(persons: list[Person]) -> bool:
+    background_tasks.add_task(write_notification, persons, endpoint)
+    return True
 
 
 @router.websocket("/person/{user_id}/websocket")

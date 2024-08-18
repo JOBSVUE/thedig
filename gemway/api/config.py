@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     app_name: str = "Gemway API"
     google_api_key: str
     google_cx: str
-    google_vision_credentials: FilePath
+    google_credentials: FilePath
     bing_api_key: Optional[str] = None
     bing_customconfig: Optional[str] = None
     google_vertexai_projectid: Optional[str] = None

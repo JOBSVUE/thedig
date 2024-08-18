@@ -50,7 +50,7 @@ search_engines = SearchChain([
     Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key),
     Brave(token=settings.brave_api_key),
     GoogleVertexAI(
-        service_account_info=json.loads(open(settings.google_vision_credentials).read()),
+        service_account_info=json.loads(open(settings.google_credentials).read()),
         project_id=settings.google_vertexai_projectid,
         datastore_id=settings.google_vertexai_projectid
         )

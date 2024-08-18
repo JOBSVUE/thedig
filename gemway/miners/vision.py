@@ -101,7 +101,7 @@ async def find_pages_with_matching_images(
     """
     # search using google vision
     client = vision.ImageAnnotatorClient.from_service_account_file(
-        settings.google_vision_credentials
+        settings.google_credentials
     )
 
     response = await asyncio.to_thread(

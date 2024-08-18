@@ -300,11 +300,13 @@ async def company_from_societecom(name: str) -> Company | None:
     # eg "1 à 3 salariés"
     number_of_employees = r.html.find("div#trancheeff-histo-description") or r.html.find("#effmoy-histo-description")
     if number_of_employees:
-        number_of_employees = number_of_employees.text.split()
-        if len(number_of_employees) > 1:
-            cmp['numberOfEmployees'] = f"{number_of_employees[0]}-{number_of_employees[2]}"
+        num_employees = number_of_employees.text.split()
+        if len(num_employees) > 1:
+            cmp['numberOfEmployees'] = f"{num_employees[0]}-{num_employees[2]}"
+        elif num_employees:
+            cmp['numberOfEmployees'] = num_employees[0]
         else:
-            cmp['numberOfEmployees'] = number_of_employees[0]
+            log.debug(f"Number of employees is void: {number_of_employees.text}")
 
     address = r.html.find("div.CompanyIdentity__adress__around").text.splitlines()
     cmp['address'] = {", ".join(address), }

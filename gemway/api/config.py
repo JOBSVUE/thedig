@@ -60,9 +60,11 @@ class Settings(BaseSettings):
     google_api_key: str
     google_cx: str
     google_vision_credentials: FilePath
-    query_type: str = "q"
     bing_api_key: Optional[str] = None
     bing_customconfig: Optional[str] = None
+    google_vertexai_projectid: Optional[str] = None
+    google_vertexai_datastore: Optional[str] = None
+    brave_api_key: Optional[str] = None
     log_level: Optional[str] = None
     log_filepath: Optional[str] = None
     redis_username: Optional[str] = None

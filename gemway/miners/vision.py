@@ -12,6 +12,7 @@ import re
 from typing import Optional
 from json import loads
 
+from .linkedin import parse_linkedin_title
 from ..api.config import settings
 from ..api.person import Person, dict_to_person
 
@@ -147,7 +148,6 @@ def is_socialprofile(url):
     }
 
 
-# TODO: make it async
 def get_socialprofile(
     url, sn, name, params=REQUESTS_PARAM, session=None, retry=0, max_retry=MAX_RETRY
 ):
@@ -257,13 +257,16 @@ def extract_socialprofile(soup, url, name):
         jsonld = loads(jsonld.text)
         try:
             jsonld = jsonld.get("author") or jsonld
+            print(jsonld["image"])
             if jsonld.get("name") and jsonld["name"].casefold() != name.casefold():
                 person["alternateName"] = jsonld["name"]
             if jsonld.get('nationality'):
                 person["nationality"] = jsonld["nationality"]
             if jsonld.get('knowsLanguage'):
                 person["knowsLanguage"] = jsonld["knowsLanguage"]
-            if jsonld.get("image", {}).get("contentUrl"):
+            if type(jsonld.get("image")) is str:
+                person["image"] = jsonld["image"]
+            elif jsonld.get("image", {}).get("contentUrl"):
                 person["image"] = jsonld["image"]["contentUrl"]
             log.debug(f"JSON-LD found: {jsonld}")
         except KeyError:
@@ -381,7 +384,7 @@ class SocialNetworkMiner:
                 log.debug(f"Invalid/existing social network profile: {page.url}")
                 continue
             page_title = BeautifulSoup(page.page_title, "html.parser").contents[0].text
-            if not match_name(self._person["name"], page_title):
+            if not match_name(self._person["name"], parse_linkedin_title(page_title).get("name", page_title)):
                 log.debug(
                     f"Social Profile: {page_title} doesn't match name {self._person['name']}"
                 )

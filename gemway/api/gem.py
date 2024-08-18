@@ -24,8 +24,8 @@ from loguru import logger as log
 import json
 
 # service
-from ..miners.linkedin import Bing
-from ..miners.company import DomainName, Company, company_by_domain, company_from_whois
+from ..miners.linkedin import Bing, Brave, GoogleCustom, GoogleVertexAI, SearchChain
+from ..miners.company import DomainName, Company, company_by_domain
 from ..miners.domainlogo import guess_country, find_favicon
 from ..miners.gravatar import gravatar as miner_gravatar
 from ..miners.vision import SocialNetworkMiner
@@ -36,43 +36,48 @@ from ..miners.bio import find_jobtitle
 # init fast api
 router = APIRouter()
 
-search_api_params = {
-    "google_api_key": settings.google_api_key,
-    "google_cx": settings.google_cx,
-    "query_type": settings.query_type,
-    "bing_custom_config": settings.bing_customconfig,
-    "bing_api_key": settings.bing_api_key,
-}
-
 MAX_REQUESTS_PER_SEC = {"times": 3, "seconds": 10}
 
 
 rw = Railway(router)
 
 
+search_engines = SearchChain([
+    GoogleCustom(token=settings.google_api_key, cx=settings.google_cx),
+    Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key),
+    Brave(token=settings.brave_api_key),
+    GoogleVertexAI(
+        service_account_info=json.loads(open(settings.google_vision_credentials).read()),
+        project_id=settings.google_vertexai_projectid,
+        datastore_id=settings.google_vertexai_projectid
+        )
+])
+
+
+@rw.register(field="email", update=("worksFor",))
+async def worksfor(email: EmailStr) -> Person:
+    # otherwise, the domain will give us the @org
+    # except for public email providers
+    domain = email.split("@")[1]
+    works_for = {"worksFor": set()}
+    if domain not in settings.public_email_providers:
+        company = await company_by_domain(domain)
+        if company:
+            works_for['worksFor'].add(company["name"])
+    return works_for
+
+
 @rw.register(field="name")
 async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
-   #miner = GoogleCustom(cx=settings.google_cx, token=settings.google_api_key)
-    miner = Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key)
-    miner.search(query=name, name=name)
-    miner.persons()
-    return miner.persons[0] if miner.persons else None
+    engine = search_engines.search(query=name, name=name)
+    if not engine:
+        return
+    log.debug(engine.profiles)
+    if type(worksFor) is set:
+        worksFor = worksFor.copy().pop()
+    engine.to_persons(worksFor=worksFor)
+    return engine.persons[0] if engine.persons else None
 
-@rw.register(
-    field="url",
-    update=(
-        "worksFor",
-        "jobTitle",
-        "workLocation",
-    ),
-    insert=("givenName", "familyName"),
-)
-async def from_linkedin_url(name: str, url: HttpUrl) -> Person:
-    if "linkedin" in url.host:
-        miner = Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key)
-        miner.search(query=str(url), name=name)
-        miner.persons()
-    return miner.persons[0] if miner.persons else None
 
 @rw.register(field="email", update=("image",))
 async def gravatar(email) -> Person:
@@ -129,20 +134,7 @@ async def social(p: dict) -> Person:
     return snm.person
 
 
-@rw.register(field="email", update=("worksFor",))
-async def worksfor(email: EmailStr) -> Person:
-    # otherwise, the domain will give us the @org
-    # except for public email providers
-    domain = email.split("@")[1]
-    works_for = {}
-    if domain not in settings.public_email_providers:
-        company = company_from_whois(domain)
-        if company:
-            works_for['worksFor'] = company['name']
-    return works_for
-
-
-@rw.register(field="description", update=("jobTitle",))
+@rw.register(field="description", insert=("jobTitle",))
 async def bio(description: str = None) -> Person:
     desc: set[str] = (
         {

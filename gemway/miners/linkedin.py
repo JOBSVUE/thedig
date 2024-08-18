@@ -16,13 +16,9 @@ from pydantic import HttpUrl, BaseModel, model_validator, Field
 
 # from curl_cffi import requests
 import requests
-from urllib.parse import quote
 
 # log
 from loguru import logger as log
-
-# Fuzzy string match for person name identification
-from rapidfuzz import fuzz
 
 from .ISO3166 import ISO3166
 from .utils import match_name
@@ -66,17 +62,23 @@ def parse_linkedin_title(title: str, name: str = None) -> dict:
         it should always ends with '| LinkedIn'
     Args:
         title (str): title from LinkedIn page
+        name (str): name of the person
     """
+    result = {}
+    
     if not title.endswith("LinkedIn") and not title.endswith("..."):
-        raise ValueError("This is not a LinkedIn profile title")
-
+        log.debug("This is not a LinkedIn profile title")
+        return result
+    
     title_ = title.split(" | ")
     full_title = title_[0].split(" - ")
     if len(full_title) < 2:
-        raise ValueError("This is not a LinkedIn profile title")
+        log.debug("This is not a LinkedIn profile title")
+        return result
 
     if name and full_title[0].casefold() != name.casefold():
-        raise ValueError("This may not its LinkedIn profile")
+        log.debug("This may not its LinkedIn profile")
+        return result
 
     result = {"name": full_title[0]}
 
@@ -94,6 +96,29 @@ def parse_linkedin_title(title: str, name: str = None) -> dict:
             result["worksFor"] = firstpart
 
     return result
+
+
+def parse_linkedin_default_description(description, country="en") -> str:
+    default_description = {
+        "en": {
+            "begin": "View ",
+            "end": "’s profile on LinkedIn, a professional community of 1 billion members.",
+        },
+        "fr": {
+            "begin": "Consultez le profil de ",
+            "end": " sur LinkedIn, une communauté professionnelle d’un milliard de membres.",
+        }
+    }
+    name = None
+    # fallback to english
+    if country not in default_description:
+        country = "en"
+        
+    if description.endswith(default_description[country]["end"]):
+        name = description[\
+            description.find(default_description[country]["begin"])+len(default_description[country]["begin"]):].\
+            removesuffix(default_description[country]["end"])
+    return name
 
 
 class LinkedInProfile(BaseModel):
@@ -134,7 +159,10 @@ class LinkedInProfile(BaseModel):
         self.identifier = self.match["identifier"]
 
     def parse_title(self):
-        r = parse_linkedin_title(self.title, self.name)
+        r = parse_linkedin_title(
+            title=self.title,
+            name=self.name,
+            )
         if not r:
             raise ValueError("Not a valid LinkedIn Profile title")
         if not match_name(self.name, r['name'], fuzzy=False, condensed=False):
@@ -209,30 +237,40 @@ class Search(ABC):
         for r in self.results:
             try:
                 self.profiles.append(LinkedInProfile(**r, **{"name": name}))
-                #if all(getattr(profiles[-1], field) for field in self.RICH_FIELDS):
-                #    return profiles[-1]
             except ValueError as e:
                 log.debug(f"Not a valid {name} {r} LinkedInprofile: {e}")
 
         return self.profiles
 
-    def persons(self):
+    def to_persons(self, worksFor: str = None):
         self.persons = []
         for profile in self.profiles:
-            self.persons.append(dict_to_person(dict(
+            alternateName = parse_linkedin_default_description(
+                description=profile.description,
+                country=profile.match["countrycode"]
+                )
+            if alternateName:
+                profile.description = None
+                
+            person = dict_to_person(dict(
                 name=profile.name,
                 url=profile.url,
                 sameAs={profile.url},
                 description=profile.description,
+                alternateName={alternateName, } if alternateName != profile.name else None,
                 workLocation={profile.workLocation or profile.country},
                 givenName=profile.givenName,
                 familyName=profile.familyName,
                 identifier={profile.identifier},
-                image=profile.image,
+                image=profile.image if not str(profile.image).startswith("https://static.licdn.com") else None,
                 jobTitle=profile.jobTitle,
                 worksFor=profile.worksFor
-            ), unsetvoid=True))
-
+            ), unsetvoid=True)
+                    
+            if worksFor and profile.worksFor and match_name(worksFor, profile.worksFor, acronym=True):
+                self.persons.insert(person)
+            else:
+                self.persons.append(person)
 
 class GoogleVertexAI(Search):
     TOKEN_URI = "https://oauth2.googleapis.com/token"
@@ -462,3 +500,26 @@ class GoogleCustom(Search):
             }
             for r in self.raw_results["items"] if r.get("pagemap", {}).get("metatags", {})
         ]
+
+
+class SearchChain:
+    
+    def __init__(self, engines: list[Search]):
+        self.engines = engines
+
+    def search(self, name: str, query: str):
+        success = False
+        for engine in self.engines:
+            try:
+                log.debug(f"Trying {engine.__class__.__name__}...")
+                engine.search(name, query)
+                if not engine.results:
+                    success = True
+                    continue
+                log.debug(f"Search successful with {engine.__class__.__name__}")
+                return engine
+            except Exception as e:
+                log.error(f"{engine.__class__.__name__} failed with error: {e}")
+
+        if not success:
+            raise Exception("All search engines have failed.")

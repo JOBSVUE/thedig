@@ -1,0 +1,219 @@
+"""
+Logger setup using loguru
+taken from https://github.com/tiangolo/fastapi/issues/2019
+
+"""
+import logging
+import sys
+from enum import Enum
+from pathlib import Path
+from typing import Optional
+
+from loguru import logger
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class LoggingLevel(str, Enum):
+    """
+    Allowed log levels for the application
+    """
+
+    CRITICAL: str = "CRITICAL"
+    ERROR: str = "ERROR"
+    WARNING: str = "WARNING"
+    INFO: str = "INFO"
+    DEBUG: str = "DEBUG"
+
+
+class LoggingSettings(BaseSettings):
+    """Configure your service logging using a LoggingSettings instance.
+
+    All arguments are optional.
+
+    Arguments:
+
+        level (str): the minimum log-level to log. (default: "DEBUG")
+        format (str): the logformat to use.
+        rotation (str): when to rotate the logfile. (default: "1 days")
+        retention (str): when to remove logfiles. (default: "1 months")
+        serialize (bool): serialize to JSON. (default: False)
+    """
+
+    level: LoggingLevel = "DEBUG"
+    format: str = (
+        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+        "<level>{level: <8}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+        "<level>{message}</level>"
+    )
+    filepath: Optional[Path] = None
+    rotation: str = "1 days"
+    retention: str = "1 months"
+    serialize: bool = False
+    model_config = SettingsConfigDict(env_prefix="log_", env_file=".env", extra="ignore")
+
+
+class InterceptHandler(logging.Handler):
+    """
+    Default handler from examples in loguru documentaion.
+    See https://loguru.readthedocs.io/en/stable/overview.html#entirely-compatible-with-standard-logging
+    """
+
+    def emit(self, record):
+        # Get corresponding Loguru level if it exists
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        # Find caller from where originated the logged message
+        frame, depth = logging.currentframe(), 2
+        while frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+
+        logger.opt(depth=depth, exception=record.exc_info).log(
+            level, record.getMessage()
+        )
+
+
+try:
+    from gunicorn.glogging import Logger
+
+    class GunicornLogger(Logger):
+        def setup(self, cfg) -> None:
+            handler = InterceptHandler()
+
+            log_settings = LoggingSettings()
+
+            # Add log handler to logger and set log level
+            self.error_log.addHandler(handler)
+            self.error_log.setLevel(log_settings.log_level)
+            self.access_log.addHandler(handler)
+            self.access_log.setLevel(log_settings.log_level)
+
+            # Configure logger before gunicorn starts logging
+            logger.configure(
+                handlers=[{"sink": sys.stdout, "level": log_settings.log_level}]
+            )
+
+except ImportError:
+    logger.warning("No gunicorn here")
+
+
+def setup_logger(
+    level: str,
+    format: str,
+    filepath: Optional[Path] = None,
+    rotation: Optional[str] = None,
+    retention: Optional[str] = None,
+    serialize: Optional[bool] = False,
+):
+    """Define the global logger to be used by your entire service.
+
+    Arguments:
+
+        level: the minimum log-level to log.
+        format: the logformat to use.
+        filepath: the path where to store the logfiles.
+        rotation: when to rotate the logfile.
+        retention: when to remove logfiles.
+        serialize: serialize to JSON (default: False).
+
+    Returns:
+
+        the logger to be used by the service.
+
+    References:
+
+        - [Loguru: Intercepting logging logs #247](https://github.com/Delgan/loguru/issues/247)
+        - [Gunicorn: generic logging options #1572](https://github.com/benoitc/gunicorn/issues/1572#issuecomment-638391953)
+    """
+    # Remove loguru default logger
+    logger.remove()
+    # Cath all existing loggers
+    # Add manually gunicorn and uvicorn
+    LOGGERS = list(
+        map(
+            logging.getLogger,
+            [
+                *logging.root.manager.loggerDict.keys(),
+                "gunicorn",
+                "gunicorn.access",
+                "gunicorn.error",
+                "uvicorn",
+                "uvicorn.access",
+                "uvicorn.error",
+            ],
+        )
+    )
+
+    # Add stdout logger
+    logger.add(
+        sys.stdout,
+        enqueue=True,
+        colorize=True,
+        backtrace=True,
+        level=level.upper(),
+        format=format,
+        serialize=serialize,
+    )
+    # Optionally add filepath logger
+    if filepath:
+        Path(filepath).parent.mkdir(parents=True, exist_ok=True)
+        logger.add(
+            str(filepath),
+            rotation=rotation,
+            retention=retention,
+            enqueue=True,
+            colorize=False,
+            backtrace=True,
+            level=level.upper(),
+            format=format,
+            serialize=serialize,
+        )
+    # Ovearrite config of standard library root logger
+    logging.basicConfig(handlers=[InterceptHandler()], level=0)
+    # Ovearrite handlers of all existing loggers from standard library logging
+    for _logger in LOGGERS:
+        _logger.handlers = [InterceptHandler()]
+        _logger.propagate = False
+
+    return logger
+
+
+# monkey patch for an issue regarding loguru and async
+# https://github.com/Delgan/loguru/issues/504#issuecomment-917365972
+def patcher(record):
+    exception = record["exception"]
+    if exception is not None:
+        fixed = Exception(str(exception.value))
+        record["exception"] = exception._replace(value=fixed)
+
+
+def setup_logger_from_settings(log_level: Optional[str] = None, log_settings: Optional[LoggingSettings] = None):
+    """Define the global logger to be used by your entire service.
+
+    Arguments:
+
+        settings: the logging settings to apply.
+
+    Returns:
+
+        the logger instance.
+    """
+    # Parse from env when no settings are given
+    if not log_settings:
+        log_settings = LoggingSettings()
+
+    logger.configure(patcher=patcher)
+
+    # Return logger even though it's not necessary
+    return setup_logger(
+        log_level or log_settings.level,
+        log_settings.format,
+        log_settings.filepath,
+        log_settings.rotation,
+        log_settings.retention,
+        log_settings.serialize,
+    )

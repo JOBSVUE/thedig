@@ -1,11 +1,13 @@
 """Transmuter API"""
 
+
+import requests
+
 # config
-from typing import Annotated
 from .config import settings
 
 # fast api
-from fastapi import APIRouter, HTTPException, Path, status, Depends
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Path, status, Depends
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
 from fastapi_limiter.depends import WebSocketRateLimiter, RateLimiter
 
@@ -13,7 +15,8 @@ from fastapi_limiter.depends import WebSocketRateLimiter, RateLimiter
 from .websocketmanager import manager as ws_manager
 
 # types
-from pydantic import EmailStr, HttpUrl
+from typing import Annotated
+from pydantic import EmailStr, HttpUrl, Field
 from .person import Person, PersonRequest, PersonResponse
 from .person import person_request_ta, person_response_ta, ValidationError
 
@@ -37,7 +40,7 @@ from ..miners.bio import find_jobtitle
 router = APIRouter()
 
 MAX_REQUESTS_PER_SEC = {"times": 3, "seconds": 10}
-
+MAX_BULK = 1000
 
 rw = Railway(router)
 
@@ -186,9 +189,25 @@ async def person_post(person: Person) -> Person:
     return persond
 
 
-@router.post("/person/", tags=("person", "railway"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
-async def person_post(persons: list[Person]) -> bool:
-    background_tasks.add_task(write_notification, persons, endpoint)
+async def persons_bulk_background(
+    persons: Annotated[Person, Field(max_items=MAX_BULK)],
+    webhook_endpoint: HttpUrl
+    ) -> bool:
+    results = []
+    for p in persons:
+        success, enriched = await rw.person(**p)
+        if success:
+            results.append(enriched)
+    try:
+        r = requests.post(str(webhook_endpoint), json=results)
+        r.raise_for_status()
+    except requests.RequestException as e:
+        log.error(e)
+
+
+@router.post("/person/bulk", tags=("person", "railway"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+async def persons_bulk(persons: list[Person], endpoint: HttpUrl, background: BackgroundTasks) -> bool:
+    background.add_task(persons_bulk_background, persons, endpoint)
     return True
 
 

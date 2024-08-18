@@ -1,8 +1,0 @@
-{
-  "displayName": "LinkedIn Profile Schema",
-  "schemaMetadata": {
-    "createTime": "2023-12-18T20:12:14.045Z"
-  },
-  "type": "PROTOCOL_BUFFER",
-  "definition": "message Schema {\n  // The person's name.\n  string name = 1;\n\n  // The person's LinkedIn profile URL.\n  string linkedin_profile_url = 2;\n\n  // The person's job title.\n  string job_title = 3;\n\n  // The person's company.\n  string company = 4;\n\n  // The person's location.\n  string location = 5;\n\n  // The person's connections count.\n  int32 connections_count = 6;\n\n  // The person's about section.\n  string about = 7;\n\n  // The person's experience.\n  repeated Experience experience = 8;\n\n  // The person's education.\n  repeated Education education = 9;\n\n  // The person's skills.\n  repeated string skills = 10;\n}\n\nmessage Experience {\n  // The company name.\n  string company = 1;\n\n  // The job title.\n  string job_title = 2;\n\n  // The start date.\n  string start_date = 3;\n\n  // The end date.\n  string end_date = 4;\n\n  // The description.\n  string description = 5;\n}\n\nmessage Education {\n  // The school name.\n  string school = 1;\n\n  // The degree.\n  string degree = 2;\n\n  // The field of study.\n  string field_of_study = 3;\n\n  // The start date.\n  string start_date = 4;\n\n  // The end date.\n  string end_date = 5;\n}\n"
-}

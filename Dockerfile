@@ -23,7 +23,7 @@ COPY ./requirements.txt $APP_HOME/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r $APP_HOME/requirements.txt
 
 #COPY tests/ tests/
-COPY gemway/ gemway/
+COPY thedig/ thedig/
 COPY .env ./
 
 COPY . $APP_HOME/

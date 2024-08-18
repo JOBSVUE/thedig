@@ -1,9 +1,9 @@
 version: '3'
 
 services:
-  gemway:
-    container_name: gemway
-    image: gemway_image
+  thedig:
+    container_name: thedig
+    image: thedig_image
     env_file:
       - .env
     build:
@@ -11,16 +11,16 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./:/app
-      - ${GOOGLE_VISION_CREDENTIALS}:/app/google-vision-gemway.json:ro
+      - ${GOOGLE_VISION_CREDENTIALS}:/app/google-vision-thedig.json:ro
     ports:
       - "8080:8080"
     depends_on:
-      - gemway_redis
+      - thedig_redis
 
-  gemway_redis:
+  thedig_redis:
     image: redis:alpine
     hostname: redis
-    container_name: gemway_redis
+    container_name: thedig_redis
     restart: always
     command:
       - 'redis-server'

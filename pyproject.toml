@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "gemway"
+name = "thedig"
 dynamic = ["version", "license"]
 description = 'enrich informations about a person using OSINT techniques in a privacy-friendly way'
 readme = "README.md"
@@ -24,12 +24,12 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Documentation = "https://github.com/ankaboot-source/gemway/"
-Issues = "https://github.com/ankaboot-source/gemway/issues"
-Source = "https://github.com/ankaboot-source/gemway/"
+Documentation = "https://github.com/ankaboot-source/thedig/"
+Issues = "https://github.com/ankaboot-source/thedig/issues"
+Source = "https://github.com/ankaboot-source/thedig/"
 
 [tool.hatch.version]
-path = "gemway/__about__.py"
+path = "thedig/__about__.py"
 
 [tool.hatch.envs.default]
 dependencies = [
@@ -59,7 +59,7 @@ dependencies = [
   "ruff>=0.0.243",
 ]
 [tool.hatch.envs.lint.scripts]
-typing = "mypy --install-types --non-interactive {args:src/gemway tests}"
+typing = "mypy --install-types --non-interactive {args:src/thedig tests}"
 style = [
   "ruff {args:.}",
   "black --check --diff {args:.}",
@@ -125,7 +125,7 @@ unfixable = [
 ]
 
 [tool.ruff.isort]
-known-first-party = ["gemway"]
+known-first-party = ["thedig"]
 
 [tool.ruff.flake8-tidy-imports]
 ban-relative-imports = "all"
@@ -135,16 +135,16 @@ ban-relative-imports = "all"
 "tests/**/*" = ["PLR2004", "S101", "TID252"]
 
 [tool.coverage.run]
-source_pkgs = ["gemway", "tests"]
+source_pkgs = ["thedig", "tests"]
 branch = true
 parallel = true
 omit = [
-  "src/gemway/__about__.py",
+  "src/thedig/__about__.py",
 ]
 
 [tool.coverage.paths]
-gemway = ["src/gemway", "*/gemway/src/gemway"]
-tests = ["tests", "*/gemway/tests"]
+thedig = ["src/thedig", "*/thedig/src/thedig"]
+tests = ["tests", "*/thedig/tests"]
 
 [tool.coverage.report]
 exclude_lines = [

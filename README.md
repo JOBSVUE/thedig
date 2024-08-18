@@ -2,7 +2,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](http://www.gnu.org/licenses/agpl-3.0)
 [![Make the Web Open Again](https://img.shields.io/badge/%23MakeTheWebOpenAgain-indigo)](https://www.scientificamerican.com/article/long-live-the-web/)
 
-# 🪨➜💎 Gemway API
+# 🪨➜💎 TheDig API
 
 Enrich data about someone (e.g job title, company, profile pictures etc.) using determinist, OSINT (Opensource Intelligence) and IA (future). Privacy-friendly design: only public data the mined person consent to share (no databreach) are exposed and any one could easily #OptOut.
 
@@ -33,7 +33,7 @@ Company informations based solely on the domain:
 - email
 - telephone
 - social network's URL
-- 
+
 ## 🛡️ Privacy-by-design
 
 This program intend to be actively GDPR compliant and respectful of mined person's privacy. Our intent is to help user's enrich data on existing contacts not to spy nor gather data on someone with a malicious purpose.
@@ -52,7 +52,7 @@ To run this project, you'll need a few environement variables which includes som
 
 You'll need a few API keys, at least Google Custom Search API and Google Vision (reverse-image search)
 - [Create a custom search engine](https://cse.google.com/cse/all)  by specifying "\*.linkedin.com" as specific sites to search on (name here doesn't matter). Once created note the *ID* created and set it in the `.env` file as `GOOGLE_CX` variable. Then you'll need an [API key](https://developers.google.com/custom-search/v1/overview#api_key). Be aware that such restricted search engine has a limited free plan, and you'll be billed above a limit defined by Google.
-- Run `setup_google.sh` to set-up automatically Google Vision API. By default, the project will be `gemway`` and so the API key. If you wish to change defaults, feel free to modify the script by yourself.
+- Run `setup_google.sh` to set-up automatically Google Vision API. By default, the project will be `thedig`` and so the API key. If you wish to change defaults, feel free to modify the script by yourself.
   
 You could also generate manually all Google API Keys for text search and JSON service-account keys for reverse-image search by doing the following steps:
   1. Visit https://console.developers.google.com and create a project.
@@ -73,7 +73,7 @@ Download it and:
 You're welcome! First, have a look on issues open and closed. If nothing is related to your needs, either open an issue or [fork, create a branch and submit your PR](https://docs.github.com/en/get-started/quickstart/contributing-to-projects).
 ### Launch in developer mode
 - Set the `LOG_LEVEL` to `DEBUG` in `.env`
-- Enter the ``gemway`` folder and run it this way : ``uvicorn main:app --reload``
+- Enter the ``thedig`` folder and run it this way : ``uvicorn main:app --reload``
 ### Contributor Copyright Agreement
 In consideration of your contributions to this product, you shall be granted the right to utilize, modify, and disseminate the product in conjunction with your contributions. Simultaneously, you hereby grant the software editor (Ankaboot Company) an irrevocable, perpetual, and unrestricted license to employ, adapt, and publish, including for commercial purposes, your contributions, in their entirety.
 

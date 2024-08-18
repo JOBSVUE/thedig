@@ -6,14 +6,14 @@ from fastapi import FastAPI, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_limiter import FastAPILimiter
 
-from gemway.api.config import settings, setup_cache
+from thedig.api.config import settings, setup_cache
 
-from gemway.api.logsetup import setup_logger_from_settings
+from thedig.api.logsetup import setup_logger_from_settings
 
 # import other apis
-from gemway.api import gem_router
-from gemway.security import get_api_key
-from gemway.__about__ import (
+from thedig.api import router
+from thedig.security import get_api_key
+from thedig.__about__ import (
     __title__,
     __summary__,
     __copyright__,
@@ -40,11 +40,11 @@ app = FastAPI(
     license_info={"name": __license__},
     dependencies=[Security(get_api_key)],
     lifespan=lifespan,
-    terms_of_service="https://github.com/ankaboot-source/gemway/#%EF%B8%8F-support",
+    terms_of_service="https://github.com/ankaboot-source/thedig/",
     openapi_tags=[
         {
-            "name": "railway",
-            "description": "🪨➜💎 enrich __iteratively__ data, every enriched data could be potentially used to mine more data",
+            "name": "archaeology",
+            "description": "🪨➜💎 enrich __iteratively__ data, every enriched data could be potentially used to excavator more data",
         },
         {
             "name": "person",
@@ -64,4 +64,4 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-app.include_router(gem_router)
+app.include_router(router)

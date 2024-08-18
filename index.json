@@ -1,0 +1,16 @@
+{
+  "displayName": "LinkedIn Profile Index",
+  "metadataSchemaUri": "gs://google-cloud-aiplatform/schema/search/metadata_1.0.0.yaml",
+  "dataSource": {
+    "dataStoreId": "linkedin-index-1723994570",
+    "crawlConfig": {
+      "crawlSchedule": {
+        "cron": "0 0 * * *" // Crawl daily at midnight UTC
+      },
+      "requiredSchemaMarker": "CUSTOM_EXTRACTED_REQUIRED_FIELDS",
+      "urlWhitelistPatterns": [
+        "*.linkedin.com/in/*"
+      ]
+    }
+  }
+}

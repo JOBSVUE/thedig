@@ -52,7 +52,7 @@ To run this project, you'll need a few environement variables which includes som
 
 You'll need a few API keys, depending on which search engine you wish to use, yet Google Vision (reverse-image search) is mandatory. Have a look at [default.env] for instructions on how to create them.
 
-In order to help you start smoothly, we provided a script for Google `setup_google.sh`. Run it to set-up automatically Google Vision API. By default, the project will be `thedig`` and so the API key. If you wish to change defaults, feel free to modify the script by yourself.
+In order to help you start smoothly, we provided a script for Google `setup_googlecloud.sh`. Run it to set-up automatically Google Vision API. By default, the project will be `thedig` and so the API key. If you wish to change defaults, feel free to modify the script by yourself.
 
 ### Launch
 

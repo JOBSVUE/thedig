@@ -1,7 +1,5 @@
 import requests
-from ..api.config import settings
 
-GITHUB_TOKEN = settings.github_token
 GITHUB_GRAPHQL_ENDPOINT = "https://api.github.com/graphql" 
 GITHUB_GRAPHQL_USERS = """{
   users_by_name: search(type: USER, query: "${name}", first: 10) {
@@ -28,21 +26,15 @@ GITHUB_GRAPHQL_USERS = """{
 }"""
 
 
-async def github_query(query: str, params: dict, token=GITHUB_TOKEN, endpoint=GITHUB_GRAPHQL_ENDPOINT):
+def github_query(query: str, params: dict, token: str, endpoint=GITHUB_GRAPHQL_ENDPOINT):
     r = requests.post(endpoint,
                       headers={'Authorization': "bearer %s " % token},
                       data=query.format(**params))
-    if not r.ok:
-        r.raise_for_status()
+    r.raise_for_status()
     return r.json()
 
 
-async def users_by_name(name: str) -> list[dict]:
-    data_json = None
-    try:
-        data = data_json.json()["data"]["location_users"]
-    except TypeError:
-        raise TypeError("GraphQL query: %s\nAnswer: %s" % (self._graphql_query("users", created_date, cursor), data_json.text))
-    self.users.extend([u['user'] for u in data["users"] if u['user']])
-    hasNextPage = data["pageInfo"]["hasNextPage"]
-    cursor = ', after: \\"%s\\"' % data["pageInfo"]["endCursor"]
+def users_by_name(results: dict, name: str) -> list[dict]:
+    data = results["data"]["location_users"]
+    users = [u['user'] for u in data["users"] if u['user']]
+    return users

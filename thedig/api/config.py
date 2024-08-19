@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     google_vertexai_projectid: Optional[str] = None
     google_vertexai_datastore: Optional[str] = None
     brave_api_key: Optional[str] = None
+    github_token: Optional[str] = None
     log_level: Optional[str] = None
     log_filepath: Optional[str] = None
     redis_username: Optional[str] = None

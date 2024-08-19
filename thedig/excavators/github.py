@@ -1,9 +1,10 @@
 import requests
+from ..api.config import settings
 
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = settings.github_token
 GITHUB_GRAPHQL_ENDPOINT = "https://api.github.com/graphql" 
 GITHUB_GRAPHQL_USERS = """{
-  users_by_name: search(type: USER, query: "${name}", first: 3) {
+  users_by_name: search(type: USER, query: "${name}", first: 10) {
     users: edges {
       user: node {
         ... on User {
@@ -34,6 +35,7 @@ async def github_query(query: str, params: dict, token=GITHUB_TOKEN, endpoint=GI
     if not r.ok:
         r.raise_for_status()
     return r.json()
+
 
 async def users_by_name(name: str) -> list[dict]:
     data_json = None

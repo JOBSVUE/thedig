@@ -10,7 +10,7 @@ from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 
 from .utils import normalize
-from ..api.person import Person, exc_to_person, person_deduplicate, person_ta, person_set_field, dict_to_person
+from ..api.person import Person, exc_to_person, person_ta, person_set_field, dict_to_person
 
 
 RE_SET = re.compile(r"(\s|^)set\W")

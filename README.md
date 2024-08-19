@@ -51,7 +51,7 @@ By using this application, you must abid to local, international and ethical pri
 To run this project, you'll need a few environement variables which includes some API keys from Google. Please edit [default.env](default.env) and rename it as `.env`.
 
 You'll need a few API keys, at least Google Custom Search API and Google Vision (reverse-image search)
-- [Create a custom search engine](https://cse.google.com/cse/all)  by specifying "\*.linkedin.com" as specific sites to search on (name here doesn't matter). Once created note the *ID* created and set it in the `.env` file as `GOOGLE_CX` variable. Then you'll need an [API key](https://developers.google.com/custom-search/v1/overview#api_key). Be aware that such restricted search engine has a limited free plan, and you'll be billed above a limit defined by Google.
+- [Create a custom search engine](https://cse.google.com/cse/all)  by specifying "\*.linkedin.com/in/\*" as specific sites to search on (name here doesn't matter). Once created note the *ID* created and set it in the `.env` file as `GOOGLE_CX` variable. Then you'll need an [API key](https://developers.google.com/custom-search/v1/overview#api_key). Be aware that such restricted search engine has a limited free plan, and you'll be billed above a limit defined by Google.
 - Run `setup_google.sh` to set-up automatically Google Vision API. By default, the project will be `thedig`` and so the API key. If you wish to change defaults, feel free to modify the script by yourself.
   
 You could also generate manually all Google API Keys for text search and JSON service-account keys for reverse-image search by doing the following steps:

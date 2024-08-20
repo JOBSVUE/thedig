@@ -3,8 +3,8 @@
 
 from hashlib import md5
 
-from loguru import logger as log
 from curl_cffi.requests import AsyncSession, RequestsError
+from loguru import logger as log
 
 # 400x400 is the de facto standard size for profile picture (linkedin, twitter)
 # make it easier for comparison purpose
@@ -54,6 +54,7 @@ async def gravatar(email: str, check: bool = True) -> str:
 # command line usage only for dev purpose
 if __name__ == "__main__":
     import sys
+
     import requests
 
     url = gravatar(sys.argv[1])

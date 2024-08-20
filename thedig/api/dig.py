@@ -1,40 +1,56 @@
 """Transmuter API"""
 
 
-import requests
-
-# config
-from .config import settings
-
-# fast api
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Path, status, Depends
-from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
-from fastapi_limiter.depends import WebSocketRateLimiter, RateLimiter
-
-# websocket manager
-from .websocketmanager import manager as ws_manager
-
-# types
-from typing import Annotated
-from pydantic import EmailStr, HttpUrl, Field
-from .person import Person, PersonRequest, PersonResponse
-from .person import person_request_ta, person_response_ta, ValidationError
-
-# logger
-from loguru import logger as log
-
 # json
 import json
 
+# types
+from typing import Annotated
+
+import requests
+
+# fast api
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Path,
+    WebSocket,
+    WebSocketDisconnect,
+    WebSocketException,
+    status,
+)
+from fastapi_limiter.depends import RateLimiter, WebSocketRateLimiter
+
+# logger
+from loguru import logger as log
+from pydantic import EmailStr, Field, HttpUrl
+
+from ..excavators.archaeology import Archeologist, JSONorNoneResponse
+from ..excavators.bio import find_jobtitle
+from ..excavators.company import Company, DomainName, company_by_domain
+from ..excavators.domainlogo import find_favicon, guess_country
+from ..excavators.gravatar import gravatar
+
 # service
 from ..excavators.linkedin import Bing, Brave, GoogleCustom, GoogleVertexAI, SearchChain
-from ..excavators.company import DomainName, Company, company_by_domain
-from ..excavators.domainlogo import guess_country, find_favicon
-from ..excavators.gravatar import gravatar
-from ..excavators.vision import SocialNetworkMiner
-from ..excavators.archaeology import Archeologist, JSONorNoneResponse
 from ..excavators.splitfullname import split_fullname
-from ..excavators.bio import find_jobtitle
+from ..excavators.vision import SocialNetworkMiner
+
+# config
+from .config import settings
+from .person import (
+    Person,
+    PersonRequest,
+    PersonResponse,
+    ValidationError,
+    person_request_ta,
+    person_response_ta,
+)
+
+# websocket manager
+from .websocketmanager import manager as ws_manager
 
 # init fast api
 router = APIRouter()

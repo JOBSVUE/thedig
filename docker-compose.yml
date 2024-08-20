@@ -13,7 +13,7 @@ services:
       - ./:/app
       - ${GOOGLE_CREDENTIALS}:/app/google-credentials-thedig.json:ro
     ports:
-      - "8080:8080"
+      - 8080:8080
     depends_on:
       - thedig_redis
 
@@ -23,6 +23,6 @@ services:
     container_name: thedig_redis
     restart: always
     command:
-      - 'redis-server'
+      - redis-server
     ports:
       - 6379:6379

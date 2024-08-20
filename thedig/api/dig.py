@@ -8,6 +8,7 @@ import json
 from typing import Annotated
 
 import requests
+from hashlib import sha256
 
 # fast api
 from fastapi import (
@@ -39,7 +40,7 @@ from ..excavators.splitfullname import split_fullname
 from ..excavators.vision import SocialNetworkMiner
 
 # config
-from .config import settings
+from .config import settings, Settings
 from .person import (
     Person,
     PersonRequest,
@@ -52,29 +53,33 @@ from .person import (
 # websocket manager
 from .websocketmanager import manager as ws_manager
 
-# init fast api
-router = APIRouter()
-
 MAX_REQUESTS_PER_SEC = {"times": 3, "seconds": 10}
 MAX_BULK = 1000
 
-ar = Archeologist(router)
+# init fast api
+router = APIRouter()
+ar = Archeologist(
+    router,
+    cache=setup_cache(db=settings.cache_redis_db_person),
+    cache_expiration=settings.cache_expiration_person,
+    )
 
-engines = []
-if settings.google_api_key and settings.google_cx:
-    engines.add(GoogleCustom(token=settings.google_api_key, cx=settings.google_cx))
-if settings.google_credentials and settings.google_vertexai_datastore and settings.google_vertexai_projectid:
-    engines.add(GoogleVertexAI(
-        service_account_info=json.loads(open(settings.google_credentials).read()),
-        project_id=settings.google_vertexai_projectid,
-        datastore_id=settings.google_vertexai_projectid
-        ))
-if settings.bing_customconfig and settings.bing_api_key:
-    engines.add(Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key))
-if settings.brave_api_key:
-    engines.add(Brave(token=settings.brave_api_key))
+def setup_search_engines(settings: Settings) -> SearchChain:
+    engines = []
+    if settings.google_api_key and settings.google_cx:
+        engines.add(GoogleCustom(token=settings.google_api_key, cx=settings.google_cx))
+    if settings.google_credentials and settings.google_vertexai_datastore and settings.google_vertexai_projectid:
+        engines.add(GoogleVertexAI(
+            service_account_info=json.loads(open(settings.google_credentials).read()),
+            project_id=settings.google_vertexai_projectid,
+            datastore_id=settings.google_vertexai_projectid
+            ))
+    if settings.bing_customconfig and settings.bing_api_key:
+        engines.add(Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key))
+    if settings.brave_api_key:
+        engines.add(Brave(token=settings.brave_api_key))
 
-search_engines = SearchChain(engines)
+    return SearchChain(engines)
 
 
 @ar.register(field="email", update=("worksFor",))
@@ -264,6 +269,38 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
         ws_manager.disconnect(websocket)
 
 
+@router.post("/person/optout", tags=("person", "GDPR"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+async def person_optout(person: Person) -> bool:
+    """Opt-out person from thedig to prevent future archeology requests and GDPR compliance
+
+    Args:
+        person (Person): person to opt-out
+
+    Returns:
+        bool: success
+    """
+    if not ar.cache:
+        raise HTTPException(status_code=503, detail="Cache is not available")
+    p_c = await ar.cache.get(sha256(person["email"]))
+    if p_c:
+        p = json.load(p_c)
+        if p["OptOut"]:
+            return True
+        elif match_name(person["name"], p["name"], fuzzy=False):
+            await ar.cache.delete(sha256(person["email"]))
+        else:
+            return HTTPException(status_code=400, detail="Name does not match")
+
+    # hash to avoid storing personal data
+    person = {
+        "name": sha256(person["name"]),
+        "email": "donotdigme@yopmail.com",
+        "OptOut": True
+    }
+    await ar.cache.set(sha256(person["email"]), json.dump(person))
+    return True        
+
+
 @router.get("/company/domain/{domain}", tags=("company", "archaeology"), response_class=JSONorNoneResponse)
 async def company_get(domain: Annotated[DomainName, Path(description="domain name")]) -> Company | None:
     """Search for public data on a company based on its domain
@@ -274,6 +311,9 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
     Returns:
         Company | None
     """
+    if await cache_company.get(domain):
+        return json.load(await cache_company.get(domain))
+
     cmp = await company_by_domain(domain)
     if not cmp or 'name' not in cmp:
         return None
@@ -287,5 +327,11 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
             cmp['image'] = {
                 favicon,
             }
+
+    await cache_company.set(
+        domain,
+        json.dump(cmp),
+        timeout=settings.cache_expiration_company
+        )
 
     return cmp

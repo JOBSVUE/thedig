@@ -1,20 +1,21 @@
 """Archeologist"""
 
-from functools import partial, update_wrapper
-from loguru import logger as log
-from inspect import signature
+import json
 import re
 from collections import defaultdict
+from functools import partial, update_wrapper
+from inspect import signature
+from hashlib import sha256
 
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
+from loguru import logger as log
 
+from ..api.person import Person, dict_to_person, exc_to_person, person_set_field, person_ta
 from .utils import normalize
-from ..api.person import Person, exc_to_person, person_ta, person_set_field, dict_to_person
-
 
 RE_SET = re.compile(r"(\s|^)set\W")
-
+DEFAULT_CACHE_EXPIRATION = 60 * 60 # 1 hour
 
 class JSONorNoneResponse(JSONResponse):
     def render(self, content: any) -> bytes:
@@ -34,9 +35,8 @@ class ExcavatorField:
     async def run(self) -> Person | None:
         if not self.excavator['person_param']:
             p_eligible = {
-                k: v for k, v in self.person.items()
-                if k in self.excavator['parameters'] & self.person.keys()
-                }
+                k: v for k, v in self.person.items() if k in self.excavator['parameters'] & self.person.keys()
+            }
             p_exc: Person = await self.excavator["endpoint"](**p_eligible)
         else:
             p_exc: Person = await self.excavator["endpoint"](self.person)
@@ -57,26 +57,19 @@ class ExcavatorField:
 
         if not p_exc:
             return {}
-        
+
         if "OptOut" in p_exc:
             upgraded.add("Optout")
             log.warning(f"{self.excavator['endpoint']} gave OptOut for {self.person}")
             return upgraded
 
         p_eligible = {
-            k: v for k, v in p_exc.items()
-            if (v and (
-                self.excavator['catchall']
-                or k in self.excavator['update']
-                or k in self.excavator['insert']
-                )
-                )
+            k: v
+            for k, v in p_exc.items()
+            if (v and (self.excavator['catchall'] or k in self.excavator['update'] or k in self.excavator['insert']))
         }
 
-        upgraded = {
-            k for k, v in p_eligible.items()
-            if self.upgrade(k, v)
-            }
+        upgraded = {k for k, v in p_eligible.items() if self.upgrade(k, v)}
 
         return upgraded
 
@@ -85,34 +78,28 @@ class ExcavatorField:
 
         # skip alternateName if same as name
         if k == "alternateName" and v == self.person.get("name"):
-            log.debug(
-                f"{self.excavator['endpoint']} does nothing - alternateName == name: {v}"
-                )
+            log.debug(f"{self.excavator['endpoint']} does nothing - alternateName == name: {v}")
         # real update
         elif k not in self.person:
             modified = True
             person_set_field(self.person, k, v)
             log.debug(f"{self.excavator['endpoint']} add {k} : {v}")
         elif self.person[k] == v:
-            log.debug(
-                f"{self.excavator['endpoint']} does nothing - existing value {k} : {v}"
-            )
+            log.debug(f"{self.excavator['endpoint']} does nothing - existing value {k} : {v}")
             return None
         elif k in self.excavator["update"] or self.excavator["catchall"]:
             modified = True
             person_set_field(self.person, k, v)
             log.debug(f"{self.excavator['endpoint']} update {k} : {v}")
         else:
-            log.debug(
-                f"{self.excavator['endpoint']} does nothing - already exists or insert mode {k} : {v}"
-            )
+            log.debug(f"{self.excavator['endpoint']} does nothing - already exists or insert mode {k} : {v}")
         return modified
 
 
 class Archeologist:
     """Enrich iteratively persons using excavators"""
 
-    _ordered_elements: list = [
+    _ordered_elements = [
         "url",
         "sameAs",
         "email",
@@ -123,10 +110,12 @@ class Archeologist:
 
     default_path: str = "/{operation}/{func_name}/{{{field}}}"
 
-    def __init__(self, router: APIRouter = None):
+    def __init__(self, router: APIRouter = None, cache=None, cache_expiration: int = DEFAULT_CACHE_EXPIRATION):
         self.fields: set = set()
         self.excavators: dict = {k: [] for k in self._ordered_elements}
         self.router = router
+        self.cache = cache
+        self.cache_expiration = cache_expiration
 
         # we don't excavate again with the same excavator, the same field/value
         # so we keep an history of what field/value was used for what excavator
@@ -140,6 +129,12 @@ class Archeologist:
         Returns:
             bool, dict: succeed or not, enriched person
         """
+        if self.cache:
+            person_c = await self.cache(sha256(person["email"]))
+            if person_c:
+                log.debug(f"cache hit for {person['email']}")
+                return True, json.load(person_c)
+
         fields = list(person.keys() & self.fields)
         exc: dict = defaultdict(list)
 
@@ -160,10 +155,10 @@ class Archeologist:
                 if (field, person[field]) in exc[excavator["endpoint"]]:
                     log.error(f"{excavator['endpoint']} already exc {field} with value {person[field]}")
                     continue
- 
+
                 exc[excavator["endpoint"]].append((field, person[field]))
 
-                excavator_f = ExcavatorField(excavator, field, person)             
+                excavator_f = ExcavatorField(excavator, field, person)
                 upgraded.update(await excavator_f.excavate())
 
             modified = True if upgraded else modified
@@ -174,35 +169,46 @@ class Archeologist:
                 fields.extend(to_excavate)
                 log.debug(f"new fields to excavate: {to_excavate}")
 
+        if self.cache and modified:
+            await self.cache.set(
+                sha256(person["email"]),
+                json.dump(person),
+                timeout=self.cache_expiration
+                )
+
         return modified, (person if modified else {})
 
     def add_route(self, excavator_func, excavator_param: dict, is_person_param: bool, route_kwargs: dict):
         route_param = {}
         route_param.update(route_kwargs)
         excavator_response_type_name = excavator_func.__annotations__['return'].__name__.lower()
-        route_param.update({
-            'path': self.default_path.format(
-                # only works if the function has one and only one return type
-                operation=excavator_response_type_name,
-                field=excavator_param['field'],
-                func_name=excavator_func.__name__,),
-            'endpoint': update_wrapper(partial(exc_to_person, excavator_func), excavator_func),
-            'response_model': (
-                excavator_func.__annotations__['return']
-                | None
+        route_param.update(
+            {
+                'path': self.default_path.format(
+                    # only works if the function has one and only one return type
+                    operation=excavator_response_type_name,
+                    field=excavator_param['field'],
+                    func_name=excavator_func.__name__,
                 ),
-            'response_class': JSONorNoneResponse,
-            'responses': (
-                {204: {
-                    'description': "No results found.",
-                    'model': None,
+                'endpoint': update_wrapper(partial(exc_to_person, excavator_func), excavator_func),
+                'response_model': (excavator_func.__annotations__['return'] | None),
+                'response_class': JSONorNoneResponse,
+                'responses': (
+                    {
+                        204: {
+                            'description': "No results found.",
+                            'model': None,
+                        }
                     }
-                 }),
-            'methods': ['POST' if is_person_param else 'GET', ],
-            'tags': (excavator_response_type_name, )
-        })
+                ),
+                'methods': [
+                    'POST' if is_person_param else 'GET',
+                ],
+                'tags': (excavator_response_type_name,),
+            }
+        )
         self.router.add_api_route(**route_param)
-    
+
     def register(self, **kw):
         """register a function as a excavator
 

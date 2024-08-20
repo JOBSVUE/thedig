@@ -2,32 +2,34 @@
 
 # fast api
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_limiter import FastAPILimiter
 
-from thedig.api.config import settings, setup_cache
-
-from thedig.api.logsetup import setup_logger_from_settings
-
-# import other apis
-from thedig.api import router
-from thedig.security import get_api_key
 from thedig.__about__ import (
-    __title__,
-    __summary__,
-    __copyright__,
     __author__,
+    __copyright__,
     __email__,
     __license__,
+    __summary__,
+    __title__,
     __version__
-)
+    )
+
+# import other apis
+from thedig.api import router, setup_search_engines
+from thedig.api.config import settings, setup_cache
+from thedig.api.logsetup import setup_logger_from_settings
+from thedig.security import get_api_key
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logger_from_settings(log_level=settings.log_level)
-    await FastAPILimiter.init(await setup_cache(settings))
+    search_engines = setup_search_engines(settings)
+    cache_company = await setup_cache(settings, db=settings.cache_redis_db_company)
+    await FastAPILimiter.init(await setup_cache(settings, db=settings.cache_redis_db))
     yield
 
 # routing composition
@@ -44,7 +46,8 @@ app = FastAPI(
     openapi_tags=[
         {
             "name": "archaeology",
-            "description": "🪨➜💎 enrich __iteratively__ data, every enriched data could be potentially used to excavator more data",
+            "description": "🪨➜💎 enrich __iteratively__ data,\
+                every enriched data could be potentially used to excavator more data",
         },
         {
             "name": "person",

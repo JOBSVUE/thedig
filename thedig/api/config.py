@@ -63,7 +63,10 @@ class Settings(BaseSettings):
     redis_host: str
     redis_port: str
     cache_redis_db: int
-    cache_expiration: int
+    cache_redis_db_person: int = 2
+    cache_redis_db_organization: int = 3
+    cache_expiration_company: int = 60*60*24*30 # 30 days
+    cache_expiration_person: int = 60*60*24*1 # 1 day
     server_port: int
     api_keys: list[str]
     api_key_name: str

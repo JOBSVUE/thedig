@@ -13,7 +13,6 @@ from pydantic import FilePath, HttpUrl
 NITTER_INSTANCES = "https://status.d420.de/api/v1/instances"
 NITTER_BACKUP_INSTANCE = "https://nitter.poast.org"
 PUBLIC_EMAIL_PROVIDERS_URL = "https://raw.githubusercontent.com/ankaboot-source/email-open-data/main/public-email-providers.json"
-PROXY_GETTER_URL = "https://faas-fra1-afec6ce7.doserverless.co/api/v1/web/fn-17051245-6c4e-4bdf-aa67-50f8d3c33580/openweb_proxy/get_proxy"
 JOBTITLES_FILE = "miners/jobtitles.json"
 
 
@@ -46,20 +45,11 @@ def get_public_email_providers(public_email_providers_url=PUBLIC_EMAIL_PROVIDERS
         log.error(f"Impossible to GET {public_email_providers_url}: {e}")
     return public_email_providers
 
-
-def get_https_proxy(proxy_getter_url: HttpUrl = PROXY_GETTER_URL) -> dict:
-    proxy = requests.get(proxy_getter_url).text
-    return {
-        "https": f"http://{proxy}",
-        "http": f"http://{proxy}",
-    }
-
-
 class Settings(BaseSettings):
     app_name: str = "TheDig API"
-    google_api_key: str
-    google_cx: str
     google_credentials: FilePath
+    google_api_key: Optional[str] = None
+    google_cx: Optional[str] = None
     bing_api_key: Optional[str] = None
     bing_customconfig: Optional[str] = None
     google_vertexai_projectid: Optional[str] = None
@@ -80,7 +70,7 @@ class Settings(BaseSettings):
     public_email_providers: Optional[set[str]] = get_public_email_providers()
     jobtitles_list_file: str = JOBTITLES_FILE
     nitter_instance_server: str = pick_nitter_instance()
-    proxy: Optional[str] = "http://ufjhhzpz-rotate:qx4z7hjklubw@p.webshare.io:80/"
+    proxy: Optional[str] = None
 
     model_config = SettingsConfigDict(env_file=".env")
 

@@ -11,6 +11,7 @@ pydantic[email]>=2.1.1
 pydantic-settings>=2.0.2
 PySocks>=1.7.1
 python-dotenv>=1.0.0
+pytest>=8.3.2
 rapidfuzz>=3.2.0
 redis>=4.5.5
 requests-ratelimiter>=0.7.0

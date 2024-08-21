@@ -7,6 +7,7 @@ import json
 # types
 from typing import Annotated
 
+import asyncio
 import requests
 from hashlib import sha256
 
@@ -60,7 +61,7 @@ MAX_BULK = 1000
 router = APIRouter()
 ar = Archeologist(
     router,
-    cache=await setup_cache(settings, db=settings.cache_redis_db_person),
+    cache=asyncio.run(setup_cache(settings, db=settings.cache_redis_db_person)),
     cache_expiration=settings.cache_expiration_person,
     )
 

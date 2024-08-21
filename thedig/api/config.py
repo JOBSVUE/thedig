@@ -8,7 +8,7 @@ from loguru import logger as log
 
 from redis.asyncio import Redis
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import FilePath, HttpUrl
+from pydantic import FilePath
 
 NITTER_INSTANCES = "https://status.d420.de/api/v1/instances"
 NITTER_BACKUP_INSTANCE = "https://nitter.poast.org"
@@ -56,18 +56,18 @@ class Settings(BaseSettings):
     google_vertexai_datastore: Optional[str] = None
     brave_api_key: Optional[str] = None
     github_token: Optional[str] = None
-    log_level: Optional[str] = None
-    log_filepath: Optional[str] = None
+    log_level: Optional[str] = "INFO"
+    log_filepath: Optional[str] = "thedig.log"
     redis_username: Optional[str] = None
     redis_password: Optional[str] = None
     redis_host: str
     redis_port: str
-    cache_redis_db: int
-    cache_redis_db_person: int = 2
-    cache_redis_db_organization: int = 3
+    cache_redis_db: int = 0
+    cache_redis_db_person: int = 1
+    cache_redis_db_organization: int = 2
     cache_expiration_company: int = 60*60*24*30 # 30 days
     cache_expiration_person: int = 60*60*24*1 # 1 day
-    server_port: int
+    server_port: int = "8080"
     api_keys: list[str]
     api_key_name: str
     public_email_providers: Optional[set[str]] = get_public_email_providers()
@@ -81,7 +81,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-async def setup_cache(settings: Settings, db: int = None) -> Redis:
+async def setup_cache(settings: Settings, db: Optional[int] = None) -> Redis:
     """setup cache based on Redis
 
     Args:

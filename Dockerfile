@@ -18,7 +18,8 @@ USER appuser
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONDONTWRITEBYTECODE=True \
     PYTHONUNBUFFERED=True \
-    PYTHONIOENCODING=utf-8
+    PYTHONIOENCODING=utf-8 \
+    PATH=$PATH:/home/appuser/.local/bin
 
 # Copy local code to the container image.
 ENV APP_HOME /app

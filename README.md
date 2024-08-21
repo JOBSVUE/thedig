@@ -2,7 +2,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](http://www.gnu.org/licenses/agpl-3.0)
 [![Make the Web Open Again](https://img.shields.io/badge/%23MakeTheWebOpenAgain-indigo)](https://www.scientificamerican.com/article/long-live-the-web/)
 
-# 🪨➜💎 TheDig API
+# 🪨➜💎 TheDig
 
 Enrich data about someone (e.g job title, company, profile pictures etc.) using determinist, OSINT (Opensource Intelligence) and IA (future). Privacy-friendly design: only public data the mined person consent to share (no databreach) are exposed and any one could easily #OptOut.
 
@@ -42,12 +42,16 @@ Company informations based solely on the domain:
 
 This program intend to be actively GDPR compliant and respectful of mined person's privacy. Our intent is to help user's enrich data on existing contacts not to spy nor gather data on someone with a malicious purpose.
 
-We implemented proactively a few GDPR principles in the code itself:
+<details>
+<summary>We implemented proactively a few GDPR principles in the code itself</summary>
+
 - Right to Opt-Out: if the person mined use the tag #OptOut in its social profile, no enrichment will occur.
 - Lawfulness, fairness and transparency: our sources of data are only public data the person already consent to share publicly. We do not mine databreached data nor doxing for examples. 
 - Purpose and Accuracy: we rather prefer not to enrich with dubious information than take the risk of false positives, for examples the social profiles found are, as possible, checked to be the ones about the person itself. We do not mine social networks or websites that are irrelevant to marketing purposes.
 
 By using this application, you must abid to local, international and ethical privacy rules. For instance, it's highly recommended to inform the person's enriched that he has been the object of this mining. Such feature is not in the scope of this present OpenSource repository. Please reach contact@ankaboot.fr for further enquiries.
+
+</details>
 
 ## 🏗️ How to use
 

@@ -40,7 +40,7 @@ from ..excavators.splitfullname import split_fullname
 from ..excavators.vision import SocialNetworkMiner
 
 # config
-from .config import settings, Settings
+from .config import settings, Settings, setup_cache
 from .person import (
     Person,
     PersonRequest,

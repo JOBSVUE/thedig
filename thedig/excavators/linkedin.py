@@ -5,7 +5,7 @@ Return format is JSON-LD simplified
 """
 
 from abc import ABC, abstractmethod
-from typing import Literal, Optional
+from typing import Literal, Optional, ClassVar
 import re
 import time
 import jwt
@@ -16,6 +16,7 @@ from pydantic import HttpUrl, BaseModel, model_validator, Field
 
 # from curl_cffi import requests
 import requests
+import json
 
 # log
 from loguru import logger as log
@@ -502,10 +503,29 @@ class GoogleCustom(Search):
         ]
 
 
-class SearchChain:
-    
-    def __init__(self, engines: list[Search]):
-        self.engines = engines
+class Singleton(type):
+    _instances: ClassVar = {}
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super().__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+
+class SearchChain(metaclass=Singleton):
+    def __init__(self, settings):
+        self.engines = []
+        if settings.google_api_key and settings.google_cx:
+            self.engines.append(GoogleCustom(token=settings.google_api_key, cx=settings.google_cx))
+        if settings.google_credentials and settings.google_vertexai_datastore and settings.google_vertexai_projectid:
+            self.engines.append(GoogleVertexAI(
+                service_account_info=json.loads(open(settings.google_credentials).read()),
+                project_id=settings.google_vertexai_projectid,
+                datastore_id=settings.google_vertexai_projectid
+                ))
+        if settings.bing_customconfig and settings.bing_api_key:
+            self.engines.append(Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key))
+        if settings.brave_api_key:
+            self.engines.append(Brave(token=settings.brave_api_key))
 
     def search(self, name: str, query: str):
         success = False
@@ -522,4 +542,5 @@ class SearchChain:
                 log.error(f"{engine.__class__.__name__} failed with error: {e}")
 
         if not success:
-            raise Exception("All search engines have failed.")
+            failed_engines = "All search engines have failed."
+            raise Exception(failed_engines)

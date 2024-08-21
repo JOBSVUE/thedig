@@ -13,9 +13,19 @@ from loguru import logger as log
 
 from ..api.person import Person, dict_to_person, exc_to_person, person_set_field, person_ta
 from .utils import normalize
+from pydantic import AnyUrl
 
 RE_SET = re.compile(r"(\s|^)set\W")
 DEFAULT_CACHE_EXPIRATION = 60 * 60 # 1 hour
+
+class SetAndURLJSON(json.JSONEncoder):
+    def default(self, obj):
+        if type(obj) is set:
+            return list(obj)
+        elif type(obj) is AnyUrl:
+            return str(obj)
+        return json.JSONEncoder.default(self, obj)
+json_dumps = SetAndURLJSON().encode
 
 class JSONorNoneResponse(JSONResponse):
     def render(self, content: any) -> bytes:
@@ -95,18 +105,17 @@ class ExcavatorField:
             log.debug(f"{self.excavator['endpoint']} does nothing - already exists or insert mode {k} : {v}")
         return modified
 
-
 class Archeologist:
     """Enrich iteratively persons using excavators"""
 
-    _ordered_elements = [
+    _ordered_elements = (
         "url",
         "sameAs",
         "email",
         "image",
         "description",
         "name",
-    ]
+    )
 
     default_path: str = "/{operation}/{func_name}/{{{field}}}"
 
@@ -130,10 +139,12 @@ class Archeologist:
             bool, dict: succeed or not, enriched person
         """
         if self.cache:
-            person_c = await self.cache(sha256(person["email"]))
+            person_c = await self.cache.get(
+                sha256(person["email"].encode("utf-8")).hexdigest()
+                )
             if person_c:
                 log.debug(f"cache hit for {person['email']}")
-                return True, json.load(person_c)
+                return True, json.loads(person_c)
 
         fields = list(person.keys() & self.fields)
         exc: dict = defaultdict(list)
@@ -171,9 +182,9 @@ class Archeologist:
 
         if self.cache and modified:
             await self.cache.set(
-                sha256(person["email"]),
-                json.dump(person),
-                timeout=self.cache_expiration
+                sha256(person["email"].encode("utf-8")).hexdigest(),
+                json_dumps(person),
+                ex=self.cache_expiration
                 )
 
         return modified, (person if modified else {})

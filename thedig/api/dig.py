@@ -29,7 +29,7 @@ from fastapi_limiter.depends import RateLimiter, WebSocketRateLimiter
 from loguru import logger as log
 from pydantic import EmailStr, Field, HttpUrl
 
-from ..excavators.archaeology import Archeologist, JSONorNoneResponse
+from ..excavators.archaeology import Archeologist, JSONorNoneResponse, json_dumps
 from ..excavators.bio import find_jobtitle
 from ..excavators.company import Company, DomainName, company_by_domain
 from ..excavators.domainlogo import find_favicon, guess_country
@@ -39,6 +39,7 @@ from ..excavators.gravatar import gravatar
 from ..excavators.linkedin import Bing, Brave, GoogleCustom, GoogleVertexAI, SearchChain
 from ..excavators.splitfullname import split_fullname
 from ..excavators.vision import SocialNetworkMiner
+from ..excavators.utils import match_name
 
 # config
 from .config import settings, Settings, setup_cache
@@ -61,27 +62,8 @@ MAX_BULK = 1000
 router = APIRouter()
 ar = Archeologist(router)
 
-def setup_search_engines(settings: Settings) -> SearchChain:
-    engines = []
-    if settings.google_api_key and settings.google_cx:
-        engines.append(GoogleCustom(token=settings.google_api_key, cx=settings.google_cx))
-    if settings.google_credentials and settings.google_vertexai_datastore and settings.google_vertexai_projectid:
-        engines.append(GoogleVertexAI(
-            service_account_info=json.loads(open(settings.google_credentials).read()),
-            project_id=settings.google_vertexai_projectid,
-            datastore_id=settings.google_vertexai_projectid
-            ))
-    if settings.bing_customconfig and settings.bing_api_key:
-        engines.append(Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key))
-    if settings.brave_api_key:
-        engines.append(Brave(token=settings.brave_api_key))
-
-    return SearchChain(engines)
-
-
 @ar.register(field="email", update=("worksFor",))
 async def worksfor(email: EmailStr) -> Person:
-    # othearise, the domain will give us the @org
     # except for public email providers
     domain = email.split("@")[1]
     works_for = {"worksFor": set()}
@@ -94,7 +76,7 @@ async def worksfor(email: EmailStr) -> Person:
 
 @ar.register(field="name")
 async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
-    engine = search_engines.search(query=name, name=name)
+    engine = SearchChain(settings).search(query=name, name=name)
     if not engine:
         return
     log.debug(engine.profiles)
@@ -130,7 +112,7 @@ async def image(p: dict) -> Person:
 
     if "OptOut" in snm.person:
         return {'OptOut': True}
-    
+
     return snm.person
 
 
@@ -211,12 +193,13 @@ async def persons_bulk_background(
     ) -> bool:
     results = []
     for p in persons:
-        success, enriched = await ar.person(**p)
+        success, enriched = await ar.person(p)
         if success:
             results.append(enriched)
     try:
-        r = requests.post(str(webhook_endpoint), json=results)
+        r = requests.post(str(webhook_endpoint), json=json_dumps(results))
         r.raise_for_status()
+        log.debug(f"Endpoint answered: {r.json()}")
     except requests.RequestException as e:
         log.error(e)
 
@@ -278,24 +261,31 @@ async def person_optout(person: Person) -> bool:
     """
     if not ar.cache:
         raise HTTPException(status_code=503, detail="Cache is not available")
-    p_c = await ar.cache.get(sha256(person["email"]))
+    p_c = await ar.cache.get(
+        sha256(person["email"].encode("utf-8")).hexdigest()
+        )
     if p_c:
-        p = json.load(p_c)
+        p = json.loads(p_c)
         if p["OptOut"]:
             return True
         elif match_name(person["name"], p["name"], fuzzy=False):
-            await ar.cache.delete(sha256(person["email"]))
+            await ar.cache.delete(
+                sha256(person["email"].encode("utf-8")).hexdigest()
+                )
         else:
             return HTTPException(status_code=400, detail="Name does not match")
 
     # hash to avoid storing personal data
     person = {
-        "name": sha256(person["name"]),
+        "name": sha256(person["name"].encode("utf-8")).hexdigest(),
         "email": "donotdigme@yopmail.com",
         "OptOut": True
     }
-    await ar.cache.set(sha256(person["email"]), json.dump(person))
-    return True        
+    await ar.cache.set(
+        sha256(person["email"].encode("utf-8")).hexdigest(),
+        json_dumps(person)
+        )
+    return True
 
 
 @router.get("/company/domain/{domain}", tags=("company", "archaeology"), response_class=JSONorNoneResponse)
@@ -309,7 +299,7 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
         Company | None
     """
     if await cache_company.get(domain):
-        return json.load(await cache_company.get(domain))
+        return json.loads(await cache_company.get(domain))
 
     cmp = await company_by_domain(domain)
     if not cmp or 'name' not in cmp:
@@ -327,8 +317,8 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
 
     await cache_company.set(
         domain,
-        json.dump(cmp),
-        timeout=settings.cache_expiration_company
+        json_dumps(cmp),
+        ex=settings.cache_expiration_company
         )
 
     return cmp

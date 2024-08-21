@@ -6,12 +6,9 @@
 
 Enrich data about someone (e.g job title, company, profile pictures etc.) using determinist, OSINT (Opensource Intelligence) and IA (future). Privacy-friendly design: only public data the mined person consent to share (no databreach) are exposed and any one could easily #OptOut.
 
-[Features](#-features)
-[Privacy-by-design](#-privacy-by-design)
-[How to use](#️-how-to-use)
-[How to contribute](#-how-to-contribute)
-[Support](#️-support)
-[License](#-license)
+<p align="center">
+[Features](#-features) ♦ [Privacy-by-design](#-privacy-by-design) ♦ [How to use](#️-how-to-use) ♦ [How to contribute](#-how-to-contribute) ♦ [Support](#️-support) ♦ [License](#-license)
+</p>
 
 ## ✨ Features
 

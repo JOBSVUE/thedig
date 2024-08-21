@@ -18,7 +18,7 @@ from thedig.__about__ import (
     )
 
 # import other apis
-from thedig.api import router, setup_search_engines
+from thedig.api import router, setup_search_engines, ar
 from thedig.api.config import settings, setup_cache
 from thedig.api.logsetup import setup_logger_from_settings
 from thedig.security import get_api_key
@@ -28,7 +28,8 @@ from thedig.security import get_api_key
 async def lifespan(app: FastAPI):
     setup_logger_from_settings(log_level=settings.log_level)
     search_engines = setup_search_engines(settings)
-    cache_company = await setup_cache(settings, db=settings.cache_redis_db_company)
+    ar.cache = await setup_cache(settings, db=settings.cache_redis_db_company)
+    ar.cache_expiration = settings.cache_expiration_person
     await FastAPILimiter.init(await setup_cache(settings, db=settings.cache_redis_db))
     yield
 

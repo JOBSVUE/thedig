@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     redis_port: str
     cache_redis_db: int = 0
     cache_redis_db_person: int = 1
-    cache_redis_db_organization: int = 2
+    cache_redis_db_company: int = 2
     cache_expiration_company: int = 60*60*24*30 # 30 days
     cache_expiration_person: int = 60*60*24*1 # 1 day
     server_port: int = "8080"

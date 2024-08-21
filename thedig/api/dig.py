@@ -59,11 +59,7 @@ MAX_BULK = 1000
 
 # init fast api
 router = APIRouter()
-ar = Archeologist(
-    router,
-    cache=asyncio.run(setup_cache(settings, db=settings.cache_redis_db_person)),
-    cache_expiration=settings.cache_expiration_person,
-    )
+ar = Archeologist(router)
 
 def setup_search_engines(settings: Settings) -> SearchChain:
     engines = []

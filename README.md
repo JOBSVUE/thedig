@@ -48,9 +48,9 @@ By using this application, you must abid to local, international and ethical pri
 ## 🏗️ How to use
 
 ### Configure
-To run this project, you'll need a few environement variables which includes some API keys from Google. Please edit [default.env](default.env) and rename it as `.env`.
+To run this project, you'll need a few environement variables which includes some API keys from Google.
 
-You'll need a few API keys, depending on which search engine you wish to use, yet Google Vision (reverse-image search) is mandatory. Have a look at [default.env] for instructions on how to create them.
+You'll need a few API keys, depending on which search engine you wish to use, yet Google Vision (reverse-image search) is mandatory. Have a look at [default.env](default.env) for instructions on how to create them, fill them and rename the file as `.env`.
 
 In order to help you start smoothly, we provided a script for Google `setup_googlecloud.sh`. Run it to set-up automatically Google Vision API. By default, the project will be `thedig` and so the API key. If you wish to change defaults, feel free to modify the script by yourself.
 

@@ -67,17 +67,17 @@ ar = Archeologist(
 def setup_search_engines(settings: Settings) -> SearchChain:
     engines = []
     if settings.google_api_key and settings.google_cx:
-        engines.add(GoogleCustom(token=settings.google_api_key, cx=settings.google_cx))
+        engines.append(GoogleCustom(token=settings.google_api_key, cx=settings.google_cx))
     if settings.google_credentials and settings.google_vertexai_datastore and settings.google_vertexai_projectid:
-        engines.add(GoogleVertexAI(
+        engines.append(GoogleVertexAI(
             service_account_info=json.loads(open(settings.google_credentials).read()),
             project_id=settings.google_vertexai_projectid,
             datastore_id=settings.google_vertexai_projectid
             ))
     if settings.bing_customconfig and settings.bing_api_key:
-        engines.add(Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key))
+        engines.append(Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key))
     if settings.brave_api_key:
-        engines.add(Brave(token=settings.brave_api_key))
+        engines.append(Brave(token=settings.brave_api_key))
 
     return SearchChain(engines)
 

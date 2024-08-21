@@ -60,7 +60,7 @@ MAX_BULK = 1000
 router = APIRouter()
 ar = Archeologist(
     router,
-    cache=setup_cache(db=settings.cache_redis_db_person),
+    cache=setup_cache(settings, db=settings.cache_redis_db_person),
     cache_expiration=settings.cache_expiration_person,
     )
 

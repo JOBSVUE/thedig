@@ -34,6 +34,21 @@ RE_LINKEDIN_URL = re.compile(
     r"^https?:\/\/((?P<countrycode>\w{2})|(:?www))\.linkedin\.com\/(?:public\-profile\/in|in|people)\/(?P<identifier>([%\w-]+))/?",
     re.U
 )
+RE_LINKEDIN_NAME_DESCRIPTION = re.compile(
+    r"<strong>([^<]+)</strong>.*<strong>([^<]+)</strong>",
+    re.U
+)
+
+LINKEDIN_DESCRIPTION = {
+    "en": {
+        "begin": "View ",
+        "end": "’s profile on LinkedIn, a professional community of 1 billion members.",
+    },
+    "fr": {
+        "begin": "Consultez le profil de ",
+        "end": " sur LinkedIn, une communauté professionnelle d’un milliard de membres.",
+    }
+}
 
 
 def country_from_url(linkedin_url: str) -> str:
@@ -99,26 +114,27 @@ def parse_linkedin_title(title: str, name: str = None) -> dict:
     return result
 
 
-def parse_linkedin_default_description(description, country="en") -> str:
-    default_description = {
-        "en": {
-            "begin": "View ",
-            "end": "’s profile on LinkedIn, a professional community of 1 billion members.",
-        },
-        "fr": {
-            "begin": "Consultez le profil de ",
-            "end": " sur LinkedIn, une communauté professionnelle d’un milliard de membres.",
-        }
-    }
+def parse_linkedin_description(description, country="en") -> str:
     name = None
+
+    html_matches = re.match(description, RE_LINKEDIN_NAME_DESCRIPTION)
+    if html_matches:
+        names = set(html_matches.groups())
+        if len(names) == 2:
+            given_name = matches.group(1)
+            family_name = matches.group(2)
+            return f"{given_name} {family_name}"
+        elif len(name) == 1:
+            return names.pop()
+
     # fallback to english
-    if country not in default_description:
+    if country not in LINKEDIN_DESCRIPTION:
         country = "en"
         
-    if description.endswith(default_description[country]["end"]):
+    if description.endswith(LINKEDIN_DESCRIPTION[country]["end"]):
         name = description[\
-            description.find(default_description[country]["begin"])+len(default_description[country]["begin"]):].\
-            removesuffix(default_description[country]["end"])
+            description.find(LINKEDIN_DESCRIPTION[country]["begin"])+len(LINKEDIN_DESCRIPTION[country]["begin"]):].\
+            removesuffix(LINKEDIN_DESCRIPTION[country]["end"])
     return name
 
 
@@ -157,6 +173,14 @@ class LinkedInProfile(BaseModel):
     def parse_url(self):
         if not self.country and self.match["countrycode"]:
             self.country = ISO3166[self.match["countrycode"].upper()]
+            # we upsert self.workLocation if None
+            # or given by the search engine if it's not the same as the country
+            # Country names like USA, UAE need to be checked as an acronym too
+            if not self.workLocation or (
+                self.country not in self.workLocation and filter(str.isupper, self.country) not in self.workLocation
+                ):
+                self.workLocation = self.country
+
         self.identifier = self.match["identifier"]
 
     def parse_title(self):
@@ -246,7 +270,7 @@ class Search(ABC):
     def to_persons(self, worksFor: str = None):
         self.persons = []
         for profile in self.profiles:
-            alternateName = parse_linkedin_default_description(
+            alternateName = parse_linkedin_description(
                 description=profile.description,
                 country=profile.match["countrycode"]
                 )
@@ -259,7 +283,7 @@ class Search(ABC):
                 sameAs={profile.url},
                 description=profile.description,
                 alternateName={alternateName, } if alternateName != profile.name else None,
-                workLocation={profile.workLocation or profile.country},
+                workLocation={profile.workLocation},
                 givenName=profile.givenName,
                 familyName=profile.familyName,
                 identifier={profile.identifier},

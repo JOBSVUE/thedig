@@ -39,16 +39,23 @@ RE_LINKEDIN_NAME_DESCRIPTION = re.compile(
     re.U
 )
 
+RE_LINKEDIN_INFOS_DESCRIPTION = re.compile(
+    r"^(?P<description>.*?)(?: · Experience: (?P<worksFor>.+?)(?: · Education: (.+?))? · Location: (?P<workLocation>.*?) · (?: · \d+\+ connections on LinkedIn)?)",
+    re.U
+)
+
 LINKEDIN_DESCRIPTION = {
     "en": {
         "begin": "View ",
-        "end": "’s profile on LinkedIn, a professional community of 1 billion members.",
+        "end": "’s profile on LinkedIn, a professional community of 1 billion members",
     },
     "fr": {
         "begin": "Consultez le profil de ",
-        "end": " sur LinkedIn, une communauté professionnelle d’un milliard de membres.",
+        "end": " sur LinkedIn, une communauté professionnelle d’un milliard de membres",
     }
 }
+
+LINKEDIN_TRAILING_DESCRIPTION = (" ...", ".")
 
 
 def country_from_url(linkedin_url: str) -> str:
@@ -114,28 +121,43 @@ def parse_linkedin_title(title: str, name: str = None) -> dict:
     return result
 
 
-def parse_linkedin_description(description, country="en") -> str:
-    name = None
+def parse_linkedin_description(description, country="en") -> dict:
+    person = dict()
 
-    html_matches = re.match(description, RE_LINKEDIN_NAME_DESCRIPTION)
+    html_matches = re.match(RE_LINKEDIN_NAME_DESCRIPTION, description)
     if html_matches:
         names = set(html_matches.groups())
         if len(names) == 2:
-            given_name = matches.group(1)
-            family_name = matches.group(2)
-            return f"{given_name} {family_name}"
+            person["familyName"] = names.pop()
+            person["givenName"] = names.pop()
+            person["alternateName"] = f"{given_name} {family_name}"
         elif len(name) == 1:
-            return names.pop()
+            person["familyName"] = names.pop()
 
     # fallback to english
     if country not in LINKEDIN_DESCRIPTION:
         country = "en"
-        
+    
+    for trailing in LINKEDIN_TRAILING_DESCRIPTION:
+        if description.endswith(trailing):
+            description = description.removesuffix(trailing)
+            break
+
     if description.endswith(LINKEDIN_DESCRIPTION[country]["end"]):
-        name = description[\
-            description.find(LINKEDIN_DESCRIPTION[country]["begin"])+len(LINKEDIN_DESCRIPTION[country]["begin"]):].\
-            removesuffix(LINKEDIN_DESCRIPTION[country]["end"])
-    return name
+        if "alternateName" not in person:
+            description = description.replace("<strong>", "").replace("</strong>", "")
+            person["alternateName"] = description[\
+                description.find(LINKEDIN_DESCRIPTION[country]["begin"])+len(LINKEDIN_DESCRIPTION[country]["begin"]):].\
+                removesuffix(LINKEDIN_DESCRIPTION[country]["end"])
+        
+        matched_infos = re.match(RE_LINKEDIN_INFOS_DESCRIPTION, description)
+        if matched_infos:
+            infos = matched_infos.groupdict()
+            person.update(
+                {key: value.strip() for key, value in infos.items() if value}
+            )
+            
+    return person
 
 
 class LinkedInProfile(BaseModel):
@@ -149,6 +171,7 @@ class LinkedInProfile(BaseModel):
     givenName: Optional[str] = None
     familyName: Optional[str] = None
     workLocation: Optional[str] = None
+    alternateName: Optional[str] = None
 
     # usually computed from the URL
     jobTitle: Optional[str] = None
@@ -163,7 +186,9 @@ class LinkedInProfile(BaseModel):
     def parse(self):
         self.match_url()
         self.parse_title()
+        self.parse_description()
         self.parse_url()
+
 
     def match_url(self):
         self.match = RE_LINKEDIN_URL.match(str(self.url))
@@ -182,6 +207,15 @@ class LinkedInProfile(BaseModel):
                 self.workLocation = self.country
 
         self.identifier = self.match["identifier"]
+
+    def parse_description(self):
+        infos = parse_linkedin_description(
+            description=self.description,
+            country=self.match["countrycode"]
+            )
+        if infos:
+            self.__dict__.update(infos)
+                
 
     def parse_title(self):
         r = parse_linkedin_title(
@@ -270,19 +304,12 @@ class Search(ABC):
     def to_persons(self, worksFor: str = None):
         self.persons = []
         for profile in self.profiles:
-            alternateName = parse_linkedin_description(
-                description=profile.description,
-                country=profile.match["countrycode"]
-                )
-            if alternateName:
-                profile.description = None
-                
             person = dict_to_person(dict(
                 name=profile.name,
                 url=profile.url,
                 sameAs={profile.url},
                 description=profile.description,
-                alternateName={alternateName, } if alternateName != profile.name else None,
+                alternateName={profile.alternateName},
                 workLocation={profile.workLocation},
                 givenName=profile.givenName,
                 familyName=profile.familyName,

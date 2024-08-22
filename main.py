@@ -18,9 +18,9 @@ from thedig.__about__ import (
     )
 
 # import other apis
+from thedig.api.logsetup import setup_logger_from_settings
 from thedig.api import router, ar
 from thedig.api.config import settings, setup_cache
-from thedig.api.logsetup import setup_logger_from_settings
 from thedig.security import get_api_key
 
 

@@ -6,10 +6,7 @@ Split fullname into givenName and familyName
 import re
 import logging
 
-try:
-    from .utils import normalize
-except ImportError:
-    from utils import normalize
+from thedig.excavators.utils import normalize
 
 
 log = logging.getLogger(__name__)

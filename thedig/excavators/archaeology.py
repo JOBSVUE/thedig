@@ -262,7 +262,7 @@ class Archeologist:
             if self.router:
                 self.add_route(excavator_func, excavator_param, is_person_param, route_kwargs=kw)
 
-            log.debug(f"add {excavator_func.__name__} to excavators with parameters: {excavator_param}")
+            log.trace(f"add {excavator_func.__name__} to excavators with parameters: {excavator_param}")
             self.excavators[excavator_param['field']].append(excavator_param)
             self.fields.add(excavator_param['field'])
             return excavator_func

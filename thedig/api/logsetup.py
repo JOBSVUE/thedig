@@ -12,7 +12,6 @@ from typing import Optional
 from loguru import logger
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 class LoggingLevel(str, Enum):
     """
     Allowed log levels for the application
@@ -32,14 +31,14 @@ class LoggingSettings(BaseSettings):
 
     Arguments:
 
-        level (str): the minimum log-level to log. (default: "DEBUG")
+        level (str): the minimum log-level to log. (default: "INFO")
         format (str): the logformat to use.
         rotation (str): when to rotate the logfile. (default: "1 days")
         retention (str): when to remove logfiles. (default: "1 months")
         serialize (bool): serialize to JSON. (default: False)
     """
 
-    level: LoggingLevel = "DEBUG"
+    level: LoggingLevel = "INFO"
     format: str = (
         "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
         "<level>{level: <8}</level> | "

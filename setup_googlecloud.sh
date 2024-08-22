@@ -35,42 +35,11 @@ gcloud iam service-accounts create $SERVICE_ACCOUNT \
 gcloud iam service-accounts keys create "${GOOGLE_AI_CREDENTIALS}" \
   --iam-account "${SERVICE_ACCOUNT}@${APP_NAME}.iam.gserviceaccount.com"
 
-# --- Vertex AI Search Setup ---
-
-# Datastore Index
-DATASTORE_ID="linkedin-index-$(date +%s)" # Example: Generate a unique ID
-gcloud datastore indexes create index.yaml --index-id="$DATASTORE_ID"
-
-# Vertex AI Search Index
-cat << EOF > linkedinprofileindex.json
-{
-  "displayName": "LinkedIn Profile Index",
-  "metadataSchemaUri": "gs://google-cloud-aiplatform/schema/search/metadata_1.0.0.yaml",
-  "dataSource": {
-    "dataStoreId": "$DATASTORE_ID",
-    "crawlConfig": {
-      "crawlSchedule": {
-        "cron": "0 0 * * *" // Crawl daily at midnight UTC
-      },
-      "requiredSchemaMarker": "CUSTOM_EXTRACTED_REQUIRED_FIELDS",
-      "urlWhitelistPatterns": [
-        "*.linkedin.com/in/*"
-      ]
-    }
-  }
-}
-EOF
-
-curl -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-  -H "Content-Type: application/json; charset=utf-8" \
-  -d @linkedinprofileindex.json \
-  "https://us-central1-aiplatform.googleapis.com/v1/projects/${APP_NAME}/locations/us-central1/indexes" | jq -r '.name' | cut -d'/' -f6
-
-
+echo "-------------------------"
 echo "Remember to manually create and configure Azure Bing Search and Brave Search credentials."
 echo "Configure only your Google Custom Search Engine, then copy/paste the cx value to your .env file"
 echo "-------------------------"
 echo "Copy/paste following lines to your .env"
 echo "\$GOOGLE_CREDENTIALS=\"${GOOGLE_AI_CREDENTIALS}\""
-echo "\$GOOGLE_VERTEX_DATASTOREID=\"${DATASTORE_ID}\""
+echo "\$GOOGLE_VERTEX_DATASTORE=\"${DATASTORE_ID}\""
 echo "\$GOOGLE_VERTEXAI_PROJECTID=\"$(gcloud config get-value project)\""

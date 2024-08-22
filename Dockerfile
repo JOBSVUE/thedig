@@ -1,13 +1,12 @@
 FROM python:3.12-slim
 
-# below is only required for PROD
-# RUN apt-get update \
-#    && apt-get upgrade -y \
-#    && apt-get install -y --no-install-recommends curl git build-essential \
-#    && apt-get autoremove -y \
-#    && apt-get clean \
-#    && rm -rf /var/apt/lists/* \
-#    && rm -rf /var/cache/apt/*
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends curl git build-essential \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/apt/lists/* \
+    && rm -rf /var/cache/apt/*
 
 # Create a non-root user
 RUN useradd -m -s /bin/bash appuser

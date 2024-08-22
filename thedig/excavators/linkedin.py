@@ -456,7 +456,7 @@ class Bing(Search):
 
 
 class GoogleCustom(Search):
-    ENDPOINT = "https://www.googleapis.com/customsearch/v1/siterestrict"
+    ENDPOINT = "https://customsearch.googleapis.com/customsearch/v1/siterestrict"
     QUERY_PARAMS = {
         "fields": "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image,pagemap/metatags/og:description)",
         "num": Search.RESULTS_COUNT,
@@ -520,7 +520,7 @@ class SearchChain(metaclass=Singleton):
             self.engines.append(GoogleVertexAI(
                 service_account_info=json.loads(open(settings.google_credentials).read()),
                 project_id=settings.google_vertexai_projectid,
-                datastore_id=settings.google_vertexai_projectid
+                datastore_id=settings.google_vertexai_datastore
                 ))
         if settings.bing_customconfig and settings.bing_api_key:
             self.engines.append(Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key))

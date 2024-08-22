@@ -68,6 +68,7 @@ Download it and:
 ```bash
   docker-compose up -d
 ```
+Then open http://localhost:8080/docs
 
 ## 🤝 How to contribute
 You're welcome! First, have a look on issues open and closed. If nothing is related to your needs, either open an issue or [fork, create a branch and submit your PR](https://docs.github.com/en/get-started/quickstart/contributing-to-projects).

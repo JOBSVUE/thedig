@@ -103,22 +103,26 @@ async def find_pages_with_matching_images(
     client = vision.ImageAnnotatorClient.from_service_account_file(
         settings.google_credentials
     )
-
-    response = await asyncio.to_thread(
-        client.annotate_image,
-        vision.AnnotateImageRequest(
-            {
-                "image": {"source": {"image_uri": image_url}},
-                "features": [
-                    {
-                        "type_": vision.Feature.Type.WEB_DETECTION,
-                        "max_results": max_results,
-                    }
-                ],
-            }
-        ),
-    )
-    response = response.web_detection
+    matching = []
+    try:
+        response = await asyncio.to_thread(
+            client.annotate_image,
+            vision.AnnotateImageRequest(
+                {
+                    "image": {"source": {"image_uri": image_url}},
+                    "features": [
+                        {
+                            "type_": vision.Feature.Type.WEB_DETECTION,
+                            "max_results": max_results,
+                        }
+                    ],
+                }
+            ),
+        )
+        response = response.web_detection
+    except Exception as e:
+        log.error(e)
+        return []
 
     if hasattr(response, "error"):
         log.error(f"Image: {image_url}. Error: {response.error.message}")

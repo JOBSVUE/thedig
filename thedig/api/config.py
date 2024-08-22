@@ -47,7 +47,7 @@ def get_public_email_providers(public_email_providers_url=PUBLIC_EMAIL_PROVIDERS
 
 class Settings(BaseSettings):
     app_name: str = "TheDig API"
-    google_credentials: FilePath
+    google_credentials: Optional[FilePath]
     google_api_key: Optional[str] = None
     google_cx: Optional[str] = None
     bing_api_key: Optional[str] = None

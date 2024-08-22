@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/bin/env python
 """
 Find social profiles from the image profile using Google Vision (Lens) API
 
@@ -9,22 +9,20 @@ Google Vision API Limits:
 
 import asyncio
 import re
-from typing import Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from json import loads
-
-from .linkedin import parse_linkedin_title
-from ..api.config import settings
-from ..api.person import Person, dict_to_person
+from typing import Optional, ClassVar
 
 from bs4 import BeautifulSoup
+from curl_cffi import requests
 from google.cloud import vision
 from loguru import logger as log
 from rapidfuzz import fuzz
+from pydantic import FilePath, HttpUrl
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-from curl_cffi import requests
-
+from ..api.config import settings
+from ..api.person import Person, dict_to_person
+from .linkedin import parse_linkedin_title
 from .utils import TOKEN_RATIO, match_name, ua_headers
 
 # generic social profile matcher
@@ -72,7 +70,7 @@ SOCIALNETWORKS = {
     # twitter is full javascript, needs a headless browser
     "twitter": "https://twitter.com/{identifier}",
     # that's why we're using nitter as a proxy
-    "twitter#alt": "%s/{identifier}" % settings.nitter_instance_server,
+    "twitter#alt": "{nitter_instance_server}/{identifier}",
     "youtube": "https://youtube.com/{identifier}",
     "dribble": "https://dribble.com/{identifier}",
 }
@@ -86,6 +84,7 @@ REQUESTS_PARAM = {
 
 async def find_pages_with_matching_images(
     image_url: str,
+    google_credentials: FilePath,
     max_results: Optional[int] = MAX_VISION_RESULTS,
 ) -> list[str]:
     """Find pages with matching images
@@ -101,7 +100,7 @@ async def find_pages_with_matching_images(
     """
     # search using google vision
     client = vision.ImageAnnotatorClient.from_service_account_file(
-        settings.google_credentials
+        google_credentials
     )
     matching = []
     try:
@@ -121,15 +120,14 @@ async def find_pages_with_matching_images(
         )
         response = response.web_detection
     except Exception as e:
-        log.error(e)
+        log.error(f"Google Vision reverse image search failed: {e}")
         return []
 
     if hasattr(response, "error"):
         log.error(f"Image: {image_url}. Error: {response.error.message}")
-        raise Exception(
-            "{}\nFor more info on error messages, check: "
-            "https://cloud.google.com/apis/design/errors".format(response.error.message)
-        )
+        google_cloud_error = "{response}\nFor more info on error messages, check: \
+        https://cloud.google.com/apis/design/errors".format(response=response.error.message)
+        raise Exception(google_cloud_error)
 
     matching = [
         r for r in response.pages_with_matching_images if "full_matching_images" in r
@@ -203,7 +201,10 @@ def get_socialprofile(
         and ratio_ogtitle < TOKEN_RATIO
         and name not in title):
         log.debug(
-            f"Name doesn't match with page title. Name: {name}, URL: {url}, Page title: {title} - {ratio_title}, OG Title {og_title} - {ratio_ogtitle}"
+            f"Name doesn't match with page title. \
+                Name: {name}, URL: {url}, \
+                    Page title: {title} - {ratio_title}, \
+                        OG Title {og_title} - {ratio_ogtitle}"
         )
         return False, sn
 
@@ -241,7 +242,7 @@ def extract_socialprofile(soup, url, name):
     # OpenGraph protocol
     og_description = soup.find("meta", attrs={"property": "og:description"})
     if og_description and all(
-        [desc not in og_description["content"] for desc in DESCRIPTION_DEFAULTS]
+        desc not in og_description["content"] for desc in DESCRIPTION_DEFAULTS
     ):
         person["description"] = og_description["content"]
         log.debug(
@@ -261,7 +262,6 @@ def extract_socialprofile(soup, url, name):
         jsonld = loads(jsonld.text)
         try:
             jsonld = jsonld.get("author") or jsonld
-            print(jsonld["image"])
             if jsonld.get("name") and jsonld["name"].casefold() != name.casefold():
                 person["alternateName"] = jsonld["name"]
             if jsonld.get('nationality'):
@@ -312,7 +312,7 @@ class SocialNetworkMiner:
 
     # supported social networks and theirs urls
     socialnetworks_urls = SOCIALNETWORKS
-    handlers = {
+    handlers: ClassVar = {
         "github": {
             "name": "span.p-name.vcard-fullname.d-block.overflow-hidden",
             "image": "/html/body/div[5]/main/div[2]/div/div[1]/div/div[2]/div[1]/div[1]/a/img",
@@ -323,12 +323,19 @@ class SocialNetworkMiner:
         },
     }
 
-    def __init__(self, person: dict, socialnetworks: Optional[list] = None):
+    def __init__(self, person: dict, nitter_instance_server: HttpUrl, google_credentials: FilePath=None, socialnetworks: Optional[list] = None):
         # specific for this miner, name is mandatory
         # TBD: find a better way to require for name
+        if google_credentials:
+            self.google_credentials = google_credentials
+        self.socialnetworks_urls["twitter#alt"] = self.socialnetworks_urls["twitter#alt"].replace(
+            "{nitter_instance_server}", nitter_instance_server
+            )
+
         if "name" not in person:
-            raise ValueError("Name is mandatory")
-        
+            name_mandatory = "Name is mandatory"
+            raise ValueError(name_mandatory)
+
         # person init
         self._original_person = person
         self._person: Person = dict_to_person(person.copy(), setdefault=True)
@@ -341,7 +348,7 @@ class SocialNetworkMiner:
                 {
                     self._person["image"],
                 }
-                if type(self._person["image"]) != set
+                if type(self._person["image"]) is not set
                 else self._person["image"]
             )
         else:
@@ -379,7 +386,7 @@ class SocialNetworkMiner:
 
         pages = []
         for img in self._person["image"]:
-            pages.extend(await find_pages_with_matching_images(str(img)))
+            pages.extend(await find_pages_with_matching_images(str(img), self.google_credentials))
 
         for page in pages:
             m = is_socialprofile(page.url)

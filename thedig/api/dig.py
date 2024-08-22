@@ -79,7 +79,6 @@ async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> P
     engine = SearchChain(settings).search(query=name, name=name)
     if not engine:
         return
-    log.debug(engine.profiles)
     if type(worksFor) is set:
         worksFor = worksFor.copy().pop()
     engine.to_persons(worksFor=worksFor)
@@ -100,27 +99,37 @@ async def exc_gravatar(email) -> Person:
     )
 
 
-@ar.register(field="image")
-async def image(p: dict) -> Person:
-    if "name" not in p:
-        return
+if hasattr(settings, "google_credentials"):
+    @ar.register(field="image")
+    async def image(p: dict) -> Person:
+        if "name" not in p:
+            return
 
-    snm = SocialNetworkMiner(p)
-    await snm.image()
+        snm = SocialNetworkMiner(
+            p,
+            google_credentials=settings.google_credentials,
+            nitter_instance_server=settings.nitter_instance_server
+            )
+        await snm.image()
 
-    snm.sameAs()
+        snm.sameAs()
 
-    if "OptOut" in snm.person:
-        return {'OptOut': True}
+        if "OptOut" in snm.person:
+            return {'OptOut': True}
 
-    return snm.person
+        return snm.person
+else:
+    log.error("No Google Credentials, no reverse-image search!")
 
 
 @ar.register(field="email")
 async def social(p: dict) -> Person:
     if "name" not in p:
         return None
-    snm = SocialNetworkMiner(p)
+    snm = SocialNetworkMiner(
+        p,
+        nitter_instance_server=settings.nitter_instance_server
+        )
 
     # fuzzy identifier miner
     # it's not an independent miner since identifier can't be mined

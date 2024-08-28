@@ -7,7 +7,8 @@ from functools import partial, update_wrapper
 from inspect import signature
 from hashlib import sha256
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, status, Depends
+from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
 from loguru import logger as log
 
@@ -17,6 +18,14 @@ from pydantic import AnyUrl
 
 RE_SET = re.compile(r"(\s|^)set\W")
 DEFAULT_CACHE_EXPIRATION = 60 * 60 # 1 hour
+ORDERED_ELEMENTS = (
+        "url",
+        "sameAs",
+        "email",
+        "image",
+        "description",
+        "name",
+    )
 
 class SetAndURLJSON(json.JSONEncoder):
     def default(self, obj):
@@ -83,7 +92,7 @@ class ExcavatorField:
 
         return upgraded
 
-    def upgrade(self, k, v):
+    def upgrade(self, k, v) -> bool:
         modified = False
 
         # skip alternateName if same as name
@@ -105,22 +114,15 @@ class ExcavatorField:
             log.debug(f"{self.excavator['endpoint']} does nothing - already exists or insert mode {k} : {v}")
         return modified
 
+
 class Archeologist:
     """Enrich iteratively persons using excavators"""
-
-    _ordered_elements = (
-        "url",
-        "sameAs",
-        "email",
-        "image",
-        "description",
-        "name",
-    )
 
     default_path: str = "/{operation}/{func_name}/{{{field}}}"
 
     def __init__(self, router: APIRouter = None, cache=None, cache_expiration: int = DEFAULT_CACHE_EXPIRATION):
         self.fields: set = set()
+        self._ordered_elements = ORDERED_ELEMENTS
         self.excavators: dict = {k: [] for k in self._ordered_elements}
         self.router = router
         self.cache = cache

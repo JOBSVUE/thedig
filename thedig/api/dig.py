@@ -10,6 +10,7 @@ from typing import Annotated
 import asyncio
 import requests
 from hashlib import sha256
+from uuid import uuid4, UUID
 
 # fast api
 from fastapi import (
@@ -50,6 +51,7 @@ from .person import (
     ValidationError,
     person_request_ta,
     person_response_ta,
+    verify_mandatory_fields
 )
 
 # websocket manager
@@ -179,7 +181,9 @@ async def country(email: EmailStr) -> Person:
 
 
 @router.get(
-    "/person/email/{email}", tags=("person", "archaeology"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))]
+    "/person/email/{email}", tags=("person", "archaeology"), dependencies=[
+        Depends(RateLimiter(**MAX_REQUESTS_PER_SEC)),
+        ]
 )
 async def person_email(email: EmailStr, name: str) -> Person:
     ar_status, persond = await ar.person({"email": email, "name": name})
@@ -188,7 +192,10 @@ async def person_email(email: EmailStr, name: str) -> Person:
     return persond
 
 
-@router.post("/person/", tags=("person", "archaeology"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+@router.post("/person/", tags=("person", "archaeology"), dependencies=[
+    Depends(RateLimiter(**MAX_REQUESTS_PER_SEC)),
+    Depends(verify_mandatory_fields)
+    ])
 async def person_post(person: Person) -> Person:
     ar_status, persond = await ar.person({"email": person['email'], "name": person['name']})
     if not ar_status:
@@ -198,7 +205,8 @@ async def person_post(person: Person) -> Person:
 
 async def persons_bulk_background(
     persons: Annotated[Person, Field(max_items=MAX_BULK)],
-    webhook_endpoint: HttpUrl
+    webhook_endpoint: HttpUrl,
+    webhook_taskid: str
     ) -> bool:
     results = []
     for p in persons:
@@ -206,17 +214,29 @@ async def persons_bulk_background(
         if success:
             results.append(enriched)
     try:
-        r = requests.post(str(webhook_endpoint), json=json_dumps(results))
+        r = requests.post(
+            str(webhook_endpoint),
+            json=json_dumps(results),
+            headers={
+                "X-Task-Id": webhook_taskid,
+            }
+            )
         r.raise_for_status()
         log.debug(f"Endpoint answered: {r.json()}")
     except requests.RequestException as e:
         log.error(e)
 
 
-@router.post("/person/bulk", tags=("person", "archaeology"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
-async def persons_bulk(persons: list[Person], endpoint: HttpUrl, background: BackgroundTasks) -> bool:
-    background.add_task(persons_bulk_background, persons, endpoint)
-    return True
+@router.post("/person/bulk", tags=("person", "archaeology"), dependencies=[
+    Depends(RateLimiter(**MAX_REQUESTS_PER_SEC)),
+    ])
+async def persons_bulk(persons: list[Person], endpoint: HttpUrl, background: BackgroundTasks) -> UUID:
+    #TODO: better validation method
+    for p in persons:
+        await verify_mandatory_fields(p)
+    taskid = uuid4()
+    background.add_task(persons_bulk_background, persons, endpoint, taskid)
+    return taskid
 
 
 @router.websocket("/person/{user_id}/websocket")

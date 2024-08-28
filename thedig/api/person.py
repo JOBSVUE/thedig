@@ -5,12 +5,13 @@ Person Types
 from pydantic import TypeAdapter, ValidationError
 from pydantic import EmailStr, HttpUrl, constr
 from typing_extensions import TypedDict
+from fastapi.exceptions import HTTPException
 import re
 
 RE_COUNTRY = r"^[A-Z]{2}$"
 RE_LANGUAGE = r"^[a-z]{2}$"
 RE_SET = re.compile(r"(\s|^)set\W")
-
+MANDATORY_FIELDS = ("name", "email")
 
 class Person(TypedDict, total=False):
     name: str
@@ -41,6 +42,15 @@ class PersonResponse(TypedDict):
     status: bool
     person: Person | None
 
+
+async def verify_mandatory_fields(person: Person):
+    if not set(MANDATORY_FIELDS).issubset(person.keys()):
+        missing_fields = f"at least one of mandatory fields {MANDATORY_FIELDS} not in {person.keys()}"
+        #TODO: Better validation error, more native to FastAPI
+        raise HTTPException(
+            status_code=422,
+            detail=missing_fields
+        )
 
 def person_set_field(person: Person, field: str, value: str | set) -> Person:
     """Set while transform field into set when the value or the dest is not set

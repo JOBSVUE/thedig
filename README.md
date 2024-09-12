@@ -2,26 +2,28 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](http://www.gnu.org/licenses/agpl-3.0)
 [![Make the Web Open Again](https://img.shields.io/badge/%23MakeTheWebOpenAgain-indigo)](https://www.scientificamerican.com/article/long-live-the-web/)
 
-# 🪨➜💎 TheDig
+# 🧩➜👤 TheDig
 
 Enrich data about someone (e.g job title, company, profile pictures etc.) using determinist, OSINT (Opensource Intelligence) and IA (future). Privacy-friendly design: only public data the mined person consent to share (no databreach) are exposed and any one could easily #OptOut.
 
 
 [Features](#-features) ♦ [Privacy-by-design](#-privacy-by-design) ♦ [How to use](#️-how-to-use) ♦ [How to contribute](#-how-to-contribute) ♦ [Support](#️-support) ♦ [License](#-license)
 
+<p align="center">
+    <img width="100%" src="thedig-banner.png" alt="Archeologists digging raw materials from social networks to reconstruct the identify of a person who looks like Michel Foucault">
+</p>
+
 
 ## ✨ Features
 
 ### Person
-Marketing-related data fetched from an email address and full name:
+Fields excavated from an email address and full name:
 - Given name, Family name
 - Job title
 - Social Network's URL and LinkedIn's URL
 - Profile pictures
 - Company's name
 - Work's location
-
-If a person add #OptOut to his social profile bio, he won't be mined.
 
 ### Company
 Company informations based solely on the domain:
@@ -80,9 +82,9 @@ In consideration of your contributions to this product, you shall be granted the
 
 ## ⚠️ Support
 
-For support, contact by email contact@ankaboot.io for commercial support or open an issue for community support (no-SLA, no-Warranty).
+For support, contact by email contact@ankaboot.io for commercial support or open an issue for community support.
 
 
 ## 📃 License
 
-This software is a free software (open source) [dual-licensed](DUAL-LICENSE) under the [AGPL](LICENSE) (No SLA, No Warranty) and a [commercial license](DUAL-LICENSE). Basically, that means that you could use, modify and distribute this software freely if the derivative work is OpenSource itself (OSI-approved). For axemple, if your software is a Software-as-a-Service, your SaaS must be OpenSource itself. If you wish to use this software in a non-OSI approved license, aka proprietary software, you must buy a commercial license from the editor of this product (aka ankaboot.io - contact@ankaboot.io).
+This software is a free software (open source) [dual-licensed](DUAL-LICENSE) under the [AGPL](LICENSE) (No SLA, No Warranty) and a [commercial license](DUAL-LICENSE). Basically, that means that you could use, modify and distribute this software freely if the derivative work is OpenSource itself (OSI-approved). For exemple, if your software is a Software-as-a-Service, your SaaS must be OpenSource itself. If you wish to use this software in a non-OSI approved license, aka proprietary software, you must buy a commercial license from the editor of this product (aka ankaboot.io - contact@ankaboot.io).

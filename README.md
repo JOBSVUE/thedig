@@ -1,20 +1,23 @@
 <a href="https://codeclimate.com/repos/6318a2c7c3233c21f30005a8/maintainability"><img src="https://api.codeclimate.com/v1/badges/18313db5cb56fa2c54e6/maintainability" /></a>
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](http://www.gnu.org/licenses/agpl-3.0)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 [![Make the Web Open Again](https://img.shields.io/badge/%23MakeTheWebOpenAgain-indigo)](https://www.scientificamerican.com/article/long-live-the-web/)
 
-# 🧩➜👤 TheDig
+<div align="center">
 
-Enrich data about someone (e.g job title, company, profile pictures etc.) using determinist, OSINT (Opensource Intelligence) and IA (future). Privacy-friendly design: only public data the mined person consent to share (no databreach) are exposed and any one could easily #OptOut.
+# TheDig 🧩➜👤
 
+Excavate public data from an email and a full name using OSINT and IA.
 
 [Features](#-features) ♦ [Privacy-by-design](#-privacy-by-design) ♦ [How to use](#️-how-to-use) ♦ [How to contribute](#-how-to-contribute) ♦ [Support](#️-support) ♦ [License](#-license)
 
-<p align="center">
-    <img width="100%" src="thedig-banner.png" alt="Archeologists digging raw materials from social networks to reconstruct the identify of a person who looks like Michel Foucault">
-</p>
+![Archeologists digging raw materials from social networks to reconstruct the identify of a person who looks like Michel Foucault](thedig-banner.png)
+    
+</div>
 
 
 ## ✨ Features
+
+TheDig checks, as much as possible, that exacataved data belongs to the person before returning any results. Person's with #OptOut in their social profile will not be enriched.
 
 ### Person
 Fields excavated from an email address and full name:
@@ -26,7 +29,7 @@ Fields excavated from an email address and full name:
 - Work's location
 
 ### Company
-Company informations based solely on the domain:
+Company informations excavated from domain:
 - name
 - website's url
 - alternate name

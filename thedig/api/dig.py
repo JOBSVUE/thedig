@@ -234,7 +234,7 @@ async def persons_bulk(persons: list[Person], endpoint: HttpUrl, background: Bac
     #TODO: better validation method
     for p in persons:
         await verify_mandatory_fields(p)
-    taskid = uuid4()
+    taskid = str(uuid4())
     background.add_task(persons_bulk_background, persons, endpoint, taskid)
     return taskid
 

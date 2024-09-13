@@ -222,7 +222,7 @@ async def persons_bulk_background(
             }
             )
         r.raise_for_status()
-        log.debug(f"Endpoint answered: {r.json()}")
+        log.debug(f"Endpoint answered: {r.json()}" if r.text else "Endpoint didn't answer")
     except requests.RequestException as e:
         log.error(e)
 

@@ -354,3 +354,41 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
         )
 
     return cmp
+
+@router.delete("/company/domain/{domain}", tags=("company", "archaeology"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))]))
+async def company_delete(domain: Annotated[DomainName, Path(description="domain name")]) -> bool:
+    """Delete company from thedig cache
+    """
+    cache_company = await setup_cache(settings, db=settings.cache_redis_db_company)
+    if await cache_company.get(domain):
+        await cache_company.delete(domain)
+        return True
+    return False
+
+@router.delete("/person/email/{email}", tags=("person", "GDPR"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+async def person_delete(email: EmailStr) -> bool:
+    """Delete person from thedig cache
+    """
+    if not ar.cache:
+        raise HTTPException(status_code=503, detail="Cache is not available")
+    if await ar.cache.get(email):
+        await ar.cache.delete(email)
+        return True
+    return False
+
+@router.delete("/person", tags=("person", "GDPR"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+async def person_delete() -> bool:
+    """Delete person from thedig cache
+    """
+    if not ar.cache:
+        raise HTTPException(status_code=503, detail="Cache is not available")
+    await ar.cache.flushall()
+    return True
+
+@router.delete("/company", tags=("company", "GDPR"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+async def person_delete() -> bool:
+    """Delete company from thedig cache
+    """
+    cache_company = await setup_cache(settings, db=settings.cache_redis_db_company)
+    await cache_company.flushall()
+    return True

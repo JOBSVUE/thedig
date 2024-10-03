@@ -54,7 +54,7 @@ app = FastAPI(
     openapi_tags=[
         {
             "name": "archaeology",
-            "description": "🪨➜💎 enrich __iteratively__ data,\
+            "description": "🧩➜👤 enrich __iteratively__ data,\
                 every enriched data could be potentially used to excavator more data",
         },
         {

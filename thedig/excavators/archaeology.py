@@ -8,6 +8,7 @@ from inspect import signature
 from hashlib import sha256
 
 from fastapi import APIRouter, status, Depends
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
 from loguru import logger as log
@@ -27,14 +28,6 @@ ORDERED_ELEMENTS = (
         "name",
     )
 
-class SetAndURLJSON(json.JSONEncoder):
-    def default(self, obj):
-        if type(obj) is set:
-            return list(obj)
-        elif type(obj) is AnyUrl:
-            return str(obj)
-        return json.JSONEncoder.default(self, obj)
-json_dumps = SetAndURLJSON().encode
 
 class JSONorNoneResponse(JSONResponse):
     def render(self, content: any) -> bytes:
@@ -185,7 +178,7 @@ class Archeologist:
         if self.cache and modified:
             await self.cache.set(
                 sha256(person["email"].encode("utf-8")).hexdigest(),
-                json_dumps(person),
+                json.dumps(jsonable_encoder(person)),
                 ex=self.cache_expiration
                 )
 

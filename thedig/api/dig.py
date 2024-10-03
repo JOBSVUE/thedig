@@ -24,13 +24,14 @@ from fastapi import (
     WebSocketException,
     status,
 )
+from fastapi.encoders import jsonable_encoder
 from fastapi_limiter.depends import RateLimiter, WebSocketRateLimiter
 
 # logger
 from loguru import logger as log
 from pydantic import EmailStr, Field, HttpUrl
 
-from ..excavators.archaeology import Archeologist, JSONorNoneResponse, json_dumps
+from ..excavators.archaeology import Archeologist, JSONorNoneResponse
 from ..excavators.bio import find_jobtitle
 from ..excavators.company import Company, DomainName, company_by_domain
 from ..excavators.domainlogo import find_favicon, guess_country
@@ -216,13 +217,13 @@ async def persons_bulk_background(
     try:
         r = requests.post(
             str(webhook_endpoint),
-            json=json_dumps(results),
+            json=jsonable_encoder(results),
             headers={
                 "X-Task-Id": webhook_taskid,
             }
             )
         r.raise_for_status()
-        log.debug(f"Endpoint answered: {r.json()}" if r.text else "Endpoint didn't answer")
+        log.debug(f"Endpoint {webhook_endpoint} " + f"answered: {r.json()}" if r.text else "didn't answer")
     except requests.RequestException as e:
         log.error(e)
 
@@ -327,6 +328,8 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
     Returns:
         Company | None
     """
+    cache_company = await setup_cache(settings, db=settings.cache_redis_db_company)
+
     if await cache_company.get(domain):
         return json.loads(await cache_company.get(domain))
 
@@ -346,7 +349,7 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
 
     await cache_company.set(
         domain,
-        json_dumps(cmp),
+        json.dumps(jsonable_encoder(cmp)),
         ex=settings.cache_expiration_company
         )
 

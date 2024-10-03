@@ -314,7 +314,7 @@ class Search(ABC):
                 givenName=profile.givenName,
                 familyName=profile.familyName,
                 identifier={profile.identifier},
-                image=profile.image if not str(profile.image).startswith("https://static.licdn.com") else None,
+                image=profile.image,
                 jobTitle=profile.jobTitle,
                 worksFor=profile.worksFor
             ), unsetvoid=True)

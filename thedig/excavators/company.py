@@ -207,15 +207,6 @@ async def company_by_domain(domain: DomainName) -> Company | None:
         Company: company object
     """
     cmp: Company = company_from_whois(domain) or {}
-    #if not cmp:
-    #    return cmp
-
-    # to be efficient web scrapping should give no false positive
-    # domain MUST BE [name of the company in whois].tld
-    #probable_name = get_name(domain)
-    #if not probable_name or probable_name not in cmp['name'].lower():
-    #    return cmp
-
     web_cmp: Company = await company_from_web(domain)
     if web_cmp:
         for field, value in web_cmp.items():

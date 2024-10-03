@@ -217,11 +217,7 @@ async def persons_bulk_background(
     try:
         r = requests.post(
             str(webhook_endpoint),
-<<<<<<< HEAD
             json=jsonable_encoder(results),
-=======
-            json=results,
->>>>>>> b9a00675acde0e031f04a326f5c4d19054897f61
             headers={
                 "X-Task-Id": webhook_taskid,
             }

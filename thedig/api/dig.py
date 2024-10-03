@@ -25,7 +25,7 @@ from fastapi import (
     status,
 )
 from fastapi.encoders import jsonable_encoder
-from fastapi_limiter.depends import RateLimiter, WebSocketRateLimiter
+from fastapi_limiter.depends import WebSocketRateLimiter
 
 # logger
 from loguru import logger as log
@@ -58,7 +58,7 @@ from .person import (
 # websocket manager
 from .websocketmanager import manager as ws_manager
 
-MAX_REQUESTS_PER_SEC = {"times": 3, "seconds": 10}
+MAX_REQUESTS_PER_SEC = {"times": settings.max_requests_times, "seconds": settings.max_requests_seconds}
 MAX_BULK = 1000
 
 # init fast api
@@ -182,10 +182,7 @@ async def country(email: EmailStr) -> Person:
 
 
 @router.get(
-    "/person/email/{email}", tags=("person", "archaeology"), dependencies=[
-        Depends(RateLimiter(**MAX_REQUESTS_PER_SEC)),
-        ]
-)
+    "/person/email/{email}", tags=("person", "archaeology"))
 async def person_email(email: EmailStr, name: str) -> Person:
     ar_status, persond = await ar.person({"email": email, "name": name})
     if not ar_status:
@@ -194,7 +191,6 @@ async def person_email(email: EmailStr, name: str) -> Person:
 
 
 @router.post("/person/", tags=("person", "archaeology"), dependencies=[
-    Depends(RateLimiter(**MAX_REQUESTS_PER_SEC)),
     Depends(verify_mandatory_fields)
     ])
 async def person_post(person: Person) -> Person:
@@ -228,9 +224,7 @@ async def persons_bulk_background(
         log.error(e)
 
 
-@router.post("/person/bulk", tags=("person", "archaeology"), dependencies=[
-    Depends(RateLimiter(**MAX_REQUESTS_PER_SEC)),
-    ])
+@router.post("/person/bulk", tags=("person", "archaeology"))
 async def persons_bulk(persons: list[Person], endpoint: HttpUrl, background: BackgroundTasks) -> UUID:
     #TODO: better validation method
     for p in persons:
@@ -279,7 +273,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
         ws_manager.disconnect(websocket)
 
 
-@router.post("/person/optout", tags=("person", "GDPR"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+@router.post("/person/optout", tags=("person", "GDPR"))
 async def person_optout(person: Person) -> bool:
     """Opt-out person from thedig to prevent future archeology requests and GDPR compliance
 
@@ -355,7 +349,7 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
 
     return cmp
 
-@router.delete("/company/domain/{domain}", tags=("company", "archaeology"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))]))
+@router.delete("/company/domain/{domain}", tags=("company", "GDPR"))
 async def company_delete(domain: Annotated[DomainName, Path(description="domain name")]) -> bool:
     """Delete company from thedig cache
     """
@@ -365,7 +359,7 @@ async def company_delete(domain: Annotated[DomainName, Path(description="domain 
         return True
     return False
 
-@router.delete("/person/email/{email}", tags=("person", "GDPR"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+@router.delete("/person/email/{email}", tags=("person", "GDPR"))
 async def person_delete(email: EmailStr) -> bool:
     """Delete person from thedig cache
     """
@@ -376,7 +370,7 @@ async def person_delete(email: EmailStr) -> bool:
         return True
     return False
 
-@router.delete("/person", tags=("person", "GDPR"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+@router.delete("/person", tags=("person", "GDPR"))
 async def person_delete() -> bool:
     """Delete person from thedig cache
     """
@@ -385,7 +379,7 @@ async def person_delete() -> bool:
     await ar.cache.flushall()
     return True
 
-@router.delete("/company", tags=("company", "GDPR"), dependencies=[Depends(RateLimiter(**MAX_REQUESTS_PER_SEC))])
+@router.delete("/company", tags=("company", "GDPR"))
 async def person_delete() -> bool:
     """Delete company from thedig cache
     """

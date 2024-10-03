@@ -3,9 +3,10 @@
 # fast api
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Security
+from fastapi import FastAPI, Security, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_limiter import FastAPILimiter
+from fastapi_limiter.depends import RateLimiter
 
 from thedig.__about__ import (
     __author__,
@@ -41,7 +42,13 @@ app = FastAPI(
     version=__version__,
     contact={"name": f"{__author__} - {__copyright__}", "email": __email__},
     license_info={"name": __license__},
-    dependencies=[Security(get_api_key)],
+    dependencies=[
+        Security(get_api_key),
+        Depends(RateLimiter(
+            times=settings.max_requests_times,
+            seconds=settings.max_requests_seconds
+            )),
+        ],
     lifespan=lifespan,
     terms_of_service="https://github.com/ankaboot-source/thedig/",
     openapi_tags=[

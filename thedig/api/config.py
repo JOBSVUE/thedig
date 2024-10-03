@@ -74,7 +74,8 @@ class Settings(BaseSettings):
     jobtitles_list_file: str = JOBTITLES_FILE
     nitter_instance_server: str = pick_nitter_instance()
     proxy: Optional[str] = None
-
+    max_requests_times: Optional[int] = 3
+    max_requests_seconds: Optional[int] = 10
     model_config = SettingsConfigDict(env_file=".env")
 
 

@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends curl git build-essential \
+    && apt-get install -y --no-install-recommends curl git build-essential whois \
     && apt-get autoremove -y \
     && apt-get clean \
     && rm -rf /var/apt/lists/* \

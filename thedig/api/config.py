@@ -1,14 +1,13 @@
 """Configuration loader"""
 # go to .env to modify configuration variables or use environment variables
-from typing import Optional
-import requests
 from random import choice
+from typing import Optional
 
+import requests
 from loguru import logger as log
-
-from redis.asyncio import Redis
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import FilePath
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from redis.asyncio import Redis
 
 NITTER_INSTANCES = "https://status.d420.de/api/v1/instances"
 NITTER_BACKUP_INSTANCE = "https://nitter.poast.org"
@@ -70,7 +69,7 @@ class Settings(BaseSettings):
     server_port: int = "8080"
     api_keys: list[str]
     api_key_name: str
-    public_email_providers: Optional[set[str]] = get_public_email_providers()
+    public_email_providers: set[str] | None = get_public_email_providers()
     jobtitles_list_file: str = JOBTITLES_FILE
     nitter_instance_server: str = pick_nitter_instance()
     proxy: str | None = None

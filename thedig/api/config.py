@@ -47,19 +47,19 @@ def get_public_email_providers(public_email_providers_url=PUBLIC_EMAIL_PROVIDERS
 
 class Settings(BaseSettings):
     app_name: str = "TheDig API"
-    google_credentials: Optional[FilePath]
-    google_api_key: Optional[str] = None
-    google_cx: Optional[str] = None
-    bing_api_key: Optional[str] = None
-    bing_customconfig: Optional[str] = None
-    google_vertexai_projectid: Optional[str] = None
-    google_vertexai_datastore: Optional[str] = None
-    brave_api_key: Optional[str] = None
-    github_token: Optional[str] = None
-    log_level: Optional[str] = "INFO"
-    log_filepath: Optional[str] = "thedig.log"
-    redis_username: Optional[str] = None
-    redis_password: Optional[str] = None
+    google_credentials: FilePath | None
+    google_api_key: str | None
+    google_cx: str | None = None
+    bing_api_key: str | None = None
+    bing_customconfig: str | None = None
+    google_vertexai_projectid: str | None = None
+    google_vertexai_datastore: str | None = None
+    brave_api_key: str | None = None
+    github_token: str | None = None
+    log_level: str | None = "INFO"
+    log_filepath: str | None = "thedig.log"
+    redis_username: str | None = None
+    redis_password: str | None = None
     redis_host: str
     redis_port: str
     cache_redis_db: int = 0
@@ -73,9 +73,11 @@ class Settings(BaseSettings):
     public_email_providers: Optional[set[str]] = get_public_email_providers()
     jobtitles_list_file: str = JOBTITLES_FILE
     nitter_instance_server: str = pick_nitter_instance()
-    proxy: Optional[str] = None
-    max_requests_times: Optional[int] = 3
-    max_requests_seconds: Optional[int] = 10
+    proxy: str | None = None
+    max_requests_times: int | None = 3
+    max_requests_seconds: int | None = 10
+    https_proxy: str | None = None
+    http_proxy: str | None = None
     model_config = SettingsConfigDict(env_file=".env")
 
 

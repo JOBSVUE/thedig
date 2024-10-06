@@ -1,7 +1,6 @@
 """Configuration loader"""
 # go to .env to modify configuration variables or use environment variables
 from random import choice
-from typing import Optional
 
 import requests
 from loguru import logger as log
@@ -27,9 +26,9 @@ def pick_nitter_instance(
         instances = {
             instance["ping_avg"]: instance["url"]
             for instance in requests.get(instances_url, timeout=timeout).json()["hosts"]
-            if instance["points"] > min_points and instance['ping_avg']
+            if instance["points"] > min_points and instance["ping_avg"]
         }
-        instance = instances[choice(sorted(instances.keys())[:first])]
+        instance = instances[choice(sorted(instances.keys())[:first])]  # noqa: S311
     except (requests.RequestException, IndexError, KeyError) as e:
         log.error(f"Failure to get nitter instances {e}, fallback to {backup_instance}")
         instance = backup_instance
@@ -83,7 +82,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-async def setup_cache(settings: Settings, db: Optional[int] = None) -> Redis:
+async def setup_cache(settings: Settings, db: int | None = None) -> Redis:
     """setup cache based on Redis
 
     Args:

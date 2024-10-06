@@ -38,7 +38,7 @@ def pick_nitter_instance(
 def get_public_email_providers(public_email_providers_url=PUBLIC_EMAIL_PROVIDERS_URL) -> set[str]:
     public_email_providers = set()
     try:
-        public_email_providers = set(requests.get(public_email_providers_url).json())
+        public_email_providers = set(requests.get(public_email_providers_url).json())  # noqa: S113
     except requests.RequestException as e:
         log.error(f"Impossible to GET {public_email_providers_url}: {e}")
     return public_email_providers

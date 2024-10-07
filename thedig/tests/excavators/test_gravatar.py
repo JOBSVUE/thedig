@@ -1,4 +1,3 @@
-import asyncio
 
 import pytest
 from curl_cffi.requests import AsyncSession, RequestsError

@@ -1,7 +1,6 @@
 """Transmuter API"""
 
 # json
-import asyncio
 import json
 from hashlib import sha256
 # types

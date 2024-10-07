@@ -22,6 +22,7 @@ from loguru import logger as log
 QUERY_TIMEOUT = 10
 
 TO_IGNORE = (
+    "Ano Nymous",
     "<data not disclosed>",
     "Contact Privacy Inc. Customer",
     "Data Protected",

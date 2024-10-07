@@ -94,11 +94,7 @@ def ua_headers(random: bool = False) -> dict:
     return {"user-agent": user_agent}
 
 
-def match_name(name: str,
-               text: str,
-               fuzzy: bool = True,
-               acronym: bool = False,
-               condensed: bool = True) -> bool:
+def match_name(name: str, text: str, fuzzy: bool = True, acronym: bool = False, condensed: bool = True) -> bool:
     if not name:
         return True
 
@@ -106,17 +102,17 @@ def match_name(name: str,
         return True
 
     if condensed:
-        text = text.replace(' ', '')
+        text = text.replace(" ", "")
 
-    match = (name.casefold() == text.casefold())
+    match = name.casefold() == text.casefold()
 
     if not match and acronym:
-        match = (name.casefold() == filter(str.isupper, text))
+        match = name.casefold() == filter(str.isupper, text)
 
     return match
 
 
-def normalize(name: str, replace: dict = {' ': ''}) -> str:
+def normalize(name: str, replace: dict = {" ": ""}) -> str:
     name = str(name.encode("ASCII", "ignore").strip().decode()).casefold()
     for k, v in replace.items():
         name = name.replace(k, v)

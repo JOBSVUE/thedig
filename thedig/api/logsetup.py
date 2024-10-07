@@ -3,6 +3,7 @@ Logger setup using loguru
 taken from https://github.com/tiangolo/fastapi/issues/2019
 
 """
+
 import logging
 import sys
 from enum import Enum
@@ -44,14 +45,13 @@ class LoggingSettings(BaseSettings):
         "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
         "<level>{level: <8}</level> | "
         "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-        "<level>{message}</level>")
+        "<level>{message}</level>"
+    )
     filepath: Optional[Path] = None
     rotation: str = "1 days"
     retention: str = "1 months"
     serialize: bool = False
-    model_config = SettingsConfigDict(env_prefix="log_",
-                                      env_file=".env",
-                                      extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="log_", env_file=".env", extra="ignore")
 
 
 class InterceptHandler(logging.Handler):
@@ -73,15 +73,13 @@ class InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
-        logger.opt(depth=depth,
-                   exception=record.exc_info).log(level, record.getMessage())
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
 try:
     from gunicorn.glogging import Logger
 
     class GunicornLogger(Logger):
-
         def setup(self, cfg) -> None:
             handler = InterceptHandler()
 
@@ -94,10 +92,7 @@ try:
             self.access_log.setLevel(log_settings.log_level)
 
             # Configure logger before gunicorn starts logging
-            logger.configure(handlers=[{
-                "sink": sys.stdout,
-                "level": log_settings.log_level
-            }])
+            logger.configure(handlers=[{"sink": sys.stdout, "level": log_settings.log_level}])
 
 except ImportError:
     logger.warning("No gunicorn here")
@@ -147,7 +142,8 @@ def setup_logger(
                 "uvicorn.access",
                 "uvicorn.error",
             ],
-        ))
+        )
+    )
 
     # Add stdout logger
     logger.add(
@@ -192,8 +188,7 @@ def patcher(record):
         record["exception"] = exception._replace(value=fixed)
 
 
-def setup_logger_from_settings(log_level: Optional[str] = None,
-                               log_settings: Optional[LoggingSettings] = None):
+def setup_logger_from_settings(log_level: Optional[str] = None, log_settings: Optional[LoggingSettings] = None):
     """Define the global logger to be used by your entire service.
 
     Arguments:

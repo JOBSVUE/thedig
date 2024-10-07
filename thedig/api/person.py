@@ -47,7 +47,7 @@ class PersonResponse(TypedDict):
 async def verify_mandatory_fields(person: Person):
     if not set(MANDATORY_FIELDS).issubset(person.keys()):
         missing_fields = f"at least one of mandatory fields {MANDATORY_FIELDS} not in {person.keys()}"
-        #TODO: Better validation error, more native to FastAPI
+        # TODO: Better validation error, more native to FastAPI
         raise HTTPException(status_code=422, detail=missing_fields)
 
 
@@ -84,9 +84,7 @@ def person_set_field(person: Person, field: str, value: str | set) -> Person:
     return person
 
 
-def dict_to_person(person_dict: dict,
-                   setdefault=False,
-                   unsetvoid=False) -> Person:
+def dict_to_person(person_dict: dict, setdefault=False, unsetvoid=False) -> Person:
     if setdefault:
         for k in Person.__annotations__.keys():
             is_k_set = RE_SET.match(str(Person.__annotations__[k]))
@@ -116,7 +114,10 @@ def dict_to_person(person_dict: dict,
 def person_unset_void(person: Person) -> Person:
     return {
         k: v
-        for k, v in person.items() if v is not None and v != {
+        for k, v in person.items()
+        if v is not None
+        and v
+        != {
             None,
         }
     }

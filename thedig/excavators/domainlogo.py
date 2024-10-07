@@ -31,12 +31,7 @@ def get_favicon(url: str, proxy=None):
     """
     favicon_url = f"{url}/favicon.ico"
     try:
-        r = requests.get(favicon_url,
-                         proxies={
-                             "https": proxy,
-                             "http": proxy
-                         },
-                         timeout=1)
+        r = requests.get(favicon_url, proxies={"https": proxy, "http": proxy}, timeout=1)
     except requests.RequestsError:
         log.debug("No reachable host for this url: %s" % favicon_url)
         return None

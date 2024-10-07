@@ -1,4 +1,5 @@
 """Configuration loader"""
+
 # go to .env to modify configuration variables or use environment variables
 from random import choice
 
@@ -10,39 +11,33 @@ from redis.asyncio import Redis
 
 NITTER_INSTANCES = "https://status.d420.de/api/v1/instances"
 NITTER_BACKUP_INSTANCE = "https://nitter.poast.org"
-PUBLIC_EMAIL_PROVIDERS_URL = "https://raw.githubusercontent.com/ankaboot-source/email-open-data/main/public-email-providers.json"
+PUBLIC_EMAIL_PROVIDERS_URL = (
+    "https://raw.githubusercontent.com/ankaboot-source/email-open-data/main/public-email-providers.json"
+)
 JOBTITLES_FILE = "miners/jobtitles.json"
 
 
-def pick_nitter_instance(instances_url=NITTER_INSTANCES,
-                         backup_instance=NITTER_BACKUP_INSTANCE,
-                         timeout=3,
-                         min_points=50,
-                         first=5) -> str:
+def pick_nitter_instance(
+    instances_url=NITTER_INSTANCES, backup_instance=NITTER_BACKUP_INSTANCE, timeout=3, min_points=50, first=5
+) -> str:
     instance = ""
     try:
         instances = {
             instance["ping_avg"]: instance["url"]
-            for instance in requests.get(instances_url,
-                                         timeout=timeout).json()["hosts"]
+            for instance in requests.get(instances_url, timeout=timeout).json()["hosts"]
             if instance["points"] > min_points and instance["ping_avg"]
         }
-        instance = instances[choice(sorted(
-            instances.keys())[:first])]  # noqa: S311
+        instance = instances[choice(sorted(instances.keys())[:first])]  # noqa: S311
     except (requests.RequestException, IndexError, KeyError) as e:
-        log.error(
-            f"Failure to get nitter instances {e}, fallback to {backup_instance}"
-        )
+        log.error(f"Failure to get nitter instances {e}, fallback to {backup_instance}")
         instance = backup_instance
     return instance
 
 
-def get_public_email_providers(
-        public_email_providers_url=PUBLIC_EMAIL_PROVIDERS_URL) -> set[str]:
+def get_public_email_providers(public_email_providers_url=PUBLIC_EMAIL_PROVIDERS_URL) -> set[str]:
     public_email_providers = set()
     try:
-        public_email_providers = set(
-            requests.get(public_email_providers_url).json())  # noqa: S113
+        public_email_providers = set(requests.get(public_email_providers_url).json())  # noqa: S113
     except requests.RequestException as e:
         log.error(f"Impossible to GET {public_email_providers_url}: {e}")
     return public_email_providers

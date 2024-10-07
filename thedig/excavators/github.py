@@ -26,18 +26,13 @@ GITHUB_GRAPHQL_USERS = """{
 }"""
 
 
-def github_query(query: str,
-                 params: dict,
-                 token: str,
-                 endpoint=GITHUB_GRAPHQL_ENDPOINT):
-    r = requests.post(endpoint,
-                      headers={'Authorization': "bearer %s " % token},
-                      data=query.format(**params))
+def github_query(query: str, params: dict, token: str, endpoint=GITHUB_GRAPHQL_ENDPOINT):
+    r = requests.post(endpoint, headers={"Authorization": "bearer %s " % token}, data=query.format(**params))
     r.raise_for_status()
     return r.json()
 
 
 def users_by_name(results: dict, name: str) -> list[dict]:
     data = results["data"]["location_users"]
-    users = [u['user'] for u in data["users"] if u['user']]
+    users = [u["user"] for u in data["users"] if u["user"]]
     return users

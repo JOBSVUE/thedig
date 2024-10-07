@@ -12,8 +12,10 @@ from html import unescape
 from typing import ClassVar, Literal, Optional
 
 import jwt
+
 # from curl_cffi import requests
 import requests
+
 # log
 from loguru import logger as log
 from pydantic import BaseModel, Field, HttpUrl, model_validator
@@ -23,33 +25,29 @@ from ..api.person import Person, dict_to_person
 from .ISO3166 import ISO3166
 from .utils import match_name
 
-HttpMethod = Literal["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD",
-                     "TRACE", "PATCH"]
+HttpMethod = Literal["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "TRACE", "PATCH"]
 
 # linkedin profile url with an ISO3166 country code regular expression
 RE_LINKEDIN_URL = re.compile(
     r"^https?:\/\/((?P<countrycode>\w{2})|(:?www))\.linkedin\.com\/(?:public\-profile\/in|in|people)\/(?P<identifier>([%\w-]+))/?",
-    re.U)
-RE_LINKEDIN_NAME_DESCRIPTION = re.compile(
-    r"<strong>([^<]+)</strong>.*<strong>([^<]+)</strong>", re.U)
+    re.U,
+)
+RE_LINKEDIN_NAME_DESCRIPTION = re.compile(r"<strong>([^<]+)</strong>.*<strong>([^<]+)</strong>", re.U)
 
 RE_LINKEDIN_INFOS_DESCRIPTION = re.compile(
     r"^(?P<description>.*?)(?: · Experience: (?P<worksFor>.+?)(?: · Education: (.+?))? · Location: (?P<workLocation>.*?) · (?: · \d+\+ connections on LinkedIn)?)",
-    re.U)
+    re.U,
+)
 
 LINKEDIN_DESCRIPTION = {
     "en": {
-        "begin":
-        "View ",
-        "end":
-        "’s profile on LinkedIn, a professional community of 1 billion members",
+        "begin": "View ",
+        "end": "’s profile on LinkedIn, a professional community of 1 billion members",
     },
     "fr": {
-        "begin":
-        "Consultez le profil de ",
-        "end":
-        " sur LinkedIn, une communauté professionnelle d’un milliard de membres",
-    }
+        "begin": "Consultez le profil de ",
+        "end": " sur LinkedIn, une communauté professionnelle d’un milliard de membres",
+    },
 }
 
 LINKEDIN_TRAILING_DESCRIPTION = (" ...", ".")
@@ -142,19 +140,15 @@ def parse_linkedin_description(description, country="en") -> dict:
 
     if description.endswith(LINKEDIN_DESCRIPTION[country]["end"]):
         if "alternateName" not in person:
-            description = description.replace("<strong>",
-                                              "").replace("</strong>", "")
-            person["alternateName"] = description[\
-                description.find(LINKEDIN_DESCRIPTION[country]["begin"])+len(LINKEDIN_DESCRIPTION[country]["begin"]):].\
-                removesuffix(LINKEDIN_DESCRIPTION[country]["end"])
+            description = description.replace("<strong>", "").replace("</strong>", "")
+            person["alternateName"] = description[
+                description.find(LINKEDIN_DESCRIPTION[country]["begin"]) + len(LINKEDIN_DESCRIPTION[country]["begin"]) :
+            ].removesuffix(LINKEDIN_DESCRIPTION[country]["end"])
 
         matched_infos = re.match(RE_LINKEDIN_INFOS_DESCRIPTION, description)
         if matched_infos:
             infos = matched_infos.groupdict()
-            person.update({
-                key: value.strip()
-                for key, value in infos.items() if value
-            })
+            person.update({key: value.strip() for key, value in infos.items() if value})
 
     return person
 
@@ -199,16 +193,15 @@ class LinkedInProfile(BaseModel):
             # we upsert self.workLocation if None
             # or given by the search engine if it's not the same as the country
             # Country names like USA, UAE need to be checked as an acronym too
-            if not self.workLocation or (self.country not in self.workLocation
-                                         and filter(str.isupper, self.country)
-                                         not in self.workLocation):
+            if not self.workLocation or (
+                self.country not in self.workLocation and filter(str.isupper, self.country) not in self.workLocation
+            ):
                 self.workLocation = self.country
 
         self.identifier = self.match["identifier"]
 
     def parse_description(self):
-        infos = parse_linkedin_description(description=self.description,
-                                           country=self.match["countrycode"])
+        infos = parse_linkedin_description(description=self.description, country=self.match["countrycode"])
         if infos:
             self.__dict__.update(infos)
 
@@ -219,7 +212,7 @@ class LinkedInProfile(BaseModel):
         )
         if not r:
             raise ValueError("Not a valid LinkedIn Profile title")
-        if not match_name(self.name, r['name'], fuzzy=False, condensed=False):
+        if not match_name(self.name, r["name"], fuzzy=False, condensed=False):
             raise ValueError("This LinkedIn profile name doesn't match")
         if "worksFor" in r:
             self.worksFor = r["worksFor"]
@@ -228,15 +221,12 @@ class LinkedInProfile(BaseModel):
 
 
 class Search(ABC):
-    RICH_FIELDS = ['worksFor', 'jobTitle']
+    RICH_FIELDS = ["worksFor", "jobTitle"]
     RESULTS_COUNT = 10
 
-    def __init__(self,
-                 endpoint: HttpUrl,
-                 method: HttpMethod,
-                 headers: dict = {},
-                 query_params: dict = {},
-                 body: dict = None):
+    def __init__(
+        self, endpoint: HttpUrl, method: HttpMethod, headers: dict = {}, query_params: dict = {}, body: dict = None
+    ):
         self.endpoint = endpoint
         self.headers = headers
         self.query_params = query_params
@@ -267,11 +257,9 @@ class Search(ABC):
         else:
             raise ValueError(f"Not a supported HTTP method: {self.method}")
 
-        prepped_req = requests.Request(method=self.method,
-                                       url=self.endpoint,
-                                       params=self.query_params,
-                                       headers=self.headers,
-                                       json=self.body).prepare()
+        prepped_req = requests.Request(
+            method=self.method, url=self.endpoint, params=self.query_params, headers=self.headers, json=self.body
+        ).prepare()
 
         r = self.session.send(prepped_req)
         r.raise_for_status()
@@ -295,22 +283,25 @@ class Search(ABC):
     def to_persons(self, worksFor: str = None):
         self.persons = []
         for profile in self.profiles:
-            person = dict_to_person(dict(name=profile.name,
-                                         url=profile.url,
-                                         sameAs={profile.url},
-                                         description=profile.description,
-                                         alternateName={profile.alternateName},
-                                         workLocation={profile.workLocation},
-                                         givenName=profile.givenName,
-                                         familyName=profile.familyName,
-                                         identifier={profile.identifier},
-                                         image=profile.image,
-                                         jobTitle=profile.jobTitle,
-                                         worksFor=profile.worksFor),
-                                    unsetvoid=True)
+            person = dict_to_person(
+                dict(
+                    name=profile.name,
+                    url=profile.url,
+                    sameAs={profile.url},
+                    description=profile.description,
+                    alternateName={profile.alternateName},
+                    workLocation={profile.workLocation},
+                    givenName=profile.givenName,
+                    familyName=profile.familyName,
+                    identifier={profile.identifier},
+                    image=profile.image,
+                    jobTitle=profile.jobTitle,
+                    worksFor=profile.worksFor,
+                ),
+                unsetvoid=True,
+            )
 
-            if worksFor and profile.worksFor and match_name(
-                    worksFor, profile.worksFor, acronym=True):
+            if worksFor and profile.worksFor and match_name(worksFor, profile.worksFor, acronym=True):
                 self.persons.insert(person)
             else:
                 self.persons.append(person)
@@ -333,20 +324,14 @@ class GoogleVertexAI(Search):
         self.access_token = None
         self.token_expiry = 0  # Timestamp when the token will expire
 
-        super().__init__(endpoint=self.ENDPOINT.format(
-            project_id=project_id, region=region, datastore_id=datastore_id),
-                         method="POST",
-                         body={
-                             "pageSize": self.RESULTS_COUNT,
-                             "contentSearchSpec": {
-                                 "snippetSpec": {
-                                     "returnSnippet": False
-                                 }
-                             }
-                         },
-                         headers={
-                             "Content-Type": "application/json",
-                         })
+        super().__init__(
+            endpoint=self.ENDPOINT.format(project_id=project_id, region=region, datastore_id=datastore_id),
+            method="POST",
+            body={"pageSize": self.RESULTS_COUNT, "contentSearchSpec": {"snippetSpec": {"returnSnippet": False}}},
+            headers={
+                "Content-Type": "application/json",
+            },
+        )
 
     def authenticate(self):
         # Check if the token is still valid and not about to expire
@@ -365,9 +350,7 @@ class GoogleVertexAI(Search):
         }
 
         # Sign the JWT with the service account's private key
-        signed_jwt = jwt.encode(payload,
-                                self.service_account_info["private_key"],
-                                algorithm="RS256")
+        signed_jwt = jwt.encode(payload, self.service_account_info["private_key"], algorithm="RS256")
 
         # Request an access token
         token_response = requests.post(
@@ -375,13 +358,13 @@ class GoogleVertexAI(Search):
             data={
                 "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
                 "assertion": signed_jwt,
-            })
+            },
+        )
 
         token_response.raise_for_status()
         token_json = token_response.json()
         self.access_token = token_json["access_token"]
-        self.token_expiry = now + token_json.get("expires_in",
-                                                 self.TOKEN_LIFEDURATION)
+        self.token_expiry = now + token_json.get("expires_in", self.TOKEN_LIFEDURATION)
 
         # Update headers with the new access token
         self.headers["Authorization"] = f"Bearer {self.access_token}"
@@ -394,25 +377,24 @@ class GoogleVertexAI(Search):
         return {**self.body, "query": query}
 
     def extract(self):
-        self.results = [{
-            "title":
-            p.get('og:title'),
-            "url":
-            p.get('og:url'),
-            "description":
-            unescape(p.get('og:description')).replace("<br>", "\n"),
-            "givenName":
-            p.get('profile:first_name'),
-            "familyName":
-            p.get('profile:last_name'),
-            "image":
-            p.get('og:image'),
-            "country":
-            ISO3166.get(p.get('locale').split('_')[-1]),
-        } for p in map(
-            lambda r: r.get('document', {}).get('derivedStructData', {}).get(
-                'pagemap', {}).get('metatags', [{}])[0],
-            self.raw_results.get("results", []))]
+        self.results = [
+            {
+                "title": p.get("og:title"),
+                "url": p.get("og:url"),
+                "description": unescape(p.get("og:description")).replace("<br>", "\n"),
+                "givenName": p.get("profile:first_name"),
+                "familyName": p.get("profile:last_name"),
+                "image": p.get("og:image"),
+                "country": ISO3166.get(p.get("locale").split("_")[-1]),
+            }
+            for p in map(
+                lambda r: r.get("document", {})
+                .get("derivedStructData", {})
+                .get("pagemap", {})
+                .get("metatags", [{}])[0],
+                self.raw_results.get("results", []),
+            )
+        ]
 
 
 class Brave(Search):
@@ -424,7 +406,7 @@ class Brave(Search):
     }
     QUERY_PARAMS = {
         "resultfilter": "web",
-        #"goggles_id": "https://raw.githubusercontent.com/carlopezzuto/google-linkedin/main/googgleLI",
+        # "goggles_id": "https://raw.githubusercontent.com/carlopezzuto/google-linkedin/main/googgleLI",
         "count": Search.RESULTS_COUNT,
         "country": "us",
         "search_lang": "en",
@@ -435,23 +417,20 @@ class Brave(Search):
         token: str,
     ):
         self.token = token
-        super().__init__(endpoint=self.ENDPOINT,
-                         method="GET",
-                         headers=self.HEADERS,
-                         query_params=self.QUERY_PARAMS)
+        super().__init__(endpoint=self.ENDPOINT, method="GET", headers=self.HEADERS, query_params=self.QUERY_PARAMS)
 
     def authenticate(self):
-        self.headers['X-Subscription-Token'] = self.token
+        self.headers["X-Subscription-Token"] = self.token
 
     def search_query(self, query: str):
         return {"q": f"site:linkedin.com/in {query}"}
 
     def extract(self):
-        self.results = [{
-            "title": p['title'],
-            "url": p['url'],
-            "description": p['description']
-        } for p in self.raw_results.get("web", {}).get("results", {}) if p]
+        self.results = [
+            {"title": p["title"], "url": p["url"], "description": p["description"]}
+            for p in self.raw_results.get("web", {}).get("results", {})
+            if p
+        ]
 
 
 class Bing(Search):
@@ -474,32 +453,29 @@ class Bing(Search):
         self.query_params["customconfig"] = customconfig
 
     def authenticate(self):
-        self.headers['Ocp-Apim-Subscription-Key'] = self.token
+        self.headers["Ocp-Apim-Subscription-Key"] = self.token
 
     def search_query(self, query: str) -> dict:
         return {"q": query}
 
     def extract(self):
         self.results = []
-        if ("webPages" not in self.raw_results
-                or not self.raw_results["webPages"].get("value")):
+        if "webPages" not in self.raw_results or not self.raw_results["webPages"].get("value"):
             return
 
         for result in self.raw_results["webPages"]["value"]:
-            self.results.append({
-                "title":
-                result["name"],
-                "description":
-                result["snippet"],
-                "url":
-                result["url"],
-                "image":
-                result.get('openGraphImage', {}).get("contentUrl"),
-            })
+            self.results.append(
+                {
+                    "title": result["name"],
+                    "description": result["snippet"],
+                    "url": result["url"],
+                    "image": result.get("openGraphImage", {}).get("contentUrl"),
+                }
+            )
 
             # Bing also gives you sometimes location
             for item in result.get("richFacts", ()):
-                if item['hint']['text'] != "ADDRESS:LOCATIONGENERAL":
+                if item["hint"]["text"] != "ADDRESS:LOCATIONGENERAL":
                     continue
                 address = item["items"][0]["text"].split(", ")
                 # however sometimes the address isn't correctly identified by Bing
@@ -510,10 +486,9 @@ class Bing(Search):
 class GoogleCustom(Search):
     ENDPOINT = "https://customsearch.googleapis.com/customsearch/v1/siterestrict"
     QUERY_PARAMS = {
-        "fields":
-        "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image,pagemap/metatags/og:description)",
+        "fields": "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image,pagemap/metatags/og:description)",
         "num": Search.RESULTS_COUNT,
-        "query_type": 'q',
+        "query_type": "q",
     }
 
     def __init__(
@@ -523,15 +498,15 @@ class GoogleCustom(Search):
     ):
         self.token = token
         self.cx = cx
-        super().__init__(endpoint=self.ENDPOINT,
-                         method="GET",
-                         query_params=self.QUERY_PARAMS)
+        super().__init__(endpoint=self.ENDPOINT, method="GET", query_params=self.QUERY_PARAMS)
 
     def authenticate(self):
-        self.headers.update({
-            "key": self.token,
-            "cx": self.cx,
-        })
+        self.headers.update(
+            {
+                "key": self.token,
+                "cx": self.cx,
+            }
+        )
 
     def search_query(self, query: str):
         return {"q": query}
@@ -542,19 +517,17 @@ class GoogleCustom(Search):
         if not self.raw_results.get("items"):
             return
 
-        self.results = [{
-            "givenName":
-            r["pagemap"]["metatags"][0]["profile:first_name"],
-            "familyName":
-            r["pagemap"]["metatags"][0]["profile:last_name"],
-            "description":
-            r["pagemap"]["metatags"][0]["og:description"],
-            "url":
-            r["link"],
-            "image":
-            r["pagemap"]["metatags"][0]["og:image"]
-        } for r in self.raw_results["items"]
-                        if r.get("pagemap", {}).get("metatags", {})]
+        self.results = [
+            {
+                "givenName": r["pagemap"]["metatags"][0]["profile:first_name"],
+                "familyName": r["pagemap"]["metatags"][0]["profile:last_name"],
+                "description": r["pagemap"]["metatags"][0]["og:description"],
+                "url": r["link"],
+                "image": r["pagemap"]["metatags"][0]["og:image"],
+            }
+            for r in self.raw_results["items"]
+            if r.get("pagemap", {}).get("metatags", {})
+        ]
 
 
 class Singleton(type):
@@ -567,24 +540,20 @@ class Singleton(type):
 
 
 class SearchChain(metaclass=Singleton):
-
     def __init__(self, settings):
         self.engines = []
         if settings.google_api_key and settings.google_cx:
-            self.engines.append(
-                GoogleCustom(token=settings.google_api_key,
-                             cx=settings.google_cx))
+            self.engines.append(GoogleCustom(token=settings.google_api_key, cx=settings.google_cx))
         if settings.google_credentials and settings.google_vertexai_datastore and settings.google_vertexai_projectid:
             self.engines.append(
                 GoogleVertexAI(
-                    service_account_info=json.loads(
-                        open(settings.google_credentials).read()),
+                    service_account_info=json.loads(open(settings.google_credentials).read()),
                     project_id=settings.google_vertexai_projectid,
-                    datastore_id=settings.google_vertexai_datastore))
+                    datastore_id=settings.google_vertexai_datastore,
+                )
+            )
         if settings.bing_customconfig and settings.bing_api_key:
-            self.engines.append(
-                Bing(customconfig=settings.bing_customconfig,
-                     token=settings.bing_api_key))
+            self.engines.append(Bing(customconfig=settings.bing_customconfig, token=settings.bing_api_key))
         if settings.brave_api_key:
             self.engines.append(Brave(token=settings.brave_api_key))
 
@@ -597,12 +566,10 @@ class SearchChain(metaclass=Singleton):
                 if not engine.results:
                     success = True
                     continue
-                log.debug(
-                    f"Search successful with {engine.__class__.__name__}")
+                log.debug(f"Search successful with {engine.__class__.__name__}")
                 return engine
             except Exception as e:
-                log.error(
-                    f"{engine.__class__.__name__} failed with error: {e}")
+                log.error(f"{engine.__class__.__name__} failed with error: {e}")
 
         if not success:
             failed_engines = "All search engines have failed."

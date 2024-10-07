@@ -18,38 +18,27 @@ def test_find_gender():
 
 def test_find_jobtitle():
     assert find_jobtitle("I am a Software Engineer") == {"Software Engineer"}
-    assert find_jobtitle("Senior Project Manager and Team Lead") == {
-        "Senior Project Manager", "Team Lead"
-    }
+    assert find_jobtitle("Senior Project Manager and Team Lead") == {"Senior Project Manager", "Team Lead"}
     assert find_jobtitle("No job title here") is None
     assert find_jobtitle("") is None
 
     # Test for longer job titles
-    assert find_jobtitle("I am a Senior Software Engineer") == {
-        "Senior Software Engineer"
-    }
+    assert find_jobtitle("I am a Senior Software Engineer") == {"Senior Software Engineer"}
 
     # Test for case insensitivity
     assert find_jobtitle("i am a software ENGINEER") == {"software ENGINEER"}
 
     # Test for multiple occurrences
-    assert find_jobtitle("Software Engineer and Project Manager") == {
-        "Software Engineer", "Project Manager"
-    }
+    assert find_jobtitle("Software Engineer and Project Manager") == {"Software Engineer", "Project Manager"}
 
 
 @pytest.fixture
 def mock_jobtitles(monkeypatch):
-    mock_titles = {
-        "software engineer", "project manager", "team lead",
-        "senior software engineer"
-    }
+    mock_titles = {"software engineer", "project manager", "team lead", "senior software engineer"}
     monkeypatch.setattr("thedig.excavators.bio.JOBTITLES", mock_titles)
 
 
 def test_find_jobtitle_with_mock(mock_jobtitles):
     assert find_jobtitle("I am a Software Engineer") == {"Software Engineer"}
-    assert find_jobtitle("Senior Software Engineer and Team Lead") == {
-        "Senior Software Engineer", "Team Lead"
-    }
+    assert find_jobtitle("Senior Software Engineer and Team Lead") == {"Senior Software Engineer", "Team Lead"}
     assert find_jobtitle("Data Scientist") is None

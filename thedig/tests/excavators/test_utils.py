@@ -1,14 +1,19 @@
 import pytest
 from pydantic import HttpUrl
 
-from thedig.excavators.utils import (absolutize, domain_to_urls, get_tld,
-                                     guess_country, match_name, normalize,
-                                     ua_headers)
+from thedig.excavators.utils import (
+    absolutize,
+    domain_to_urls,
+    get_tld,
+    guess_country,
+    match_name,
+    normalize,
+    ua_headers,
+)
 
 
 def test_absolutize():
-    assert absolutize("https://example.com",
-                      "http://test.com") == "https://example.com"
+    assert absolutize("https://example.com", "http://test.com") == "https://example.com"
     assert absolutize("/path", "http://test.com") == "http://test.com/path"
     assert absolutize("invalid", "http://test.com") == ""
 

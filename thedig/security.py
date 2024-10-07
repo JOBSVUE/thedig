@@ -1,12 +1,14 @@
 """
 Security
 """
+
 import secrets
 
 # fast api
 from fastapi import Request, Security, WebSocket, status
 from fastapi.exceptions import HTTPException
 from fastapi.security.api_key import APIKeyHeader, APIKeyQuery
+
 # logging modules
 from loguru import logger as log
 
@@ -14,14 +16,10 @@ from thedig.api.config import settings
 
 
 class UniversalAPIKey(APIKeyHeader):
-
-    async def __call__(self,
-                       request: Request = None,
-                       websocket: WebSocket = None):
+    async def __call__(self, request: Request = None, websocket: WebSocket = None):
         if not request and not websocket:
             if self.auto_error:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                                    detail="Not authenticated")
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated")
             return None
         if websocket:
             return await APIKeyQuery.__call__(self, websocket)
@@ -37,9 +35,7 @@ api_key_header_auth = UniversalAPIKey(
 
 async def get_api_key(api_key_header: str = Security(api_key_header_auth)):
     log.debug(f"Checking API Key authentication: {api_key_header}")
-    if not any(
-            secrets.compare_digest(api_key_header, api_key_v)
-            for api_key_v in settings.api_keys):
+    if not any(secrets.compare_digest(api_key_header, api_key_v) for api_key_v in settings.api_keys):
         log.debug(f"Invalid API Key {api_key_header}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

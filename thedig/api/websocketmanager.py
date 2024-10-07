@@ -4,7 +4,6 @@ from fastapi import WebSocket
 
 
 class SetEncoder(json.JSONEncoder):
-
     def default(self, obj):
         if isinstance(obj, set):
             return list(obj)
@@ -12,7 +11,6 @@ class SetEncoder(json.JSONEncoder):
 
 
 class WebSocketManager:
-
     def __init__(self):
         self.connections: set[WebSocket] = set()
 

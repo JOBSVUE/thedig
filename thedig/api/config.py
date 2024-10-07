@@ -14,34 +14,39 @@ PUBLIC_EMAIL_PROVIDERS_URL = "https://raw.githubusercontent.com/ankaboot-source/
 JOBTITLES_FILE = "miners/jobtitles.json"
 
 
-def pick_nitter_instance(
-    instances_url=NITTER_INSTANCES,
-    backup_instance=NITTER_BACKUP_INSTANCE,
-    timeout=3,
-    min_points=50,
-    first=5
-) -> str:
+def pick_nitter_instance(instances_url=NITTER_INSTANCES,
+                         backup_instance=NITTER_BACKUP_INSTANCE,
+                         timeout=3,
+                         min_points=50,
+                         first=5) -> str:
     instance = ""
     try:
         instances = {
             instance["ping_avg"]: instance["url"]
-            for instance in requests.get(instances_url, timeout=timeout).json()["hosts"]
+            for instance in requests.get(instances_url,
+                                         timeout=timeout).json()["hosts"]
             if instance["points"] > min_points and instance["ping_avg"]
         }
-        instance = instances[choice(sorted(instances.keys())[:first])]  # noqa: S311
+        instance = instances[choice(sorted(
+            instances.keys())[:first])]  # noqa: S311
     except (requests.RequestException, IndexError, KeyError) as e:
-        log.error(f"Failure to get nitter instances {e}, fallback to {backup_instance}")
+        log.error(
+            f"Failure to get nitter instances {e}, fallback to {backup_instance}"
+        )
         instance = backup_instance
     return instance
 
 
-def get_public_email_providers(public_email_providers_url=PUBLIC_EMAIL_PROVIDERS_URL) -> set[str]:
+def get_public_email_providers(
+        public_email_providers_url=PUBLIC_EMAIL_PROVIDERS_URL) -> set[str]:
     public_email_providers = set()
     try:
-        public_email_providers = set(requests.get(public_email_providers_url).json())  # noqa: S113
+        public_email_providers = set(
+            requests.get(public_email_providers_url).json())  # noqa: S113
     except requests.RequestException as e:
         log.error(f"Impossible to GET {public_email_providers_url}: {e}")
     return public_email_providers
+
 
 class Settings(BaseSettings):
     app_name: str = "TheDig API"
@@ -63,8 +68,8 @@ class Settings(BaseSettings):
     cache_redis_db: int = 0
     cache_redis_db_person: int = 1
     cache_redis_db_company: int = 2
-    cache_expiration_company: int = 60*60*24*30 # 30 days
-    cache_expiration_person: int = 60*60*24*1 # 1 day
+    cache_expiration_company: int = 60 * 60 * 24 * 30  # 30 days
+    cache_expiration_person: int = 60 * 60 * 24 * 1  # 1 day
     server_port: int = "8080"
     api_keys: list[str]
     api_key_name: str

@@ -74,8 +74,8 @@ def domain_to_urls(domain: str) -> list[str]:
     return [
         f"https://www.{domain}",
         f"https://{domain}",
-    #    f"http://www.{domain}",
-    #    f"http://{domain}",
+        #    f"http://www.{domain}",
+        #    f"http://{domain}",
     ]
 
 
@@ -92,7 +92,11 @@ def ua_headers(random: bool = False) -> dict:
     return {"user-agent": user_agent}
 
 
-def match_name(name: str, text: str, fuzzy: bool = True, acronym: bool = False, condensed: bool = True) -> bool:
+def match_name(name: str,
+               text: str,
+               fuzzy: bool = True,
+               acronym: bool = False,
+               condensed: bool = True) -> bool:
     if not name:
         return True
 
@@ -111,9 +115,7 @@ def match_name(name: str, text: str, fuzzy: bool = True, acronym: bool = False, 
 
 
 def normalize(name: str, replace: dict = {' ': ''}) -> str:
-    name = str(
-        name.encode("ASCII", "ignore").strip().decode()
-        ).casefold()
+    name = str(name.encode("ASCII", "ignore").strip().decode()).casefold()
     for k, v in replace.items():
         name = name.replace(k, v)
     return name

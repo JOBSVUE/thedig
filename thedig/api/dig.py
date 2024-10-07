@@ -1,6 +1,5 @@
 """Transmuter API"""
 
-
 # json
 import json
 
@@ -45,27 +44,25 @@ from ..excavators.utils import match_name
 
 # config
 from .config import settings, Settings, setup_cache
-from .person import (
-    Person,
-    PersonRequest,
-    PersonResponse,
-    ValidationError,
-    person_request_ta,
-    person_response_ta,
-    verify_mandatory_fields
-)
+from .person import (Person, PersonRequest, PersonResponse, ValidationError,
+                     person_request_ta, person_response_ta,
+                     verify_mandatory_fields)
 
 # websocket manager
 from .websocketmanager import manager as ws_manager
 
-MAX_REQUESTS_PER_SEC = {"times": settings.max_requests_times, "seconds": settings.max_requests_seconds}
+MAX_REQUESTS_PER_SEC = {
+    "times": settings.max_requests_times,
+    "seconds": settings.max_requests_seconds
+}
 MAX_BULK = 1000
 
 # init fast api
 router = APIRouter()
 ar = Archeologist(router)
 
-@ar.register(field="email", update=("worksFor",))
+
+@ar.register(field="email", update=("worksFor", ))
 async def worksfor(email: EmailStr) -> Person:
     # except for public email providers
     domain = email.split("@")[1]
@@ -78,7 +75,9 @@ async def worksfor(email: EmailStr) -> Person:
 
 
 @ar.register(field="name")
-async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
+async def linkedin(name: str,
+                   email: EmailStr = None,
+                   worksFor: str = None) -> Person:
     engine = SearchChain(settings).search(query=name, name=name)
     if not engine:
         return
@@ -88,21 +87,18 @@ async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> P
     return engine.persons[0] if engine.persons else None
 
 
-@ar.register(field="email", update=("image",))
+@ar.register(field="email", update=("image", ))
 async def exc_gravatar(email) -> Person:
     avatar = await gravatar(email)
-    return (
-        {
-            'image': {
-                avatar,
-            }
+    return ({
+        'image': {
+            avatar,
         }
-        if avatar
-        else {}
-    )
+    } if avatar else {})
 
 
 if hasattr(settings, "google_credentials"):
+
     @ar.register(field="image")
     async def image(p: dict) -> Person:
         if "name" not in p:
@@ -112,8 +108,7 @@ if hasattr(settings, "google_credentials"):
             p,
             google_credentials=settings.google_credentials,
             nitter_instance_server=settings.nitter_instance_server,
-            proxy=settings.proxy
-            )
+            proxy=settings.proxy)
         await snm.image()
 
         snm.sameAs()
@@ -133,8 +128,7 @@ async def social(p: dict) -> Person:
     snm = SocialNetworkMiner(
         p,
         nitter_instance_server=settings.nitter_instance_server,
-        proxy=settings.proxy
-        )
+        proxy=settings.proxy)
 
     # fuzzy identifier miner
     # it's not an independent miner since identifier can't be mined
@@ -149,15 +143,11 @@ async def social(p: dict) -> Person:
     return snm.person
 
 
-@ar.register(field="description", insert=("jobTitle",))
+@ar.register(field="description", insert=("jobTitle", ))
 async def bio(description: str = None) -> Person:
-    desc: set[str] = (
-        {
-            description,
-        }
-        if type(description) is str
-        else description
-    )
+    desc: set[str] = ({
+        description,
+    } if type(description) is str else description)
     job_title = {}
     jt = set()
     for d in desc:
@@ -177,14 +167,13 @@ async def name(name: str, email: EmailStr) -> Person:
     return splitted
 
 
-@ar.register(field="email", insert=("workLocation",))
+@ar.register(field="email", insert=("workLocation", ))
 async def country(email: EmailStr) -> Person:
     country = guess_country(email.split("@")[-1])
     return {"workLocation": country} if country else {}
 
 
-@router.get(
-    "/person/email/{email}", tags=("person", "archaeology"))
+@router.get("/person/email/{email}", tags=("person", "archaeology"))
 async def person_email(email: EmailStr, name: str) -> Person:
     ar_status, persond = await ar.person({"email": email, "name": name})
     if not ar_status:
@@ -192,42 +181,45 @@ async def person_email(email: EmailStr, name: str) -> Person:
     return persond
 
 
-@router.post("/person/", tags=("person", "archaeology"), dependencies=[
-    Depends(verify_mandatory_fields)
-    ])
+@router.post("/person/",
+             tags=("person", "archaeology"),
+             dependencies=[Depends(verify_mandatory_fields)])
 async def person_post(person: Person) -> Person:
-    ar_status, persond = await ar.person({"email": person['email'], "name": person['name']})
+    ar_status, persond = await ar.person({
+        "email": person['email'],
+        "name": person['name']
+    })
     if not ar_status:
         raise HTTPException(status_code=204)
     return persond
 
 
-async def persons_bulk_background(
-    persons: Annotated[Person, Field(max_items=MAX_BULK)],
-    webhook_endpoint: HttpUrl,
-    webhook_taskid: str
-    ) -> bool:
+async def persons_bulk_background(persons: Annotated[Person,
+                                                     Field(
+                                                         max_items=MAX_BULK)],
+                                  webhook_endpoint: HttpUrl,
+                                  webhook_taskid: str) -> bool:
     results = []
     for p in persons:
         success, enriched = await ar.person(p)
         if success:
             results.append(enriched)
     try:
-        r = requests.post(
-            str(webhook_endpoint),
-            json=jsonable_encoder(results),
-            headers={
-                "X-Task-Id": webhook_taskid,
-            }
-            )
+        r = requests.post(str(webhook_endpoint),
+                          json=jsonable_encoder(results),
+                          headers={
+                              "X-Task-Id": webhook_taskid,
+                          })
         r.raise_for_status()
-        log.debug(f"Endpoint {webhook_endpoint} " + f"answered: {r.json()}" if r.text else "didn't answer")
+        log.debug(f"Endpoint {webhook_endpoint} " +
+                  f"answered: {r.json()}" if r.text else "didn't answer")
     except requests.RequestException as e:
         log.error(e)
 
 
 @router.post("/person/bulk", tags=("person", "archaeology"))
-async def persons_bulk(persons: list[Person], endpoint: HttpUrl, background: BackgroundTasks) -> UUID:
+async def persons_bulk(persons: list[Person], endpoint: HttpUrl,
+                       background: BackgroundTasks) -> UUID:
     #TODO: better validation method
     for p in persons:
         await verify_mandatory_fields(p)
@@ -288,16 +280,14 @@ async def person_optout(person: Person) -> bool:
     if not ar.cache:
         raise HTTPException(status_code=503, detail="Cache is not available")
     p_c = await ar.cache.get(
-        sha256(person["email"].encode("utf-8")).hexdigest()
-        )
+        sha256(person["email"].encode("utf-8")).hexdigest())
     if p_c:
         p = json.loads(p_c)
         if p["OptOut"]:
             return True
         elif match_name(person["name"], p["name"], fuzzy=False):
             await ar.cache.delete(
-                sha256(person["email"].encode("utf-8")).hexdigest()
-                )
+                sha256(person["email"].encode("utf-8")).hexdigest())
         else:
             return HTTPException(status_code=400, detail="Name does not match")
 
@@ -309,13 +299,16 @@ async def person_optout(person: Person) -> bool:
     }
     await ar.cache.set(
         sha256(person["email"].encode("utf-8")).hexdigest(),
-        json_dumps(person)
-        )
+        json_dumps(person))
     return True
 
 
-@router.get("/company/domain/{domain}", tags=("company", "archaeology"), response_class=JSONorNoneResponse)
-async def company_get(domain: Annotated[DomainName, Path(description="domain name")]) -> Company | None:
+@router.get("/company/domain/{domain}",
+            tags=("company", "archaeology"),
+            response_class=JSONorNoneResponse)
+async def company_get(
+    domain: Annotated[DomainName, Path(description="domain name")]
+) -> Company | None:
     """Search for public data on a company based on its domain
 
     Args:
@@ -324,7 +317,8 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
     Returns:
         Company | None
     """
-    cache_company = await setup_cache(settings, db=settings.cache_redis_db_company)
+    cache_company = await setup_cache(settings,
+                                      db=settings.cache_redis_db_company)
 
     if await cache_company.get(domain):
         return json.loads(await cache_company.get(domain))
@@ -343,23 +337,26 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
                 favicon,
             }
 
-    await cache_company.set(
-        domain,
-        json.dumps(jsonable_encoder(cmp)),
-        ex=settings.cache_expiration_company
-        )
+    await cache_company.set(domain,
+                            json.dumps(jsonable_encoder(cmp)),
+                            ex=settings.cache_expiration_company)
 
     return cmp
 
+
 @router.delete("/company/domain/{domain}", tags=("company", "GDPR"))
-async def company_domain_delete(domain: Annotated[DomainName, Path(description="domain name")]) -> bool:
+async def company_domain_delete(
+        domain: Annotated[DomainName,
+                          Path(description="domain name")]) -> bool:
     """Delete company from thedig cache
     """
-    cache_company = await setup_cache(settings, db=settings.cache_redis_db_company)
+    cache_company = await setup_cache(settings,
+                                      db=settings.cache_redis_db_company)
     if await cache_company.get(domain):
         await cache_company.delete(domain)
         return True
     return False
+
 
 @router.delete("/person/email/{email}", tags=("person", "GDPR"))
 async def person_email_delete(email: EmailStr) -> bool:
@@ -372,6 +369,7 @@ async def person_email_delete(email: EmailStr) -> bool:
         return True
     return False
 
+
 @router.delete("/person", tags=("person", "GDPR"))
 async def person_delete() -> bool:
     """Delete person from thedig cache
@@ -381,10 +379,12 @@ async def person_delete() -> bool:
     await ar.cache.flushall()
     return True
 
+
 @router.delete("/company", tags=("company", "GDPR"))
 async def company_delete() -> bool:
     """Delete company from thedig cache
     """
-    cache_company = await setup_cache(settings, db=settings.cache_redis_db_company)
+    cache_company = await setup_cache(settings,
+                                      db=settings.cache_redis_db_company)
     await cache_company.flushall()
     return True

@@ -1,6 +1,6 @@
 import requests
 
-GITHUB_GRAPHQL_ENDPOINT = "https://api.github.com/graphql" 
+GITHUB_GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
 GITHUB_GRAPHQL_USERS = """{
   users_by_name: search(type: USER, query: "${name}", first: 10) {
     users: edges {
@@ -26,7 +26,10 @@ GITHUB_GRAPHQL_USERS = """{
 }"""
 
 
-def github_query(query: str, params: dict, token: str, endpoint=GITHUB_GRAPHQL_ENDPOINT):
+def github_query(query: str,
+                 params: dict,
+                 token: str,
+                 endpoint=GITHUB_GRAPHQL_ENDPOINT):
     r = requests.post(endpoint,
                       headers={'Authorization': "bearer %s " % token},
                       data=query.format(**params))

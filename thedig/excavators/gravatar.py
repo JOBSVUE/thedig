@@ -19,7 +19,8 @@ def email_hash(email: str) -> str:
     >>> md5_hash('myemailaddress@example.com')
     '0bc83cb571cd1c50ba6f3e8a78ef1346'
     """
-    return md5(email.encode("utf-8").lower(), usedforsecurity=False).hexdigest()
+    return md5(email.encode("utf-8").lower(),
+               usedforsecurity=False).hexdigest()
 
 
 async def gravatar(email: str, check: bool = True) -> str:
@@ -32,9 +33,8 @@ async def gravatar(email: str, check: bool = True) -> str:
     Returns:
         str: Gravatar URL
     """
-    gravatar_image_url = GRAVATAR_URL.format(
-        hashed_email=email_hash(email), size=GRAVATAR_SIZE
-    )
+    gravatar_image_url = GRAVATAR_URL.format(hashed_email=email_hash(email),
+                                             size=GRAVATAR_SIZE)
 
     # if no check is needed that's over
     if not check:
@@ -80,15 +80,12 @@ if __name__ == "__main__":
             if r > 248:
                 return 231
             return round(((r - 8) / 247) * 24) + 232
-        return (
-            16
-            + (36 * round(r / 255 * 5))
-            + (6 * round(g / 255 * 5))
-            + round(b / 255 * 5)
-        )
+        return (16 + (36 * round(r / 255 * 5)) + (6 * round(g / 255 * 5)) +
+                round(b / 255 * 5))
 
     def get_color(r, g, b):
-        return "\x1b[48;5;{}m \x1b[0m".format(int(get_ansi_color_code(r, g, b)))
+        return "\x1b[48;5;{}m \x1b[0m".format(int(get_ansi_color_code(r, g,
+                                                                      b)))
 
     def show_image(url_image: str, height: int = 100):
         response = requests.get(url_image)

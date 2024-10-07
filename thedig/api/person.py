@@ -13,6 +13,7 @@ RE_LANGUAGE = r"^[a-z]{2}$"
 RE_SET = re.compile(r"(\s|^)set\W")
 MANDATORY_FIELDS = ("name", "email")
 
+
 class Person(TypedDict, total=False):
     name: str
     email: EmailStr
@@ -47,10 +48,8 @@ async def verify_mandatory_fields(person: Person):
     if not set(MANDATORY_FIELDS).issubset(person.keys()):
         missing_fields = f"at least one of mandatory fields {MANDATORY_FIELDS} not in {person.keys()}"
         #TODO: Better validation error, more native to FastAPI
-        raise HTTPException(
-            status_code=422,
-            detail=missing_fields
-        )
+        raise HTTPException(status_code=422, detail=missing_fields)
+
 
 def person_set_field(person: Person, field: str, value: str | set) -> Person:
     """Set while transform field into set when the value or the dest is not set
@@ -70,18 +69,24 @@ def person_set_field(person: Person, field: str, value: str | set) -> Person:
         if field not in person:
             person[field] = set()
         elif type(person[field]) is not set:
-            person[field] = {person[field], }
+            person[field] = {
+                person[field],
+            }
         if type(value) is set:
             person[field] |= value
         else:
-            person[field] |= {value, }
+            person[field] |= {
+                value,
+            }
     else:
         person[field] = value
 
     return person
 
 
-def dict_to_person(person_dict: dict, setdefault=False, unsetvoid=False) -> Person:
+def dict_to_person(person_dict: dict,
+                   setdefault=False,
+                   unsetvoid=False) -> Person:
     if setdefault:
         for k in Person.__annotations__.keys():
             is_k_set = RE_SET.match(str(Person.__annotations__[k]))
@@ -90,12 +95,16 @@ def dict_to_person(person_dict: dict, setdefault=False, unsetvoid=False) -> Pers
             elif k not in person_dict:
                 person_dict[k] = set()
             elif not is_pure_iterable(person_dict[k]):
-                person_dict[k] = {person_dict[k], }
+                person_dict[k] = {
+                    person_dict[k],
+                }
     else:
         for k, v in person_dict.items():
             is_k_set = RE_SET.match(str(Person.__annotations__[k]))
             if is_k_set and not is_pure_iterable(v):
-                person_dict[k] = {v, }
+                person_dict[k] = {
+                    v,
+                }
 
     # unefficient but clearer
     if unsetvoid:
@@ -105,14 +114,19 @@ def dict_to_person(person_dict: dict, setdefault=False, unsetvoid=False) -> Pers
 
 
 def person_unset_void(person: Person) -> Person:
-    return {k: v for k, v in person.items() if v is not None and v != {None, }}
+    return {
+        k: v
+        for k, v in person.items() if v is not None and v != {
+            None,
+        }
+    }
 
 
 def person_deduplicate(person: Person) -> Person:
     similar_fields = {
         "sameAs": "url",
         "alternateName": "name",
-        }
+    }
     for field, original in similar_fields.items():
         if person.get(original) in person.get(field, ()):
             person[field].remove(person[original])

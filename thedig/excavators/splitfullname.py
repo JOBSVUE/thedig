@@ -8,7 +8,6 @@ import logging
 
 from thedig.excavators.utils import normalize
 
-
 log = logging.getLogger(__name__)
 
 RE_WHITESPACE = re.compile(r"\s+")
@@ -166,7 +165,8 @@ def is_company(name: str, domain: str) -> bool:
 
     _name = normalize(name)
 
-    return _name in (domain.split(".")[-2], domain, ".".join(domain.split(".")[-2:]))
+    return _name in (domain.split(".")[-2], domain,
+                     ".".join(domain.split(".")[-2:]))
 
 
 def _split_fullname(fullname: str) -> dict:
@@ -209,7 +209,7 @@ def _split_fullname(fullname: str) -> dict:
     if len(words) == 2:
         result = {
             "givenName": order(words[0], words[1])["givenName"],
-            }
+        }
         if jobtitle:
             result["jobTitle"] = jobtitle
         return result
@@ -223,7 +223,8 @@ def _split_fullname(fullname: str) -> dict:
 
     if first_word_upper ^ last_word_upper:
         # trick to reverse FAMILY NAME Given Name
-        isfamily = str.isupper if last_word_upper else lambda f: not str.isupper(f)
+        isfamily = str.isupper if last_word_upper else lambda f: not str.isupper(
+            f)
         for i in range(len(words)):
             if isfamily(words[i]):
                 break
@@ -292,12 +293,14 @@ if __name__ == "__main__":
 
     if args.file:
         with open(args.file, newline="", encoding="utf-8-sig") as csvfile:
-            reader = csv.DictReader(
-                csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_ALL
-            )
+            reader = csv.DictReader(csvfile,
+                                    delimiter=",",
+                                    quotechar='"',
+                                    quoting=csv.QUOTE_ALL)
             for row in reader:
                 if row.get("Name"):
-                    s = split_fullname(row["Name"], row["Email"].split("@")[-1])
+                    s = split_fullname(row["Name"],
+                                       row["Email"].split("@")[-1])
                     if s:
                         print(f"{row['Name']}: {s} from {row['Email']}")
                     else:

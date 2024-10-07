@@ -8,15 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_limiter import FastAPILimiter
 from fastapi_limiter.depends import RateLimiter
 
-from thedig.__about__ import (
-    __author__,
-    __copyright__,
-    __email__,
-    __license__,
-    __summary__,
-    __title__,
-    __version__
-    )
+from thedig.__about__ import (__author__, __copyright__, __email__,
+                              __license__, __summary__, __title__, __version__)
 
 # import other apis
 from thedig.api.logsetup import setup_logger_from_settings
@@ -31,8 +24,10 @@ async def lifespan(app: FastAPI):
     ar.cache = await setup_cache(settings, db=settings.cache_redis_db_person)
     ar.cache_expiration = settings.cache_expiration_person
 
-    await FastAPILimiter.init(await setup_cache(settings, db=settings.cache_redis_db))
+    await FastAPILimiter.init(await setup_cache(settings,
+                                                db=settings.cache_redis_db))
     yield
+
 
 # routing composition
 app = FastAPI(
@@ -40,21 +35,25 @@ app = FastAPI(
     title=__title__,
     summary=__summary__,
     version=__version__,
-    contact={"name": f"{__author__} - {__copyright__}", "email": __email__},
+    contact={
+        "name": f"{__author__} - {__copyright__}",
+        "email": __email__
+    },
     license_info={"name": __license__},
     dependencies=[
         Security(get_api_key),
-        Depends(RateLimiter(
-            times=settings.max_requests_times,
-            seconds=settings.max_requests_seconds
-            )),
-        ],
+        Depends(
+            RateLimiter(times=settings.max_requests_times,
+                        seconds=settings.max_requests_seconds)),
+    ],
     lifespan=lifespan,
     terms_of_service="https://github.com/ankaboot-source/thedig/",
     openapi_tags=[
         {
-            "name": "archaeology",
-            "description": "🧩➜👤 enrich __iteratively__ data,\
+            "name":
+            "archaeology",
+            "description":
+            "🧩➜👤 enrich __iteratively__ data,\
                 every enriched data could be potentially used to excavator more data",
         },
         {
@@ -67,7 +66,6 @@ app = FastAPI(
         },
     ],
 )
-
 
 app.add_middleware(
     CORSMiddleware,

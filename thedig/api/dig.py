@@ -71,7 +71,7 @@ async def worksfor(email: EmailStr) -> Person:
     domain = email.split("@")[1]
     works_for = {"worksFor": set()}
     if domain not in settings.public_email_providers:
-        company = await company_by_domain(domain)
+        company = await company_by_domain(domain, proxy=settings.proxy)
         if company:
             works_for['worksFor'].add(company["name"])
     return works_for
@@ -111,7 +111,8 @@ if hasattr(settings, "google_credentials"):
         snm = SocialNetworkMiner(
             p,
             google_credentials=settings.google_credentials,
-            nitter_instance_server=settings.nitter_instance_server
+            nitter_instance_server=settings.nitter_instance_server,
+            proxy=settings.proxy
             )
         await snm.image()
 
@@ -131,7 +132,8 @@ async def social(p: dict) -> Person:
         return None
     snm = SocialNetworkMiner(
         p,
-        nitter_instance_server=settings.nitter_instance_server
+        nitter_instance_server=settings.nitter_instance_server,
+        proxy=settings.proxy
         )
 
     # fuzzy identifier miner
@@ -327,10 +329,10 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
     if await cache_company.get(domain):
         return json.loads(await cache_company.get(domain))
 
-    cmp = await company_by_domain(domain)
+    cmp = await company_by_domain(domain, proxy=settings.proxy)
     if not cmp or 'name' not in cmp:
         return None
-    favicon = find_favicon(domain)
+    favicon = find_favicon(domain, proxy=settings.proxy)
     if favicon:
         if 'logo' not in cmp:
             cmp['logo'] = favicon
@@ -350,7 +352,7 @@ async def company_get(domain: Annotated[DomainName, Path(description="domain nam
     return cmp
 
 @router.delete("/company/domain/{domain}", tags=("company", "GDPR"))
-async def company_delete(domain: Annotated[DomainName, Path(description="domain name")]) -> bool:
+async def company_domain_delete(domain: Annotated[DomainName, Path(description="domain name")]) -> bool:
     """Delete company from thedig cache
     """
     cache_company = await setup_cache(settings, db=settings.cache_redis_db_company)
@@ -360,7 +362,7 @@ async def company_delete(domain: Annotated[DomainName, Path(description="domain 
     return False
 
 @router.delete("/person/email/{email}", tags=("person", "GDPR"))
-async def person_delete(email: EmailStr) -> bool:
+async def person_email_delete(email: EmailStr) -> bool:
     """Delete person from thedig cache
     """
     if not ar.cache:
@@ -380,7 +382,7 @@ async def person_delete() -> bool:
     return True
 
 @router.delete("/company", tags=("company", "GDPR"))
-async def person_delete() -> bool:
+async def company_delete() -> bool:
     """Delete company from thedig cache
     """
     cache_company = await setup_cache(settings, db=settings.cache_redis_db_company)

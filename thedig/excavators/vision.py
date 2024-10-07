@@ -20,7 +20,6 @@ from loguru import logger as log
 from rapidfuzz import fuzz
 from pydantic import FilePath, HttpUrl
 
-from ..api.config import settings
 from ..api.person import Person, dict_to_person
 from .linkedin import parse_linkedin_title
 from .utils import TOKEN_RATIO, match_name, ua_headers
@@ -323,7 +322,14 @@ class SocialNetworkMiner:
         },
     }
 
-    def __init__(self, person: dict, nitter_instance_server: HttpUrl, google_credentials: FilePath=None, socialnetworks: Optional[list] = None):
+    def __init__(
+        self,
+        person: dict,
+        nitter_instance_server: HttpUrl,
+        google_credentials: FilePath=None,
+        socialnetworks: list | None = None,
+        proxy: dict | None = None
+        ):
         # specific for this miner, name is mandatory
         # TBD: find a better way to require for name
         if google_credentials:
@@ -335,6 +341,8 @@ class SocialNetworkMiner:
         if "name" not in person:
             name_mandatory = "Name is mandatory"
             raise ValueError(name_mandatory)
+
+        self.proxy = proxy
 
         # person init
         self._original_person = person
@@ -490,7 +498,13 @@ class SocialNetworkMiner:
         with ThreadPoolExecutor(max_workers=MAX_PARRALEL_REQUESTS) as executor:
             for sn, url in social.items():
                 getters[
-                    executor.submit(get_socialprofile, url, sn, self._person["name"])
+                    executor.submit(
+                        get_socialprofile,
+                        url,
+                        sn,
+                        self._person["name"],
+                        params={"proxies" : {"https": self.proxy, "http": self.proxy}} | REQUESTS_PARAM
+                        )
                 ] = (sn, url)
 
             for future in as_completed(getters):

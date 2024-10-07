@@ -6,19 +6,19 @@ Enrichment related to a domain
 """
 
 import re
-from bs4 import BeautifulSoup
 import urllib.parse
 
-from loguru import logger as log
+from bs4 import BeautifulSoup
 from curl_cffi import requests
-from .utils import domain_to_urls, guess_country
-from .ISO3166 import ISO3166
+from loguru import logger as log
 
+from .ISO3166 import ISO3166
+from .utils import domain_to_urls, guess_country
 
 FAVICON_RE = re.compile("^(shortcut icon|icon)$", re.I)
 
 
-def get_favicon(url: str):
+def get_favicon(url: str, proxy=None):
     """check for favicon at a specific URL
 
     Args:
@@ -31,7 +31,7 @@ def get_favicon(url: str):
     """
     favicon_url = f"{url}/favicon.ico"
     try:
-        r = requests.get(favicon_url, timeout=1)
+        r = requests.get(favicon_url, proxies={"https": proxy, "http": proxy}, timeout=1)
     except requests.RequestsError:
         log.debug("No reachable host for this url: %s" % favicon_url)
         return None
@@ -54,18 +54,19 @@ def get_ogimage(html, url) -> str | None:
     return og_image_url
 
 
-def scrap_favicon(url: str) -> str | None:
+def scrap_favicon(url: str, proxy=None) -> str | None:
     """Scrap for favicon on a website
     fallback to og:image if found
 
     Args:
         url (str): website url
+        proxy (str): https/socks5 proxy (optional)
 
     Returns:
         str: favicon url found
     """
     try:
-        r = requests.get(url)
+        r = requests.get(url, proxies={"https": proxy, "http": proxy})
     except requests.RequestsError:
         return None
 
@@ -73,11 +74,11 @@ def scrap_favicon(url: str) -> str | None:
         return None
 
     soup = BeautifulSoup(r.text, features="lxml")
-    log.debug("That page's url seems Ok: %s " % url)
+    log.debug(f"That page's url seems Ok: {url}")
 
     favicon_link = soup.find("link", attrs={"rel": FAVICON_RE})
     if favicon_link:
-        log.debug("We did find the favicon link in the HTML: %s" % favicon_link)
+        log.debug(f"We did find the favicon link in the HTML: {favicon_link}")
         favicon_href = favicon_link.get("href")
         favicon_url = urllib.parse.urljoin(url, favicon_href)
     else:
@@ -86,24 +87,25 @@ def scrap_favicon(url: str) -> str | None:
     return favicon_url
 
 
-def find_favicon(domain: str) -> str:
-    """_summary_
+def find_favicon(domain: str, proxy=None) -> str:
+    """Find a favicon from a domain
 
     Args:
-        domain (str): _description_
+        domain (str): domain
+        proxy (str): https/socks5 proxy (optional)
 
     Returns:
-        str: _description_
+        str: favicon URL
     """
     urls = domain_to_urls(domain)
     for url in urls:
-        favicon_url = get_favicon(url)
+        favicon_url = get_favicon(url, proxy=proxy)
         if favicon_url:
             return favicon_url
         elif favicon_url is None:  # not a valid website
             continue  # next URL
         elif not favicon_url:
-            favicon_url = scrap_favicon(url)
+            favicon_url = scrap_favicon(url, proxy=proxy)
             if favicon_url:
                 return favicon_url
 

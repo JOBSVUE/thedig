@@ -17,7 +17,6 @@ import rapidfuzz
 import whoisdomain as whois
 from .utils import absolutize, match_name, normalize, domain_to_urls
 import random
-from ..api.config import settings
 from loguru import logger as log
 
 QUERY_TIMEOUT = 10
@@ -86,12 +85,6 @@ DomainName = Annotated[str, StringConstraints(
     pattern=r"^([\w-]+\.)*(\w[\w-]{0,66})\.(?P<tld>[a-z]{2,18})$",
     strict=True
     )]
-
-
-PROXY = {
-    'https': settings.proxy if hasattr(settings, "proxy") else "",
-    'http': settings.proxy if hasattr(settings, "proxy") else "",
-    }
 
 
 class Organization(TypedDict, total=False):
@@ -197,7 +190,7 @@ def company_from_whois(domain: DomainName) -> Company | None:
     return cmp
 
 
-async def company_by_domain(domain: DomainName) -> Company | None:
+async def company_by_domain(domain: DomainName, proxy=None) -> Company | None:
     """Will get company using its domain whois
 
     Args:
@@ -207,7 +200,7 @@ async def company_by_domain(domain: DomainName) -> Company | None:
         Company: company object
     """
     cmp: Company = company_from_whois(domain) or {}
-    web_cmp: Company = await company_from_web(domain)
+    web_cmp: Company = await company_from_web(domain, proxy)
     if web_cmp:
         for field, value in web_cmp.items():
             if type(value) is set and len(value) > 1:
@@ -220,17 +213,17 @@ async def company_by_domain(domain: DomainName) -> Company | None:
     return cmp
 
 
-async def company_from_web(domain: DomainName) -> Company | None:
-    company = await company_from_website(domain)
+async def company_from_web(domain: DomainName, proxy=None) -> Company | None:
+    company = await company_from_website(domain, proxy)
     name = company.get('name', get_name(domain))
     if not name:
         return None
 
     cmps = []
     cmps.extend((
-        await company_from_crunchbase(name, domain),
-        await company_from_indeed(name, domain),
-        await company_from_linkedin(name, domain),
+        await company_from_crunchbase(name, domain, proxy),
+        await company_from_indeed(name, domain, proxy),
+        await company_from_linkedin(name, domain,proxy),
     ))
     if domain[-3:].lower() == ".fr":
         cmps.append(await company_from_societecom(name))
@@ -250,10 +243,11 @@ async def company_from_web(domain: DomainName) -> Company | None:
     return company
 
 
-async def find_company_societecom(name: str) -> HttpUrl | None:
+async def find_company_societecom(name: str, proxy=None) -> HttpUrl | None:
     r = hrequests.get(
         f"https://www.societe.com/cgi-bin/liste?ori=avance&nom={urllib.parse.quote(name)}&exa=on",
-        timeout=QUERY_TIMEOUT
+        timeout=QUERY_TIMEOUT,
+        proxy=proxy
         )
     if not r.ok:
         log.error(f"Couldn't get results for {r.url}: {r.status_code} : {r.reason}")
@@ -271,13 +265,13 @@ async def find_company_societecom(name: str) -> HttpUrl | None:
     return f"https://www.societe.com{links[0].attrs['href']}"
 
 
-async def company_from_societecom(name: str) -> Company | None:
+async def company_from_societecom(name: str, proxy=None) -> Company | None:
     url = await find_company_societecom(name)
 
     if not url:
         return None
 
-    r = hrequests.get(url, timeout=QUERY_TIMEOUT)
+    r = hrequests.get(url, timeout=QUERY_TIMEOUT, proxy=proxy)
     if not r.ok:
         log.error(f"{r.url} : {r.reason}")
         return None
@@ -306,13 +300,14 @@ async def company_from_societecom(name: str) -> Company | None:
     return cmp
 
 
-async def company_from_indeed(name: str, domain: DomainName = "") -> Company | None:
+async def company_from_indeed(name: str, domain: DomainName = "", proxy=None) -> Company | None:
     url = f"https://www.indeed.com/cmp/{name}"
     
     try:
         r = hrequests.get(
             url,
             timeout=QUERY_TIMEOUT,
+            proxy=proxy
         )
     except Exception as e:
         log.error(e)
@@ -380,15 +375,15 @@ async def company_from_indeed(name: str, domain: DomainName = "") -> Company | N
     return cmp
 
 
-async def company_from_linkedin(name: str, domain: DomainName = "") -> Company | None:
+async def company_from_linkedin(name: str, domain: DomainName = "", proxy=None) -> Company | None:
     cmp = (
-        await _company_from_linkedin(name, domain)
-        or await _company_from_linkedin(name, domain, use_domain=True)
+        await _company_from_linkedin(name, domain, proxy)
+        or await _company_from_linkedin(name, domain, use_domain=True, proxy=proxy)
         )
     return cmp
 
 
-async def _company_from_linkedin(name: str, domain: DomainName = "", use_domain: bool = False) -> Company | None:
+async def _company_from_linkedin(name: str, domain: DomainName = "", use_domain: bool = False, proxy=None) -> Company | None:
     normalized_name = normalize(
         domain if use_domain else name,
         replace={' ': '', '.': '-'}
@@ -399,7 +394,7 @@ async def _company_from_linkedin(name: str, domain: DomainName = "", use_domain:
             url,
             timeout=QUERY_TIMEOUT,
             #verify=False,
-            proxies=PROXY
+            proxy=proxy
         )
     except Exception as e:
         log.error(f"{e}")
@@ -478,13 +473,13 @@ async def _company_from_linkedin(name: str, domain: DomainName = "", use_domain:
     return cmp
 
 
-async def company_from_crunchbase(name: str, domain: DomainName = "") -> Company | None:
+async def company_from_crunchbase(name: str, domain: DomainName = "", proxy=None) -> Company | None:
     url = f"https://www.crunchbase.com/organization/{normalize(name)}"
     try:
         r = hrequests.get(
             url,
             timeout=QUERY_TIMEOUT,
-            proxies=PROXY,
+            proxy=proxy,
             browser=random.choice(("firefox", "chrome")),
             os=random.choice(("win", "lin", "mac"))
         )
@@ -570,12 +565,12 @@ async def company_from_crunchbase(name: str, domain: DomainName = "") -> Company
     return cmp
 
 
-async def company_from_website(domain: DomainName):
+async def company_from_website(domain: DomainName, proxy=None):
     cmp = {}
     urls = domain_to_urls(domain)
     for url in urls:
         try:
-            r = requests.get(url, timeout=1)
+            r = requests.get(url, proxy=proxy, timeout=QUERY_TIMEOUT)
             if r.ok:
                 break
         except requests.RequestsError:

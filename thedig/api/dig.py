@@ -1,31 +1,20 @@
 """Transmuter API"""
 
 # json
+import asyncio
 import json
-
+from hashlib import sha256
 # types
 from typing import Annotated
+from uuid import UUID, uuid4
 
-import asyncio
 import requests
-from hashlib import sha256
-from uuid import uuid4, UUID
-
 # fast api
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    Depends,
-    HTTPException,
-    Path,
-    WebSocket,
-    WebSocketDisconnect,
-    WebSocketException,
-    status,
-)
+from fastapi import (APIRouter, BackgroundTasks, Depends, HTTPException, Path,
+                     WebSocket, WebSocketDisconnect, WebSocketException,
+                     status)
 from fastapi.encoders import jsonable_encoder
 from fastapi_limiter.depends import WebSocketRateLimiter
-
 # logger
 from loguru import logger as log
 from pydantic import EmailStr, Field, HttpUrl
@@ -35,19 +24,17 @@ from ..excavators.bio import find_jobtitle
 from ..excavators.company import Company, DomainName, company_by_domain
 from ..excavators.domainlogo import find_favicon, guess_country
 from ..excavators.gravatar import gravatar
-
 # service
-from ..excavators.linkedin import Bing, Brave, GoogleCustom, GoogleVertexAI, SearchChain
+from ..excavators.linkedin import (Bing, Brave, GoogleCustom, GoogleVertexAI,
+                                   SearchChain)
 from ..excavators.splitfullname import split_fullname
-from ..excavators.vision import SocialNetworkMiner
 from ..excavators.utils import match_name
-
+from ..excavators.vision import SocialNetworkMiner
 # config
-from .config import settings, Settings, setup_cache
+from .config import Settings, settings, setup_cache
 from .person import (Person, PersonRequest, PersonResponse, ValidationError,
                      person_request_ta, person_response_ta,
                      verify_mandatory_fields)
-
 # websocket manager
 from .websocketmanager import manager as ws_manager
 

@@ -1,4 +1,5 @@
 import pytest
+
 from thedig.excavators.bio import find_gender, find_jobtitle, normalize
 
 

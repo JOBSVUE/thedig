@@ -3,18 +3,17 @@
 # fast api
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Security, Depends
+from fastapi import Depends, FastAPI, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_limiter import FastAPILimiter
 from fastapi_limiter.depends import RateLimiter
 
 from thedig.__about__ import (__author__, __copyright__, __email__,
                               __license__, __summary__, __title__, __version__)
-
+from thedig.api import ar, router
+from thedig.api.config import settings, setup_cache
 # import other apis
 from thedig.api.logsetup import setup_logger_from_settings
-from thedig.api import router, ar
-from thedig.api.config import settings, setup_cache
 from thedig.security import get_api_key
 
 

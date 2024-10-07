@@ -2,10 +2,12 @@
 Various utilities
 """
 
+import urllib
+
+from fake_useragent import UserAgent
 from pydantic import HttpUrl
 from rapidfuzz import fuzz
-from fake_useragent import UserAgent
-import urllib
+
 from .ISO3166 import ISO3166
 
 TOKEN_RATIO = 82

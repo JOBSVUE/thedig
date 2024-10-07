@@ -3,8 +3,8 @@
 Split fullname into givenName and familyName
 """
 
-import re
 import logging
+import re
 
 from thedig.excavators.utils import normalize
 
@@ -271,8 +271,8 @@ def split_fullname(fullname: str, domain: str = None) -> dict:
 
 
 if __name__ == "__main__":
-    import csv
     import argparse
+    import csv
 
     parser = argparse.ArgumentParser(
         prog="Fullname Splitter",

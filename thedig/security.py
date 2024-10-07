@@ -4,13 +4,13 @@ Security
 import secrets
 
 # fast api
-from fastapi import Security, status, WebSocket, Request
+from fastapi import Request, Security, WebSocket, status
 from fastapi.exceptions import HTTPException
 from fastapi.security.api_key import APIKeyHeader, APIKeyQuery
-from thedig.api.config import settings
-
 # logging modules
 from loguru import logger as log
+
+from thedig.api.config import settings
 
 
 class UniversalAPIKey(APIKeyHeader):

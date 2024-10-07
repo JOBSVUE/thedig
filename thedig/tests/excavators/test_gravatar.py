@@ -1,7 +1,9 @@
-import pytest
-from thedig.excavators.gravatar import email_hash, gravatar
-from curl_cffi.requests import AsyncSession, RequestsError
 import asyncio
+
+import pytest
+from curl_cffi.requests import AsyncSession, RequestsError
+
+from thedig.excavators.gravatar import email_hash, gravatar
 
 
 @pytest.mark.parametrize("email, expected_hash", [

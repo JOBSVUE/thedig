@@ -1,5 +1,6 @@
 import pytest
-from thedig.excavators.splitfullname import split_fullname, is_company
+
+from thedig.excavators.splitfullname import is_company, split_fullname
 
 
 @pytest.mark.parametrize("fullname, domain, expected", [

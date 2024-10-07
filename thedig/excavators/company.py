@@ -3,21 +3,23 @@
 Grab informations about a company from its domain
 """
 import json
+import random
 import re
 import string
-from typing import Annotated, Required
-from typing_extensions import TypedDict
 import urllib.parse
-from bs4 import BeautifulSoup
-from pydantic import EmailStr, HttpUrl, StringConstraints, TypeAdapter
+from typing import Annotated, Required
+
 import hrequests
-from curl_cffi import requests
 import pydantic
 import rapidfuzz
 import whoisdomain as whois
-from .utils import absolutize, match_name, normalize, domain_to_urls
-import random
+from bs4 import BeautifulSoup
+from curl_cffi import requests
 from loguru import logger as log
+from pydantic import EmailStr, HttpUrl, StringConstraints, TypeAdapter
+from typing_extensions import TypedDict
+
+from .utils import absolutize, domain_to_urls, match_name, normalize
 
 QUERY_TIMEOUT = 10
 

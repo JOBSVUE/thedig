@@ -11,14 +11,14 @@ import asyncio
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from json import loads
-from typing import Optional, ClassVar
+from typing import ClassVar, Optional
 
 from bs4 import BeautifulSoup
 from curl_cffi import requests
 from google.cloud import vision
 from loguru import logger as log
-from rapidfuzz import fuzz
 from pydantic import FilePath, HttpUrl
+from rapidfuzz import fuzz
 
 from ..api.person import Person, dict_to_person
 from .linkedin import parse_linkedin_title

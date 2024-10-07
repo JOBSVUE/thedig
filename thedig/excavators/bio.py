@@ -2,9 +2,10 @@
 Mine bio from social network profiles
 """
 
+import importlib.resources as pkg_resources
 import re
 from json import load
-import importlib.resources as pkg_resources
+
 from . import data
 
 RE_WORDS = re.compile(r"\w{2,}|of|to")

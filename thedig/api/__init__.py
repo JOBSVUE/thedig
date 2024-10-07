@@ -1,2 +1,2 @@
 # import API
-from .dig import router, ar
+from .dig import ar, router

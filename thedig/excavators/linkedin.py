@@ -4,27 +4,24 @@ Mine public data from LinkedIn with an email address using Google Search API
 Return format is JSON-LD simplified
 """
 
-from abc import ABC, abstractmethod
-from typing import Literal, Optional, ClassVar
+import json
 import re
 import time
+from abc import ABC, abstractmethod
+from html import unescape
+from typing import ClassVar, Literal, Optional
+
 import jwt
+# from curl_cffi import requests
+import requests
+# log
+from loguru import logger as log
+from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 # needed for memory sharing between threads
 from ..api.person import Person, dict_to_person
-from pydantic import HttpUrl, BaseModel, model_validator, Field
-
-# from curl_cffi import requests
-import requests
-import json
-
-# log
-from loguru import logger as log
-
 from .ISO3166 import ISO3166
 from .utils import match_name
-
-from html import unescape
 
 HttpMethod = Literal["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD",
                      "TRACE", "PATCH"]

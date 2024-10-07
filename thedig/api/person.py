@@ -2,11 +2,11 @@
 Person Types
 """
 
-from pydantic import TypeAdapter, ValidationError
-from pydantic import EmailStr, HttpUrl, constr
-from typing_extensions import TypedDict
-from fastapi.exceptions import HTTPException
 import re
+
+from fastapi.exceptions import HTTPException
+from pydantic import EmailStr, HttpUrl, TypeAdapter, ValidationError, constr
+from typing_extensions import TypedDict
 
 RE_COUNTRY = r"^[A-Z]{2}$"
 RE_LANGUAGE = r"^[a-z]{2}$"

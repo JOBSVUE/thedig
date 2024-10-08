@@ -126,7 +126,7 @@ def parse_linkedin_description(description, country="en") -> dict:
             person["familyName"] = names.pop()
             person["givenName"] = names.pop()
             person["alternateName"] = f"{given_name} {family_name}"
-        elif len(name) == 1:
+        elif len(names) == 1:
             person["familyName"] = names.pop()
 
     # fallback to english
@@ -134,12 +134,14 @@ def parse_linkedin_description(description, country="en") -> dict:
         country = "en"
 
     for trailing in LINKEDIN_TRAILING_DESCRIPTION:
-        description = description.removesuffix(trailing)
-        break
+        if description.endswith(trailing):
+            description = description.removesuffix(trailing)
+            break
 
     if description.endswith(LINKEDIN_DESCRIPTION[country]["end"]):
         # clean description suffix
         description = description.removesuffix(LINKEDIN_DESCRIPTION[country]["end"])
+
         person["description"] = description
         # add alternateName found in description
         if "alternateName" not in person:
@@ -151,6 +153,9 @@ def parse_linkedin_description(description, country="en") -> dict:
                 description.find(LINKEDIN_DESCRIPTION[country]["begin"])
                 + len(LINKEDIN_DESCRIPTION[country]["begin"]) :
             ]
+        person["description"] = description.replace(LINKEDIN_DESCRIPTION[country]["begin"], "")
+        person["description"] = person["description"].removesuffix(person["alternateName"])
+
         # add other infos
         matched_infos = re.match(RE_LINKEDIN_INFOS_DESCRIPTION, description)
         if matched_infos:
@@ -165,21 +170,21 @@ class LinkedInProfile(BaseModel):
     name: str
 
     # not every search engine got them correctly
-    description: Optional[str] = None
-    image: Optional[HttpUrl] = None
-    givenName: Optional[str] = None
-    familyName: Optional[str] = None
-    workLocation: Optional[str] = None
-    alternateName: Optional[str] = None
+    description: str | None = None
+    image: HttpUrl | None = None
+    givenName: str | None = None
+    familyName: str | None = None
+    workLocation: str | None = None
+    alternateName: str | None = None
 
     # usually computed from the URL
-    jobTitle: Optional[str] = None
-    worksFor: Optional[str] = None
-    country: Optional[str] = None
-    identifier: Optional[str] = None
+    jobTitle: str | None = None
+    worksFor: str | None = None
+    country: str | None = None
+    identifier: str | None = None
 
     # private attribute for regexp purposes
-    match: Optional[dict] = Field(default=None, exclude=True)
+    match: dict | None = Field(default=None, exclude=True)
 
     @model_validator(mode="after")
     def parse(self):
@@ -191,7 +196,8 @@ class LinkedInProfile(BaseModel):
     def match_url(self):
         self.match = RE_LINKEDIN_URL.match(str(self.url))
         if not self.match:
-            raise ValueError("Not a valid LinkedIn profile URL")
+            invalid_linkedin_url = "Invalid LinkedIn profile URL"
+            raise ValueError(invalid_linkedin_url)
 
     def parse_url(self):
         if not self.country and self.match["countrycode"]:
@@ -204,11 +210,19 @@ class LinkedInProfile(BaseModel):
             ):
                 self.workLocation = self.country
 
+        # we don't need generated linkedin identifier
+        # generated linkedin identifier looks like firstname-lastname-a1b2c3d4
+        # 3 words separated by a "-", last word has at least 2 digits and 8 char
+        splitted_id = self.match["identifier"].split("-")
+        if len(splitted_id) >= 3 and len(splitted_id[-1]) >= 8 and sum(c.isdigit() for c in splitted_id[-1]) >= 2:
+            return
         self.identifier = self.match["identifier"]
 
     def parse_description(self):
         infos = parse_linkedin_description(description=self.description, country=self.match["countrycode"])
         if infos:
+            if infos["alternateName"] == self.name:
+                del infos["alternateName"]
             self.__dict__.update(infos)
 
     def parse_title(self):

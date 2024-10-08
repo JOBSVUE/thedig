@@ -123,20 +123,20 @@ class Archeologist:
         # we don't excavate again with the same excavator, the same field/value
         # so we keep an history of what field/value was used for what excavator
 
-    async def person(self, person: dict) -> tuple[bool, dict]:
+    async def person(self, person: dict) -> tuple[bool, bool, dict]:
         """Transmute one person
 
         Args:
             person (dict): person to transmute
 
         Returns:
-            bool, dict: succeed or not, enriched person
+            bool, bool, dict: succeed or not, enrich or not, enriched person
         """
         if self.cache:
             person_c = await self.cache.get(sha256(person["email"].encode("utf-8")).hexdigest())
             if person_c:
                 log.debug(f"cache hit for {person['email']}")
-                return True, json.loads(person_c)
+                return True, None, json.loads(person_c)
 
         fields = list(person.keys() & self.fields)
         exc: dict = defaultdict(list)
@@ -144,6 +144,7 @@ class Archeologist:
         log.debug(f"excavating {fields} for {person}")
 
         modified = False
+        enriched = False
         # sync because we want to control the order of excavating fields
         for field in fields:
             log.debug(f"excavating {field}: {person.get(field)}")
@@ -163,6 +164,7 @@ class Archeologist:
 
                 excavator_f = ExcavatorField(excavator, field, person)
                 upgraded.update(await excavator_f.excavate())
+                enriched |= excavator["enrich"] if upgraded else False
 
             modified = True if upgraded else modified
 
@@ -179,7 +181,7 @@ class Archeologist:
                 ex=self.cache_expiration,
             )
 
-        return modified, (person if modified else {})
+        return modified, enriched, (person if modified else {})
 
     def add_route(self, excavator_func, excavator_param: dict, is_person_param: bool, route_kwargs: dict):
         route_param = {}
@@ -219,7 +221,7 @@ class Archeologist:
             field (str): schema.org field to excavate
             update (set): fields updated or added by the excavator
             insert (set): fields inserted only by the excavator
-            transmute (bool): if excavator is part of transmute, default to True
+            enrich (bool): if excavator is part of enrich, default to True
 
         Returns:
             function: excavator
@@ -237,7 +239,7 @@ class Archeologist:
                 "field": kw.pop("field"),
                 "update": kw.pop("update", []),
                 "insert": kw.pop("insert", []),
-                "transmute": kw.pop("transmute", False),
+                "enrich": kw.pop("enrich", True),
                 "endpoint": excavator_func,
                 "parameters": parameters,
             }

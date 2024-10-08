@@ -23,6 +23,7 @@ from fastapi import (
     status,
 )
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from fastapi_limiter.depends import WebSocketRateLimiter
 
 # logger
@@ -145,7 +146,7 @@ async def social(p: dict) -> Person:
     return snm.person
 
 
-@ar.register(field="description", insert=("jobTitle",))
+@ar.register(field="description", insert=("jobTitle",), enrich=False)
 async def bio(description: str = None) -> Person:
     desc: set[str] = (
         {
@@ -167,7 +168,7 @@ async def bio(description: str = None) -> Person:
     return job_title
 
 
-@ar.register(field="name", update=("givenName", "familyName"))
+@ar.register(field="name", update=("givenName", "familyName"), enrich=False)
 async def name(name: str, email: EmailStr) -> Person:
     splitted: Person = split_fullname(name, email.split("@")[1])
     return splitted
@@ -181,34 +182,42 @@ async def country(email: EmailStr) -> Person:
 
 @router.get("/person/email/{email}", tags=("person", "archaeology"))
 async def person_email(email: EmailStr, name: str) -> Person:
-    ar_status, persond = await ar.person({"email": email, "name": name})
-    if not ar_status:
+    modified, enriched, persond = await ar.person({"email": email, "name": name})
+    if not modified:
         raise HTTPException(status_code=204)
-    return persond
+    return JSONResponse(
+        status_code=status.HTTP_200_OK if enriched else status.HTTP_203_NON_AUTHORITATIVE_INFORMATION,
+        content=jsonable_encoder(persond)
+        )
 
 
 @router.post("/person/", tags=("person", "archaeology"), dependencies=[Depends(verify_mandatory_fields)])
 async def person_post(person: Person) -> Person:
-    ar_status, persond = await ar.person({"email": person["email"], "name": person["name"]})
-    if not ar_status:
+    modified, enriched, persond = await ar.person({"email": person["email"], "name": person["name"]})
+    if not modified:
         raise HTTPException(status_code=204)
-    return persond
-
+    return JSONResponse(
+        status_code=status.HTTP_200_OK if enriched else status.HTTP_203_NON_AUTHORITATIVE_INFORMATION,
+        content=jsonable_encoder(persond)
+        )
 
 async def persons_bulk_background(
     persons: Annotated[Person, Field(max_items=MAX_BULK)], webhook_endpoint: HttpUrl, webhook_taskid: str
 ) -> bool:
     results = []
+    enriched_total = 0
     for p in persons:
-        success, enriched = await ar.person(p)
-        if success:
-            results.append(enriched)
+        modified, enriched, enriched_p = await ar.person(p)
+        if modified:
+            results.append(enriched_p)
+            enriched_total += 1 if enriched else 0
     try:
         r = requests.post(
             str(webhook_endpoint),
             json=jsonable_encoder(results),
             headers={
                 "X-Task-Id": webhook_taskid,
+                "X-Enriched-Total": enriched_total,
             },
         )
         r.raise_for_status()

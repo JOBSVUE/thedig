@@ -37,7 +37,7 @@ from ..excavators.domainlogo import find_favicon, guess_country
 from ..excavators.gravatar import gravatar
 
 # service
-from ..excavators.linkedin import Bing, Brave, GoogleCustom, GoogleVertexAI, SearchChain
+from ..excavators.linkedin import SearchChain
 from ..excavators.splitfullname import split_fullname
 from ..excavators.utils import match_name
 from ..excavators.vision import SocialNetworkMiner

@@ -217,7 +217,7 @@ async def persons_bulk_background(
             json=jsonable_encoder(results),
             headers={
                 "X-Task-Id": webhook_taskid,
-                "X-Enriched-Total": enriched_total,
+                "X-Enriched-Total": str(enriched_total),
             },
         )
         r.raise_for_status()

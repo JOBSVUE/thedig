@@ -117,7 +117,7 @@ def parse_linkedin_title(title: str, name: str = None) -> dict:
 
 
 def parse_linkedin_description(description, country="en") -> dict:
-    person = dict()
+    person = {}
 
     html_matches = re.match(RE_LINKEDIN_NAME_DESCRIPTION, description)
     if html_matches:
@@ -134,24 +134,30 @@ def parse_linkedin_description(description, country="en") -> dict:
         country = "en"
 
     for trailing in LINKEDIN_TRAILING_DESCRIPTION:
-        if description.endswith(trailing):
-            description = description.removesuffix(trailing)
-            break
+        description = description.removesuffix(trailing)
+        break
 
     if description.endswith(LINKEDIN_DESCRIPTION[country]["end"]):
+        # clean description suffix
+        description = description.removesuffix(LINKEDIN_DESCRIPTION[country]["end"])
+        person["description"] = description
+        # add alternateName found in description
         if "alternateName" not in person:
-            description = description.replace("<strong>", "").replace("</strong>", "")
+            description = (
+                description.replace("<strong>", "")
+                .replace("</strong>", "")
+            )
             person["alternateName"] = description[
-                description.find(LINKEDIN_DESCRIPTION[country]["begin"]) + len(LINKEDIN_DESCRIPTION[country]["begin"]) :
-            ].removesuffix(LINKEDIN_DESCRIPTION[country]["end"])
-
+                description.find(LINKEDIN_DESCRIPTION[country]["begin"])
+                + len(LINKEDIN_DESCRIPTION[country]["begin"]) :
+            ]
+        # add other infos
         matched_infos = re.match(RE_LINKEDIN_INFOS_DESCRIPTION, description)
         if matched_infos:
             infos = matched_infos.groupdict()
             person.update({key: value.strip() for key, value in infos.items() if value})
 
     return person
-
 
 class LinkedInProfile(BaseModel):
     url: HttpUrl

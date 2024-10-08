@@ -503,53 +503,6 @@ class Bing(Search):
                     self.results[-1]["workLocation"] = ", ".join(address)
 
 
-class GoogleCustom(Search):
-    ENDPOINT = "https://customsearch.googleapis.com/customsearch/v1/siterestrict"
-    QUERY_PARAMS = {
-        "fields": "items(title,link,pagemap/cse_thumbnail,pagemap/metatags/profile:first_name,pagemap/metatags/profile:last_name,pagemap/metatags/og:image,pagemap/metatags/og:description)",
-        "num": Search.RESULTS_COUNT,
-        "query_type": "q",
-    }
-
-    def __init__(
-        self,
-        token: str,
-        cx: str,
-    ):
-        self.token = token
-        self.cx = cx
-        super().__init__(endpoint=self.ENDPOINT, method="GET", query_params=self.QUERY_PARAMS)
-
-    def authenticate(self):
-        self.headers.update(
-            {
-                "key": self.token,
-                "cx": self.cx,
-            }
-        )
-
-    def search_query(self, query: str):
-        return {"q": query}
-
-    def extract(self):
-        self.results = []
-
-        if not self.raw_results.get("items"):
-            return
-
-        self.results = [
-            {
-                "givenName": r["pagemap"]["metatags"][0]["profile:first_name"],
-                "familyName": r["pagemap"]["metatags"][0]["profile:last_name"],
-                "description": r["pagemap"]["metatags"][0]["og:description"],
-                "url": r["link"],
-                "image": r["pagemap"]["metatags"][0]["og:image"],
-            }
-            for r in self.raw_results["items"]
-            if r.get("pagemap", {}).get("metatags", {})
-        ]
-
-
 class Singleton(type):
     _instances: ClassVar = {}
 
@@ -562,8 +515,6 @@ class Singleton(type):
 class SearchChain(metaclass=Singleton):
     def __init__(self, settings):
         self.engines = []
-        if settings.google_api_key and settings.google_cx:
-            self.engines.append(GoogleCustom(token=settings.google_api_key, cx=settings.google_cx))
         if settings.google_credentials and settings.google_vertexai_datastore and settings.google_vertexai_projectid:
             self.engines.append(
                 GoogleVertexAI(

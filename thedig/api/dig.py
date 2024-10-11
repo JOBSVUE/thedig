@@ -362,11 +362,11 @@ async def person_email_delete(email: EmailStr) -> bool:
     """Delete person from thedig cache"""
     if not ar.cache:
         raise HTTPException(status_code=503, detail="Cache is not available")
-    if await ar.cache.get(email):
-        await ar.cache.delete(email)
-        return True
-    return False
-
+    email_hash = sha256(email.encode("utf-8")).hexdigest()
+    if not await ar.cache.get(email_hash):
+        raise HTTPException(status_code=404, detail="Email not found")
+    await ar.cache.delete(email_hash)
+    return True
 
 @router.delete("/person", tags=("person", "GDPR"))
 async def person_delete() -> bool:

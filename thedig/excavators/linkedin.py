@@ -7,6 +7,7 @@ Return format is JSON-LD simplified
 import json
 import re
 import time
+import unicodedata
 from abc import ABC, abstractmethod
 from html import unescape
 from typing import ClassVar, Literal, Optional
@@ -85,13 +86,14 @@ def parse_linkedin_title(title: str, name: str = None) -> dict:
     result = {}
 
     if not title.endswith("LinkedIn") and not title.endswith("..."):
-        log.debug("This is not a LinkedIn profile title")
+        log.debug("This is not a LinkedIn profile title: wrong ending")
         return result
 
     title_ = title.split(" | ")
-    full_title = title_[0].split(" - ")
+    #actually, LinkedIn separator is not - but –
+    full_title = title_[0].replace(" – ", " – ").split(" - ")
     if len(full_title) < 2:
-        log.debug("This is not a LinkedIn profile title")
+        log.debug("This is not a LinkedIn profile title: wrong separator or too short")
         return result
 
     if name and full_title[0].casefold() != name.casefold():
@@ -293,10 +295,11 @@ class Search(ABC):
         # returns the first or the most complete
         self.profiles = []
         for r in self.results:
+            normalized_r = {k: unicodedata.normalize("NFKD", v) for k, v in r.items()}
             try:
-                self.profiles.append(LinkedInProfile(**r, **{"name": name}))
+                self.profiles.append(LinkedInProfile(**normalized_r, **{"name": name}))
             except ValueError as e:
-                log.debug(f"Not a valid {name} {r} LinkedInprofile: {e}")
+                log.debug(f"Not a valid {name} {normalized_r} LinkedInprofile: {e}")
 
         return self.profiles
 

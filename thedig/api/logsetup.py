@@ -47,10 +47,11 @@ class LoggingSettings(BaseSettings):
         "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
         "<level>{message}</level>"
     )
-    filepath: Optional[Path] = None
+    filepath: Path | None = None
     rotation: str = "1 days"
     retention: str = "1 months"
     serialize: bool = False
+    backtrace: bool = True
     model_config = SettingsConfigDict(env_prefix="log_", env_file=".env", extra="ignore")
 
 

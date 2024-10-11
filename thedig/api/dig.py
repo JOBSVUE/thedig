@@ -136,12 +136,9 @@ async def social(p: dict) -> Person:
     # fuzzy identifier miner
     # it's not an independent miner since identifier can't be mined
     # until confirmed social profiles are found
-    log.debug(snm.person.get("identifier", "no identifier"))
     await snm.identifier()
-    log.debug(snm.person.get("identifier", "no identifier"))
 
     snm.sameAs()
-    log.debug(snm.person.get("identifier", "no identifier"))
 
     if "OptOut" in snm.person:
         return {"OptOut": True}

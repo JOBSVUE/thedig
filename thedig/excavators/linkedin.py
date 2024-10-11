@@ -215,6 +215,7 @@ class LinkedInProfile(BaseModel):
         self.parse_title()
         self.parse_description()
         self.parse_url()
+        self.clean_image()
 
     def match_url(self):
         self.match = RE_LINKEDIN_URL.match(str(self.url))
@@ -261,6 +262,13 @@ class LinkedInProfile(BaseModel):
             self.worksFor = r["worksFor"]
         if "jobTitle" in r:
             self.jobTitle = r["jobTitle"]
+
+    def clean_image(self):
+        if not self.image:
+            return
+
+        if str(self.image).startswith("https://static.licdn.com/aero-v1/sc/h/"):
+            self.image = None
 
 
 class Search(ABC):

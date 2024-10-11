@@ -60,7 +60,7 @@ SOCIALNETWORKS = {
     "github": "https://github.com/{identifier}",
     "instagram": "https://instagram.com/{identifier}",
     # linkedin don't let you scrap at all :(
-    "linkedin": None,
+    # "linkedin": None,
     "pinterest": "https://pinterest.com/{identifier}",
     "snapchat": "https://snapchat.com/add/{identifier}",
     # no telegram, false positive

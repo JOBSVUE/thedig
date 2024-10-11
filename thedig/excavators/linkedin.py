@@ -44,10 +44,31 @@ LINKEDIN_DESCRIPTION = {
     "en": {
         "begin": "View ",
         "end": "’s profile on LinkedIn, a professional community of 1 billion members",
+        "re": RE_LINKEDIN_INFOS_DESCRIPTION
     },
     "fr": {
         "begin": "Consultez le profil de ",
         "end": " sur LinkedIn, une communauté professionnelle d’un milliard de membres",
+         "re": re.compile(
+               r"^(?P<description>.*?)(?: · Expérience : (?P<worksFor>.+?)(?: · Formation : (.+?))? · Lieu : (?P<workLocation>.*?) · (?: · \d+\+ relations sur LinkedIn)?)",
+               re.U,
+               )
+    },
+    "de": {
+        "begin": "Sehen Sie sich das Profil von ",
+        "end": " auf LinkedIn, einer professionellen Community mit mehr als 1 Milliarde Mitgliedern, an",
+        "re": re.compile(
+               r"^(?P<description>.*?)(?: · Berufserfahrung: (?P<worksFor>.+?)(?: · Ausbildung: (.+?))? · Standort: (?P<workLocation>.*?) · (?: · \d+\+ Kontakte auf LinkedIn)?)",
+               re.U,
+               )
+    },
+    "ch": {
+        "begin": "Sehen Sie sich das Profil von ",
+        "end": " auf LinkedIn, einer professionellen Community mit mehr als 1 Milliarde Mitgliedern, an",
+        "re": re.compile(
+               r"^(?P<description>.*?)(?: · Berufserfahrung: (?P<worksFor>.+?)(?: · Ausbildung: (.+?))? · Standort: (?P<workLocation>.*?) · (?: · \d+\+ Kontakte auf LinkedIn)?)",
+               re.U,
+               )
     },
 }
 
@@ -91,7 +112,7 @@ def parse_linkedin_title(title: str, name: str = None) -> dict:
 
     title_ = title.split(" | ")
     #actually, LinkedIn separator is not - but –
-    full_title = title_[0].replace(" – ", " – ").split(" - ")
+    full_title = title_[0].replace(" – ", " - ").split(" - ")
     if len(full_title) < 2:
         log.debug("This is not a LinkedIn profile title: wrong separator or too short")
         return result
@@ -159,7 +180,7 @@ def parse_linkedin_description(description, country="en") -> dict:
         person["description"] = person["description"].removesuffix(person["alternateName"])
 
         # add other infos
-        matched_infos = re.match(RE_LINKEDIN_INFOS_DESCRIPTION, description)
+        matched_infos = re.match(LINKEDIN_DESCRIPTION[country]["re"], description)
         if matched_infos:
             infos = matched_infos.groupdict()
             person.update({key: value.strip() for key, value in infos.items() if value})

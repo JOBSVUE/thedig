@@ -207,10 +207,16 @@ async def persons_bulk_background(
     results = []
     enriched_total = 0
     for p in persons:
-        modified, enriched, enriched_p = await ar.person(p)
-        if modified:
-            results.append(enriched_p)
-            enriched_total += 1 if enriched else 0
+        try:
+            modified, enriched, enriched_p = await ar.person(p)
+            if modified:
+                results.append(enriched_p)
+                enriched_total += 1 if enriched else 0
+        # at least, answer to the endpoint with the data he got
+        # avoid the client to wait forever
+        except Exception as e:
+            log.error(e)
+            continue
     try:
         r = requests.post(
             str(webhook_endpoint),

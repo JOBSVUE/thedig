@@ -37,7 +37,7 @@ from ..excavators.domainlogo import find_favicon, guess_country
 from ..excavators.gravatar import gravatar
 
 # service
-from ..excavators.linkedin import SearchChain
+from ..excavators.linkedin import SearchChain, linkedin_profile_picture
 from ..excavators.splitfullname import split_fullname
 from ..excavators.utils import match_name
 from ..excavators.vision import SocialNetworkMiner
@@ -87,9 +87,16 @@ async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> P
     engine.to_persons(worksFor=worksFor)
     return engine.persons[0] if engine.persons else None
 
+if hasattr(settings, "proxycurl_api_key"):
+    @ar.register(field="url", insert=("image",))
+    async def linkedin_to_image(url: HttpUrl) -> Person:
+        image = linkedin_profile_picture(url, api_key=settings.proxycurl_api_key)
+        if not image:
+            return
+        return {"image": str(image)}
 
 @ar.register(field="email", update=("image",))
-async def exc_gravatar(email) -> Person:
+async def email_to_image(email) -> Person:
     avatar = await gravatar(email)
     return (
         {
@@ -172,7 +179,6 @@ async def bio(description: str = None) -> Person:
 async def name(name: str, email: EmailStr) -> Person:
     splitted: Person = split_fullname(name, email.split("@")[1])
     return splitted
-
 
 @ar.register(field="email", insert=("workLocation",))
 async def country(email: EmailStr) -> Person:

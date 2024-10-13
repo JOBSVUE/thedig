@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     google_vertexai_projectid: str | None = None
     google_vertexai_datastore: str | None = None
     brave_api_key: str | None = None
+    proxycurl_api_key: str | None = None
     github_token: str | None = None
     log_level: str | None = "INFO"
     log_filepath: str | None = "thedig.log"

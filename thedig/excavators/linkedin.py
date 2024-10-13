@@ -74,6 +74,33 @@ LINKEDIN_DESCRIPTION = {
 
 LINKEDIN_TRAILING_DESCRIPTION = (" ...", ".")
 
+REQUESTS_TIMEOUT = 3
+PROXYCURL_PICTURE_ENDPOINT = "https://nubela.co/proxycurl/api/linkedin/person/profile-picture"
+
+def linkedin_profile_picture(url: HttpUrl, api_key: str, proxy=None) -> HttpUrl:
+    match = RE_LINKEDIN_URL.match(str(url))
+    if not match:
+        log.debug(f"Not a valid LinkedIn profile URL: {url}")
+        return
+    linkedin_url = f"https://www.linkedin.com/in/{match.group("identifier")}"
+    try:
+        r = requests.get(
+            PROXYCURL_PICTURE_ENDPOINT,
+            params={"linkedin_person_profile_url": linkedin_url},
+            timeout=REQUESTS_TIMEOUT,
+            headers={"Authorization": f"Bearer {api_key}"},
+            proxies={"https": proxy}
+        )
+        log.debug(r.text)
+    except requests.RequestsException as e:
+        log.debug(e)
+        return
+
+    if not r.ok:
+        return
+
+    return r.json().get("tmp_profile_pic_url")
+
 
 def country_from_url(linkedin_url: str) -> str:
     """Country name based on the xx.linkedin.com profile url

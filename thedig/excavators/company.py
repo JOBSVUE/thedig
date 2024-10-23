@@ -295,7 +295,7 @@ async def company_from_societecom(name: str, proxy=None) -> Company | None:
                 cmp["numberOfEmployees"] = num_employees[0]
             else:
                 log.debug(f"Number of employees is void: {number_of_employees.text}")
-        except UnicodeDecodeError:
+        except (UnicodeDecodeError, SystemError): #Why SystemError?!
             log.error(f"Couldn't get number of employees because of encoding error from {url}")
 
     address = r.html.find("div.CompanyIdentity__adress__around").text.splitlines()

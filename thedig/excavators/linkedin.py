@@ -12,12 +12,12 @@ from abc import ABC, abstractmethod
 from html import unescape
 from typing import ClassVar, Literal, Optional
 
+import deepface
+import face_recognition
 import jwt
 
 # from curl_cffi import requests
 import requests
-
-# log
 from loguru import logger as log
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 
@@ -214,6 +214,18 @@ def parse_linkedin_description(description, country="en") -> dict:
 
     return person
 
+def _remote_image_array(url):
+    image_f = requests.get(
+        url,
+        stream=True,
+        timeout=REQUESTS_TIMEOUT
+    )
+    if not image_f.ok:
+        failed_request = f"Failed to get image from {image}: {image_f.status_code}"
+        raise ValueError(failed_request)
+    image_f.raw.decode_contente = True
+    return face_recognition.load_image_file(image_f.raw)
+
 class LinkedInProfile(BaseModel):
     url: HttpUrl
     title: str
@@ -303,13 +315,20 @@ class Search(ABC):
     RESULTS_COUNT = 10
 
     def __init__(
-        self, endpoint: HttpUrl, method: HttpMethod, headers: dict = {}, query_params: dict = {}, body: dict = None
+        self,
+        endpoint: HttpUrl,
+        method: HttpMethod,
+        headers: dict = {},
+        query_params: dict = {},
+        body: dict | None = None,
+        proxy: str | None = None,
     ):
         self.endpoint = endpoint
         self.headers = headers
         self.query_params = query_params
         self.body = body
         self.method = method
+        self.proxy = proxy
         self.session = requests.Session()
         self.authenticate()
 
@@ -384,6 +403,42 @@ class Search(ABC):
                 self.persons.insert(person)
             else:
                 self.persons.append(person)
+        return self.persons
+
+    def face_match(self, image: HttpUrl, deepface_fallback=True):  # noqa: FBT002
+        matches = []
+
+        original_face_img = _remote_image_array(str(image))
+        original_face = face_recognition.face_encodings(
+            original_face_img
+        )[0]
+
+        for person in self.persons:
+            if not hasattr(person, "image"):
+                continue
+            profile_face = face_recognition.face_encodings(_remote_image_array(str(person["image"])))
+            if True in face_recognition.compare_faces(
+                [original_face],
+                profile_face
+            )[0]:
+                matches.append(person)
+
+        if matches or not deepface_fallback:
+            return matches
+
+        # ok let's try deepface now
+        for person in self.persons:
+            if not hasattr(person, "image"):
+                continue
+            if deepface.verify(
+                img1_path=original_face_img,
+                img2_path=_remote_image_array(str(person["image"]))
+                )["verified"]:
+                matches.append(person)
+                break # deepface is costly, so only one match is enough
+
+        return matches
+
 
 
 class GoogleVertexAI(Search):

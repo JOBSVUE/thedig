@@ -77,14 +77,32 @@ async def worksfor(email: EmailStr) -> Person:
     return works_for
 
 
+@ar.register(field="email", update=("image",))
+
 @ar.register(field="name")
-async def linkedin(name: str, email: EmailStr = None, worksFor: str = None) -> Person:
+async def linkedin(
+    person: Person,
+    ) -> Person:
+    # name: str,
+    # email: EmailStr = None,
+    # worksFor: str = None,
+    # image: list[HttpUrl] | None = None
+    name = person["name"]
+    worksFor = person.get("worksFor", None)
+    image = person.get("image", None)
+
+    log.error(image)
     engine = SearchChain(settings).search(query=name, name=name)
     if not engine:
         return
     if type(worksFor) is set:
         worksFor = worksFor.copy().pop()
     engine.to_persons(worksFor=worksFor)
+    if image and engine.persons:
+        for img in image:
+            face_matches = engine.face_match(img)
+            if face_matches:
+                return face_matches[0]
     return engine.persons[0] if engine.persons else None
 
 if hasattr(settings, "proxycurl_api_key"):

@@ -5,6 +5,7 @@ fake-useragent>=1.1.3
 fastapi>=0.100.0
 fastapi-limiter>=0.1.5
 google-cloud-vision>=3.4.4
+httpx[socks]>=0.27.0
 PyJWT>=2.9.0
 lxml>=5.2.2
 loguru>=0.7.0
@@ -17,10 +18,12 @@ rapidfuzz>=3.2.0
 redis>=4.5.5
 requests-ratelimiter>=0.7.0
 requests[socks]>=2.29.0
+socksio>=1.0.0
 typing_extensions>=4.7.1
 uvicorn>=0.22
 whoisdomain>=1.20230720.2
 # hrequests[all]>=0.8
 # TODO: replace when hrequests release a stable version compatible with python 3.12
 git+https://github.com/daijro/hrequests.git@main
-httpx[socks]
+# this fork installs binary instead of recompiling from source
+git+https://github.com/AdamaB98/face_recognition.git

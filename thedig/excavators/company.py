@@ -278,7 +278,7 @@ async def company_from_societecom(name: str, proxy=None) -> Company | None:
 
     cmp: Company = Company(
         name=name,
-        foundingDate=r.html.find("span.TableTextGenerique").text,
+        foundingDate=r.html.find("span.TableTextGenerique").text.strip(),
         sameAs={
             url,
         },
@@ -296,7 +296,7 @@ async def company_from_societecom(name: str, proxy=None) -> Company | None:
             else:
                 log.debug(f"Number of employees is void: {number_of_employees.text}")
         except UnicodeDecodeError:
-            log.error(f"Couldn't get number of employees because of encoding error: {url}")
+            log.error(f"Couldn't get number of employees because of encoding error from {url}")
 
     address = r.html.find("div.CompanyIdentity__adress__around").text.splitlines()
     cmp["address"] = {

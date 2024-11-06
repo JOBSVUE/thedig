@@ -77,21 +77,14 @@ async def worksfor(email: EmailStr) -> Person:
     return works_for
 
 
-@ar.register(field="email", update=("image",))
-
 @ar.register(field="name")
 async def linkedin(
-    person: Person,
+    name: str,
+    email: EmailStr = None,
+    worksFor: str = None,
+    image: list[HttpUrl] | None = None
     ) -> Person:
-    # name: str,
-    # email: EmailStr = None,
-    # worksFor: str = None,
-    # image: list[HttpUrl] | None = None
-    name = person["name"]
-    worksFor = person.get("worksFor", None)
-    image = person.get("image", None)
 
-    log.error(image)
     engine = SearchChain(settings).search(query=name, name=name)
     if not engine:
         return
